@@ -1,4 +1,4 @@
-# Version: core_1_9
+# Version: 2.02
 import os
 import glob
 import re
@@ -77,13 +77,13 @@ def normalize_bank_name_for_module(bank: str) -> str:
 def load_parser_module(bank: str):
     bank_module_name = normalize_bank_name_for_module(bank)
 
-    pattern = os.path.join(PARSERS_DIR, f"{bank_module_name}-*.py")
-    matches = sorted(glob.glob(pattern))
+    parser_path = os.path.join(PARSERS_DIR, f"{bank_module_name}.py")
 
-    if matches:
-        parser_path = matches[-1]
-    else:
-        parser_path = os.path.join(PARSERS_DIR, f"{bank_module_name}.py")
+    if not os.path.exists(parser_path):
+        pattern = os.path.join(PARSERS_DIR, f"{bank_module_name}-*.py")
+        matches = sorted(glob.glob(pattern))
+        if matches:
+            parser_path = matches[-1]
 
     if not os.path.exists(parser_path):
         raise FileNotFoundError(

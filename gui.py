@@ -1,4 +1,4 @@
-# Version: gui_1_20
+# Version: 2.02
 import os
 import traceback
 import zipfile
@@ -17,44 +17,19 @@ except Exception as e:
         f"Original error: {e}"
     )
 
-import importlib
-import glob
-import re
+from core import *  # noqa: F403
 
 
-def _import_latest_core_star() -> str:
-    """Import the latest core_*.py module in this folder and expose its public names.
-
-    This keeps the GUI version-agnostic while core_* filenames bump regularly.
-    """
-    here = os.path.dirname(os.path.abspath(__file__))
-    candidates = glob.glob(os.path.join(here, "core_*.py"))
-    if not candidates:
-        raise ModuleNotFoundError(
-            "No core_*.py found next to the GUI. Expected something like core_1_0.py or core_1_1.py."
-        )
-
-    def _ver_key(path: str):
-        base = os.path.splitext(os.path.basename(path))[0]
-        # Extract all digit groups so names like core_2_02 or core_1_1 work.
-        nums = re.findall(r"\d+", base)
-        return tuple(int(n) for n in nums) if nums else (0,)
-
-    best = max(candidates, key=_ver_key)
-    mod_name = os.path.splitext(os.path.basename(best))[0]
-
-    core_mod = importlib.import_module(mod_name)
-
-    # Emulate `from <core> import *` by copying public names into this module's globals.
-    for k, v in core_mod.__dict__.items():
-        if k.startswith("_"):
-            continue
-        globals()[k] = v
-
-    return mod_name
+def _read_app_version() -> str:
+    version_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION.txt")
+    try:
+        with open(version_path, "r", encoding="utf-8") as f:
+            return (f.read() or "").strip()
+    except Exception:
+        return ""
 
 
-_CORE_MODULE = _import_latest_core_star()
+APP_VERSION = _read_app_version()
 
 
 
@@ -459,8 +434,8 @@ class App(TkinterDnD.Tk):
                 lines = []
                 lines.append(f"Support log generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 lines.append(f"Bank: {(data.get('bank') or '').strip()}")
-                lines.append(f"GUI: {os.path.basename(__file__)}")
-                lines.append(f"Core: {_CORE_MODULE}")
+                lines.append(f"GUI: {APP_VERSION}")
+                lines.append(f"Core: {APP_VERSION}")
                 lines.append("")
 
                 if issue_reasons:
@@ -597,11 +572,7 @@ class App(TkinterDnD.Tk):
 
         source_pdfs = list(data.get("source_pdfs") or [])
 
-        main_id = ""
-        try:
-            main_id = os.path.basename(__file__)
-        except Exception:
-            main_id = ""
+        main_id = APP_VERSION
 
         autodetect_result = data.get("autodetect_first_pdf")
         parser_file = data.get("parser_file") or ""
