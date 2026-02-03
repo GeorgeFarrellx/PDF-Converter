@@ -87,11 +87,11 @@ def load_parser_module(bank: str):
 
     if not os.path.exists(parser_path):
         raise FileNotFoundError(
-            f"No parser found for bank '{bank}'. Expected either:\n"
-            f"  - {os.path.join(PARSERS_DIR, bank_module_name + '-<version>.py')}\n"
-            f"  - {os.path.join(PARSERS_DIR, bank_module_name + '.py')}\n\n"
-            f"Tried: {parser_path}"
-        )
+    f"No parser found for bank '{bank}'. Expected either:\n"
+    f"  - {os.path.join(PARSERS_DIR, bank_module_name + '.py')}\n"
+    f"  - {os.path.join(PARSERS_DIR, bank_module_name + '-<version>.py')}\n\n"
+    f"Tried: {parser_path}"
+)
 
     module_key = os.path.splitext(os.path.basename(parser_path))[0]
 
