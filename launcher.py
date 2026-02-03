@@ -1,67 +1,12 @@
+# Version: 2.02
 import os
 import sys
-import re
-import glob
 import traceback
 from datetime import datetime
 
 
 def ensure_folder(path: str) -> None:
     os.makedirs(path, exist_ok=True)
-
-
-def _parse_version_from_main_filename(path: str):
-    """
-    Extract a comparable version key from filenames like:
-      main-1.97.py
-      main-2.00.py
-      main-10.3.py
-
-    Returns a tuple of ints, e.g. (2, 0)
-    If it can't parse, returns None.
-    """
-    base = os.path.basename(path)
-    m = re.match(r"^main-(\d+(?:\.\d+)*)\.py$", base, re.IGNORECASE)
-    if not m:
-        return None
-    parts = m.group(1).split(".")
-    out = []
-    for p in parts:
-        try:
-            out.append(int(p))
-        except Exception:
-            return None
-    return tuple(out)
-
-
-def find_newest_main(script_dir: str) -> str:
-    """
-    Find newest main-*.py by numeric version (not string sort).
-    Falls back to modification time if versions are not parseable.
-    """
-    matches = glob.glob(os.path.join(script_dir, "main-*.py"))
-    if not matches:
-        # fallback
-        fallback = os.path.join(script_dir, "main.py")
-        return os.path.abspath(fallback)
-
-    parsed = []
-    unparsed = []
-    for p in matches:
-        v = _parse_version_from_main_filename(p)
-        if v is None:
-            unparsed.append(p)
-        else:
-            parsed.append((v, p))
-
-    if parsed:
-        # choose max version tuple
-        parsed.sort(key=lambda x: x[0])
-        return os.path.abspath(parsed[-1][1])
-
-    # If nothing parseable, use newest modified file
-    unparsed.sort(key=lambda p: os.path.getmtime(p))
-    return os.path.abspath(unparsed[-1])
 
 
 def write_startup_log(logs_dir: str, prefix: str, content: str) -> str:
@@ -87,11 +32,11 @@ def main():
     except Exception:
         pass
 
-    # Ensure imports can find sibling modules like core_1_0.py / gui_1_0.py
+    # Ensure imports can find sibling modules like core.py / gui.py
     if app_dir not in sys.path:
         sys.path.insert(0, app_dir)
 
-    target = find_newest_main(app_dir)
+    target = os.path.abspath(os.path.join(app_dir, "main.py"))
 
     header = []
     header.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
