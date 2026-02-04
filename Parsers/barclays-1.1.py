@@ -1,4 +1,4 @@
-# Version: barclays.py
+# Version: barclays-1.1.py
 """Barclays (Business Current Account) PDF parser.
 
 Text-based PDFs (no OCR).
@@ -23,6 +23,7 @@ Notes:
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import date
 
@@ -227,70 +228,41 @@ def _parse_period_from_page1(pdf_path: str) -> tuple[date | None, date | None]:
 
     return None, None
 
-    lines = [ln.strip() for ln in (text.splitlines() if text else []) if ln.strip()]
 
-    # Search lines first (more reliable than a single joined blob)
-    for ln in lines:
-        m = PERIOD_BOTH_YEARS_RE.search(ln)
-        if m:
-            sd = int(m.group("sd"))
-            sm = _month_num(m.group("sm"))
-            sy = int(m.group("sy"))
-            ed = int(m.group("ed"))
-            em = _month_num(m.group("em"))
-            ey = int(m.group("ey"))
-            if sm and em:
-                try:
-                    return date(sy, sm, sd), date(ey, em, ed)
-                except Exception:
-                    pass
+def _parse_period_from_filename(pdf_path: str) -> tuple[date | None, date | None]:
+    name = os.path.basename(pdf_path or "")
+    m = re.search(
+        r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*"
+        r"(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+        name,
+    )
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+        return date(y1, m1, d1), date(y2, m2, d2)
+    except Exception:
+        return None, None
 
-        m = PERIOD_SAME_END_YEAR_RE.search(ln)
-        if m:
-            sd = int(m.group("sd"))
-            sm = _month_num(m.group("sm"))
-            ed = int(m.group("ed"))
-            em = _month_num(m.group("em"))
-            ey = int(m.group("ey"))
-            if sm and em:
-                # If start month > end month, it spans year-end.
-                sy = ey - 1 if sm > em else ey
-                try:
-                    return date(sy, sm, sd), date(ey, em, ed)
-                except Exception:
-                    pass
 
-    # Fallback: search entire text
-    blob = " ".join(text.split())
-    m = PERIOD_BOTH_YEARS_RE.search(blob)
-    if m:
-        sd = int(m.group("sd"))
-        sm = _month_num(m.group("sm"))
-        sy = int(m.group("sy"))
-        ed = int(m.group("ed"))
-        em = _month_num(m.group("em"))
-        ey = int(m.group("ey"))
-        if sm and em:
-            try:
-                return date(sy, sm, sd), date(ey, em, ed)
-            except Exception:
-                return None, None
-
-    m = PERIOD_SAME_END_YEAR_RE.search(blob)
-    if m:
-        sd = int(m.group("sd"))
-        sm = _month_num(m.group("sm"))
-        ed = int(m.group("ed"))
-        em = _month_num(m.group("em"))
-        ey = int(m.group("ey"))
-        if sm and em:
-            sy = ey - 1 if sm > em else ey
-            try:
-                return date(sy, sm, sd), date(ey, em, ed)
-            except Exception:
-                return None, None
-
-    return None, None
+def extract_statement_period(pdf_path: str) -> tuple[date | None, date | None]:
+    """Public wrapper to extract the statement coverage period (start_date, end_date)."""
+    try:
+        start, end = _parse_period_from_page1(pdf_path)
+        if start or end:
+            return start, end
+        return _parse_period_from_filename(pdf_path)
+    except Exception:
+        return None, None
 
 
 def _infer_year(dd: int, mm: int, period_start: date | None, period_end: date | None) -> int:

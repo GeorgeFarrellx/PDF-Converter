@@ -1,3 +1,5 @@
+# Version: natwest-1.1.py
+import os
 import re
 import datetime as _dt
 from decimal import Decimal, InvalidOperation
@@ -196,6 +198,67 @@ def _extract_period_years(all_text: str) -> (Optional[int], Optional[int]):
         y1 = int(m.group("y1"))
         y2 = int(m.group("y2"))
         return y1, y2
+    except Exception:
+        return None, None
+
+
+def _extract_period_dates(all_text: str) -> (Optional[_dt.date], Optional[_dt.date]):
+    if not all_text:
+        return None, None
+    m = _PERIOD_RE.search(all_text)
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = _MONTHS.get(m.group("m1").lower())
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = _MONTHS.get(m.group("m2").lower())
+        y2 = int(m.group("y2"))
+        if not m1 or not m2:
+            return None, None
+        return _dt.date(y1, m1, d1), _dt.date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
+def _parse_period_from_filename(pdf_path: str):
+    name = os.path.basename(pdf_path or "")
+    m = re.search(
+        r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*"
+        r"(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+        name,
+    )
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+        return _dt.date(y1, m1, d1), _dt.date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
+def extract_statement_period(pdf_path: str):
+    """Public wrapper to extract the statement coverage period (start_date, end_date)."""
+    try:
+        all_text_chunks = []
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                all_text_chunks.append(page.extract_text() or "")
+        all_text = "\n".join(all_text_chunks)
+        start, end = _extract_period_dates(all_text)
+        if start or end:
+            return start, end
+        return _parse_period_from_filename(pdf_path)
     except Exception:
         return None, None
 

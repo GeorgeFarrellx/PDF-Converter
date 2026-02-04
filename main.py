@@ -4,19 +4,57 @@ import sys
 import traceback
 from datetime import datetime
 
-import core
-from gui import App
+import importlib
 
-# Re-export the core symbols main relies on
-PARSERS_DIR = core.PARSERS_DIR
-LOGS_DIR = core.LOGS_DIR
-ensure_folder = core.ensure_folder
-_run_self_tests = core._run_self_tests
+
+def _show_startup_error(message: str) -> None:
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("Startup Error", message)
+        root.destroy()
+    except Exception:
+        print(message, file=sys.stderr)
+
+
+def check_dependencies() -> None:
+    missing = []
+    installable = []
+
+    if sys.version_info < (3, 10):
+        missing.append("Python 3.10+ is required.")
+
+    for module, package in [
+        ("tkinterdnd2", "tkinterdnd2"),
+        ("pandas", "pandas"),
+        ("openpyxl", "openpyxl"),
+    ]:
+        try:
+            importlib.import_module(module)
+        except Exception:
+            missing.append(f"Missing dependency: {package}")
+            installable.append(package)
+
+    if missing:
+        message = "The application cannot start because required dependencies are missing:\n\n"
+        message += "\n".join(f"- {item}" for item in missing)
+        if installable:
+            message += "\n\nInstall them with:\n  python -m pip install " + " ".join(installable)
+        _show_startup_error(message)
+        raise SystemExit(1)
 
 
 def main():
-    if not os.path.isdir(PARSERS_DIR):
-        raise FileNotFoundError(f"Missing Parsers folder: {PARSERS_DIR}")
+    check_dependencies()
+
+    import core
+    from gui import App
+
+    if not os.path.isdir(core.PARSERS_DIR):
+        raise FileNotFoundError(f"Missing Parsers folder: {core.PARSERS_DIR}")
 
     app = App()
     app.mainloop()
@@ -24,16 +62,20 @@ def main():
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
-        _run_self_tests()
+        check_dependencies()
+        import core
+        core._run_self_tests()
         raise SystemExit(0)
 
     try:
         main()
     except Exception as e:
         try:
-            ensure_folder(LOGS_DIR)
+            import core
+
+            core.ensure_folder(core.LOGS_DIR)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            crash_path = os.path.join(LOGS_DIR, f"startup_crash_{ts}.txt")
+            crash_path = os.path.join(core.LOGS_DIR, f"startup_crash_{ts}.txt")
             err = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             with open(crash_path, "w", encoding="utf-8") as f:
                 f.write(err)

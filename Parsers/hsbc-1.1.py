@@ -1,4 +1,5 @@
-# Version: hsbc.py
+# Version: hsbc-1.1.py
+import os
 import re
 from datetime import date, datetime
 import pdfplumber
@@ -178,6 +179,69 @@ def _infer_statement_years(page1_text: str):
     start_year = y if m1 <= m2 else (y - 1)
     end_year = y
     return start_year, end_year
+
+
+def _parse_period_from_text(page1_text: str):
+    if not page1_text:
+        return None, None
+    t = " ".join(page1_text.split())
+    m = re.search(
+        r"\b(?P<d1>\d{1,2})\s+(?P<m1>[A-Za-z]+)\s+to\s+(?P<d2>\d{1,2})\s+(?P<m2>[A-Za-z]+)\s+(?P<y>\d{4})\b",
+        t,
+    )
+    if not m:
+        return None, None
+    y = int(m.group("y"))
+    m1 = MONTHS_FULL.get(m.group("m1").title())
+    m2 = MONTHS_FULL.get(m.group("m2").title())
+    if not m1 or not m2:
+        return None, None
+    start_year = y if m1 <= m2 else (y - 1)
+    try:
+        start = date(start_year, m1, int(m.group("d1")))
+        end = date(y, m2, int(m.group("d2")))
+        return start, end
+    except Exception:
+        return None, None
+
+
+def _parse_period_from_filename(pdf_path: str):
+    name = os.path.basename(pdf_path or "")
+    m = re.search(
+        r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*"
+        r"(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+        name,
+    )
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+        return date(y1, m1, d1), date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
+def extract_statement_period(pdf_path: str):
+    """Public wrapper to extract the statement coverage period (start_date, end_date)."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            page1 = pdf.pages[0] if pdf.pages else None
+            text = page1.extract_text() if page1 else ""
+        start, end = _parse_period_from_text(text or "")
+        if start or end:
+            return start, end
+        return _parse_period_from_filename(pdf_path)
+    except Exception:
+        return None, None
 
 
 def _parse_date_from_left(left_text: str, current_year: int | None, last_month: int | None):

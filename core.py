@@ -12,17 +12,8 @@ from collections import Counter
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-import pandas as pd
-
-from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
-from openpyxl.styles import Border
-
-# Optional: bank auto-detection uses pdfplumber
-try:
-    import pdfplumber
-except Exception:
-    pdfplumber = None
+_PDFPLUMBER_CACHE = None
+_PDFPLUMBER_ERROR_SHOWN = False
 
 
 # ----------------------------
@@ -54,6 +45,33 @@ BANK_OPTIONS = [
 
 def ensure_folder(path: str) -> None:
     os.makedirs(path, exist_ok=True)
+
+
+def _show_dependency_error(message: str) -> None:
+    try:
+        messagebox.showerror("Missing Dependency", message)
+    except Exception:
+        print(message, file=sys.stderr)
+
+
+def _require_pdfplumber(show_error: bool = True):
+    global _PDFPLUMBER_CACHE, _PDFPLUMBER_ERROR_SHOWN
+    if _PDFPLUMBER_CACHE is not None:
+        return _PDFPLUMBER_CACHE
+    try:
+        import pdfplumber
+    except Exception as e:
+        if show_error and not _PDFPLUMBER_ERROR_SHOWN:
+            _show_dependency_error(
+                "pdfplumber is required for PDF text extraction.\n\n"
+                "Install it with:\n"
+                "  python -m pip install pandas openpyxl pdfplumber\n\n"
+                f"Original error: {e}"
+            )
+            _PDFPLUMBER_ERROR_SHOWN = True
+        return None
+    _PDFPLUMBER_CACHE = pdfplumber
+    return pdfplumber
 
 
 def make_unique_path(path: str) -> str:
@@ -122,6 +140,7 @@ def auto_detect_bank_from_pdf(pdf_path: str) -> str | None:
     Some PDFs (e.g. NatWest transaction exports) only include bank identifiers in the footer of the last page,
     so we also scan a small footer snippet from the final page.
     """
+    pdfplumber = _require_pdfplumber()
     if pdfplumber is None:
         return None
 
@@ -274,6 +293,7 @@ def auto_detect_bank_from_pdf(pdf_path: str) -> str | None:
 
 
 def extract_barclays_statement_period(pdf_path: str) -> tuple[date | None, date | None]:
+    pdfplumber = _require_pdfplumber()
     if pdfplumber is None:
         return (None, None)
 
@@ -361,6 +381,7 @@ def extract_statement_period_from_pdf(pdf_path: str, bank_hint: str = "") -> tup
 
     Returns (period_start, period_end) as datetime.date, or (None, None).
     """
+    pdfplumber = _require_pdfplumber()
     if pdfplumber is None:
         return (None, None)
 
@@ -431,6 +452,7 @@ def is_pdf(path: str) -> bool:
 
 
 def get_client_name_from_pdf(pdf_path: str) -> str:
+    pdfplumber = _require_pdfplumber()
     if pdfplumber is None:
         return ""
 
@@ -555,6 +577,20 @@ def find_duplicate_statements(recon_results: list[dict]) -> list[list[dict]]:
 def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = ""):
     if not transactions:
         raise ValueError("No transactions found!")
+
+    try:
+        import pandas as pd
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.table import Table, TableStyleInfo
+        from openpyxl.styles import Border
+    except Exception as e:
+        _show_dependency_error(
+            "pandas and openpyxl are required for Excel output.\n\n"
+            "Install them with:\n"
+            "  python -m pip install pandas openpyxl pdfplumber\n\n"
+            f"Original error: {e}"
+        )
+        return None
 
     df = pd.DataFrame(transactions)
     if "T/N" not in df.columns:
@@ -1986,7 +2022,7 @@ def _run_self_tests() -> None:
 
     # Additional test: period extraction for Starling summary line
     # (Only runs when pdfplumber is available; otherwise it's a no-op)
-    if pdfplumber is None:
+    if _require_pdfplumber(show_error=False) is None:
         assert extract_statement_period_from_pdf("dummy.pdf", bank_hint="starling") == (None, None)
 
     # reconcile_statement should pick up parser.extract_statement_period when present
