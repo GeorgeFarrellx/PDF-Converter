@@ -1,4 +1,4 @@
-# Version: 2.02
+# Version: 2.03
 import os
 import glob
 import re
@@ -1113,6 +1113,8 @@ def _overlap_dedupe_continuity_resolution(
 def compute_statement_continuity(recon_results: list[dict]) -> list[dict]:
     if not recon_results or len(recon_results) < 2:
         return []
+
+    import pandas as pd
 
     def _safe_date(d):
         if d is None:
