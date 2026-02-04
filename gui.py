@@ -1,5 +1,7 @@
 # Version: 2.06
 import os
+import subprocess
+import sys
 import traceback
 import zipfile
 from datetime import datetime, timedelta, date
@@ -217,7 +219,7 @@ class App(TkinterDnD.Tk):
             coverage_period=data.get("coverage_period", "") or "",
             continuity_results=data.get("continuity_results") or [],
             pre_save=pre_save,
-            support_bundle_callback=self.create_support_bundle_zip,
+            open_log_folder_callback=self.open_log_folder,
         )
 
     def save_last_output(self):
@@ -277,6 +279,24 @@ class App(TkinterDnD.Tk):
             self.set_status(f"Done with warnings. Output: {output_path}")
         else:
             self.set_status(f"Done. Output: {output_path}")
+
+    def open_log_folder(self):
+        try:
+            ensure_folder(LOGS_DIR)
+        except Exception as e:
+            messagebox.showerror("Open log folder", f"Cannot access Logs folder:\n{e}")
+            return
+
+        log_path = os.path.abspath(LOGS_DIR)
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(log_path)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", log_path], check=False)
+            else:
+                subprocess.run(["xdg-open", log_path], check=False)
+        except Exception as e:
+            messagebox.showerror("Open log folder", f"Could not open log folder:\n{e}")
 
     def create_support_bundle_zip(self):
         if not self.last_report_data:
@@ -1735,16 +1755,6 @@ class App(TkinterDnD.Tk):
                 except Exception:
                     pass
 
-            # Auto-create support bundle when we have an issue OR warnings.
-            try:
-                if any_issue or any_warn:
-                    self.create_support_bundle_zip()
-            except Exception as e:
-                messagebox.showwarning(
-                    "Support bundle",
-                    f"Could not create support bundle automatically:\n{e}",
-                )
-
             proceed = show_reconciliation_popup(
                 self,
                 "(Not saved yet)",
@@ -1752,7 +1762,7 @@ class App(TkinterDnD.Tk):
                 coverage_period=coverage_period,
                 continuity_results=continuity_results,
                 pre_save=True,
-                support_bundle_callback=self.create_support_bundle_zip,
+                open_log_folder_callback=self.open_log_folder,
             )
 
             if not proceed:

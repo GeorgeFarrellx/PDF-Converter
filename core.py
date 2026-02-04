@@ -1620,7 +1620,7 @@ def show_reconciliation_popup(
     coverage_period: str = "",
     continuity_results: list[dict] | None = None,
     pre_save: bool = False,
-    support_bundle_callback=None,
+    open_log_folder_callback=None,
 ):
     continuity_results = continuity_results or []
 
@@ -1817,22 +1817,15 @@ def show_reconciliation_popup(
         result["proceed"] = proceed
         win.destroy()
 
-    def _copy():
-        content = "Output file:\n" + display_path + "\n\n" + "\n".join(lines_for_clipboard).strip()
-        win.clipboard_clear()
-        win.clipboard_append(content)
+    if any_warn and callable(open_log_folder_callback):
 
-    ttk.Button(btns, text="Copy details", command=_copy).pack(side="left")
-
-    if any_warn and callable(support_bundle_callback):
-
-        def _make_bundle():
+        def _open_log_folder():
             try:
-                support_bundle_callback()
+                open_log_folder_callback()
             except Exception as e:
-                messagebox.showerror("Support bundle error", str(e))
+                messagebox.showerror("Open log folder error", str(e))
 
-        ttk.Button(btns, text="Create Support Bundle (ZIP)", command=_make_bundle).pack(side="left", padx=(10, 0))
+        ttk.Button(btns, text="Open Log Folder", command=_open_log_folder).pack(side="left", padx=(10, 0))
 
     if pre_save:
         ttk.Button(btns, text="Cancel", command=lambda: _close(False)).pack(side="right")
