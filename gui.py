@@ -1,4 +1,4 @@
-# Version: 2.07
+# Version: 2.08
 import os
 import re
 import subprocess
@@ -508,12 +508,22 @@ class App(TkinterDnD.Tk):
                     pass
 
             learning_report_path = data.get("learning_report_path") or ""
-            if not learning_report_path:
+            learning_report_inline = data.get("learning_report_inline") or ""
+            learning_report_error = data.get("learning_report_error") or ""
+
+            if not learning_report_path and not learning_report_inline and not learning_report_error:
                 try:
-                    report_path, _, _ = self.generate_learning_report(reason="Support bundle")
+                    report_path, report_text, report_err = self.generate_learning_report(
+                        reason="Support bundle"
+                    )
                     learning_report_path = report_path or ""
-                except Exception:
-                    learning_report_path = ""
+                    learning_report_inline = report_text or ""
+                    learning_report_error = report_err or ""
+                except Exception as e:
+                    learning_report_error = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
+
             learning_report_exists = bool(learning_report_path and os.path.exists(learning_report_path))
 
             pdf_paths = list(data.get("source_pdfs") or [])
@@ -568,10 +578,10 @@ class App(TkinterDnD.Tk):
                 if learning_report_exists:
                     ext = os.path.splitext(learning_report_path)[1] or ".txt"
                     zf.write(learning_report_path, arcname=f"Learning Report{ext}")
-                elif data.get("learning_report_inline"):
-                    zf.writestr("LEARNING REPORT.txt", data["learning_report_inline"])
-                elif data.get("learning_report_error"):
-                    zf.writestr("LEARNING_FAILED_INLINE.txt", data["learning_report_error"])
+                elif learning_report_inline:
+                    zf.writestr("LEARNING REPORT.txt", learning_report_inline)
+                elif learning_report_error:
+                    zf.writestr("LEARNING_FAILED_INLINE.txt", learning_report_error)
                 else:
                     lines = [
                         "Learning report was not created or could not be found on disk at bundle time.",
