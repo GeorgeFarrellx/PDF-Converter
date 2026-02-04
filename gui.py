@@ -1,5 +1,6 @@
 # Version: 2.08
 import os
+import re
 import subprocess
 import sys
 import traceback
@@ -420,7 +421,10 @@ class App(TkinterDnD.Tk):
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_base = sanitize_filename(bundle_base) or "RUN"
-        zip_name = f"{safe_base}.zip"
+        zip_base = re.sub(r"\s\d{2}\.\d{2}\.\d{2}\s*-\s*\d{2}\.\d{2}\.\d{2}$", "", safe_base).strip()
+        if not zip_base:
+            zip_base = safe_base
+        zip_name = f"{zip_base}.zip"
         zip_path = make_unique_path(os.path.join(LOGS_DIR, zip_name))
 
         transactions = self.last_excel_data.get("transactions") or []
