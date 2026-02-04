@@ -1,4 +1,4 @@
-# Version: 2.05
+# Version: 2.06
 import os
 import traceback
 import zipfile
@@ -852,8 +852,34 @@ class App(TkinterDnD.Tk):
 
             return report_path
 
-        except Exception:
-            return None
+        except Exception as e:
+            try:
+                ensure_folder(LOGS_DIR)
+                ts_fail = datetime.now().strftime("%Y%m%d_%H%M%S")
+                data = getattr(self, "last_report_data", None) or {}
+                bank_fail = sanitize_filename((data.get("bank") or self.bank_var.get() or "Unknown").strip()) or "Unknown"
+                base_fail = sanitize_filename(str(data.get("bundle_base") or data.get("client_name") or "RUN")) or "RUN"
+                fail_name = f"LEARNING_FAILED - {ts_fail} - {bank_fail} - {base_fail}.txt"
+                fail_path = make_unique_path(os.path.join(LOGS_DIR, fail_name))
+                with open(fail_path, "w", encoding="utf-8") as f:
+                    f.write("LEARNING REPORT FAILED\n")
+                    f.write("=" * 60 + "\n\n")
+                    f.write(f"Type: {type(e).__name__}\n")
+                    f.write(f"Message: {e}\n\n")
+                    f.write("Traceback:\n")
+                    f.write("".join(traceback.format_exception(type(e), e, e.__traceback__)))
+                    f.write("\n")
+
+                try:
+                    if self.last_report_data is None:
+                        self.last_report_data = {}
+                    self.last_report_data["learning_report_path"] = fail_path
+                except Exception:
+                    pass
+
+                return fail_path
+            except Exception:
+                return None
 
     def clear_list(self):
         self.selected_files = []
