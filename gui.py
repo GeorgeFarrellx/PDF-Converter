@@ -1,4 +1,4 @@
-# Version: 2.10
+# Version: 2.11
 import os
 import re
 import subprocess
@@ -523,7 +523,7 @@ class App(TkinterDnD.Tk):
             ):
                 try:
                     report_path, report_text, report_err = self.generate_learning_report(
-                        reason="Support bundle"
+                        reason="Support bundle", write_to_disk=False
                     )
                     learning_report_path = report_path or ""
                     learning_report_inline = report_text or ""
@@ -622,6 +622,25 @@ class App(TkinterDnD.Tk):
                     except Exception:
                         pass
 
+            try:
+                cutoff = datetime.now() - timedelta(minutes=2)
+                for name in os.listdir(LOGS_DIR):
+                    if not name.startswith("LEARNING - ") or not name.lower().endswith(".txt"):
+                        continue
+                    full_path = os.path.join(LOGS_DIR, name)
+                    try:
+                        mtime = datetime.fromtimestamp(os.path.getmtime(full_path))
+                    except Exception:
+                        continue
+                    if mtime < cutoff:
+                        continue
+                    try:
+                        os.remove(full_path)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
             if created_temp_excel and temp_excel_path and os.path.exists(temp_excel_path):
                 try:
                     os.remove(temp_excel_path)
@@ -641,7 +660,12 @@ class App(TkinterDnD.Tk):
             messagebox.showerror("Support bundle error", f"{e}\n\nDetails:\n{err}")
 
 
-    def generate_learning_report(self, reason: str | None = None, exception: Exception | None = None):
+    def generate_learning_report(
+        self,
+        reason: str | None = None,
+        exception: Exception | None = None,
+        write_to_disk: bool = False,
+    ):
         pdfplumber = _require_pdfplumber(show_error=False)
         pdfplumber_available = pdfplumber is not None
 
@@ -880,6 +904,15 @@ class App(TkinterDnD.Tk):
             self.last_report_data["learning_report_generated"] = True
         except Exception:
             pass
+
+        if not write_to_disk:
+            try:
+                if self.last_report_data is None:
+                    self.last_report_data = {}
+                self.last_report_data["learning_report_inline"] = report_text
+            except Exception:
+                pass
+            return None, report_text, None
 
         try:
             ensure_folder(LOGS_DIR)
@@ -1732,6 +1765,8 @@ class App(TkinterDnD.Tk):
                 "any_warn": bool(any_warn),
                 "log_path": recon_log_path,
                 "learning_report_path": None,
+                "learning_report_inline": "",
+                "learning_report_error": "",
                 "learning_report_generated": False,
                 "output_xlsx_path": None,
                 "bundle_base": os.path.splitext(filename)[0],
@@ -1761,7 +1796,15 @@ class App(TkinterDnD.Tk):
                 )
                 issue_reason = "Mismatch" if (any_recon_mismatch or any_cont_mismatch) else "Issue"
                 try:
-                    self.generate_learning_report(reason=issue_reason)
+                    report_path, report_text, report_err = self.generate_learning_report(
+                        reason=issue_reason, write_to_disk=False
+                    )
+                    try:
+                        if self.last_report_data is not None:
+                            self.last_report_data["learning_report_inline"] = report_text or ""
+                            self.last_report_data["learning_report_error"] = report_err or ""
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 
@@ -1834,6 +1877,8 @@ class App(TkinterDnD.Tk):
                         "any_warn": True,
                         "log_path": None,
                         "learning_report_path": None,
+                        "learning_report_inline": "",
+                        "learning_report_error": "",
                         "learning_report_generated": False,
                         "output_xlsx_path": None,
                         "bundle_base": "RUN",
@@ -1843,7 +1888,15 @@ class App(TkinterDnD.Tk):
                         "client_name": "",
                         "run_filename": "",
                     }
-                self.generate_learning_report(reason="Exception", exception=e)
+                report_path, report_text, report_err = self.generate_learning_report(
+                    reason="Exception", exception=e, write_to_disk=False
+                )
+                try:
+                    if self.last_report_data is not None:
+                        self.last_report_data["learning_report_inline"] = report_text or ""
+                        self.last_report_data["learning_report_error"] = report_err or ""
+                except Exception:
+                    pass
             except Exception:
                 pass
 
