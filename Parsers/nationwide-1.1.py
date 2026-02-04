@@ -1,6 +1,7 @@
-# Version: nationwide.py
+# Version: nationwide-1.1.py
+import os
 import re
-from datetime import datetime
+from datetime import datetime, date
 import pdfplumber
 
 YEAR_RE = re.compile(r"\b(20\d{2})\b")
@@ -91,6 +92,39 @@ def _find_table_header(lines):
 def _infer_year(all_text: str):
     m = YEAR_RE.search(all_text)
     return int(m.group(1)) if m else None
+
+
+def _parse_period_from_filename(pdf_path: str):
+    name = os.path.basename(pdf_path or "")
+    m = re.search(
+        r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*"
+        r"(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+        name,
+    )
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+        return date(y1, m1, d1), date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
+def extract_statement_period(pdf_path: str):
+    """Public wrapper to extract the statement coverage period (start_date, end_date)."""
+    try:
+        return _parse_period_from_filename(pdf_path)
+    except Exception:
+        return None, None
 
 
 def _update_year_from_left_zone(left_zone_words, current_year):

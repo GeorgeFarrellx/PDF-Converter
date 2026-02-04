@@ -1,3 +1,4 @@
+# Version: lloyds-1.1.py
 """lloyds.py
 
 Lloyds Bank (UK) Business Account statement parser (text-based PDFs, NO OCR).
@@ -18,6 +19,7 @@ Each transaction dict keys (exact):
 from __future__ import annotations
 
 import datetime as _dt
+import os
 import re
 from typing import Dict, List, Optional
 
@@ -164,6 +166,47 @@ def _parse_statement_period(text: str) -> Optional[tuple[_dt.date, _dt.date]]:
         return start, end
     except Exception:
         return None
+
+
+def _parse_period_from_filename(pdf_path: str) -> Optional[tuple[_dt.date, _dt.date]]:
+    name = os.path.basename(pdf_path or "")
+    m = re.search(
+        r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*"
+        r"(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+        name,
+    )
+    if not m:
+        return None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+        return _dt.date(y1, m1, d1), _dt.date(y2, m2, d2)
+    except Exception:
+        return None
+
+
+def extract_statement_period(pdf_path: str) -> tuple[Optional[_dt.date], Optional[_dt.date]]:
+    """Public wrapper to extract the statement coverage period (start_date, end_date)."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        period = _parse_statement_period(full_text)
+        if period:
+            return period
+        period = _parse_period_from_filename(pdf_path)
+        if period:
+            return period
+        return None, None
+    except Exception:
+        return None, None
 
 
 def _parse_tx_date(day: str, mon_abbr: str, year_part: Optional[str], period: Optional[tuple[_dt.date, _dt.date]]) -> Optional[_dt.date]:

@@ -1,15 +1,16 @@
 """Santander PDF statement parser (text-based, no OCR)
 
-File: santander.py
-Version: 1.5
+File: santander-1.6.py
+Version: 1.6
 
 Notes:
 - Supports Santander Business Banking statements and Santander Online Banking transaction exports.
 - Applies global transaction type rules as specified in the main project instructions.
 """
 
-__version__ = "1.5"
+__version__ = "1.6"
 
+import os
 import re
 import datetime as _dt
 from typing import List, Dict, Optional, Tuple
@@ -323,6 +324,47 @@ def _infer_period_business(blob: str) -> Tuple[Optional[_dt.date], Optional[_dt.
         d2 = _parse_full_date_any(_clean_text(m.group(2)))
         return d1, d2
     return None, None
+
+
+def _parse_period_from_filename(pdf_path: str) -> Tuple[Optional[_dt.date], Optional[_dt.date]]:
+    name = os.path.basename(pdf_path or "")
+    m = re.search(
+        r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*"
+        r"(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+        name,
+    )
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+        return _dt.date(y1, m1, d1), _dt.date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
+def extract_statement_period(pdf_path: str) -> Tuple[Optional[_dt.date], Optional[_dt.date]]:
+    """Public wrapper to extract the statement coverage period (start_date, end_date)."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        start, end = _infer_period_business(full_text)
+        if start or end:
+            return start, end
+        start, end = _infer_period_online(full_text)
+        if start or end:
+            return start, end
+        return _parse_period_from_filename(pdf_path)
+    except Exception:
+        return None, None
 
 
 def _choose_year_for_business_tx(day: int, month: int, period_start: Optional[_dt.date], period_end: Optional[_dt.date],

@@ -69,7 +69,7 @@ class App(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("Bank Parser")
+        self.title("PDF Converter")
         self.geometry("760x520")
         self.minsize(720, 500)
 

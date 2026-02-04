@@ -1,9 +1,10 @@
-# tsb.py
+# Version: tsb-1.1.py
 # TSB (Spend & Save / similar) text-based PDF parser (NO OCR)
 # Requires: pdfplumber
 
 from __future__ import annotations
 
+import os
 import re
 import datetime as _dt
 from typing import List, Dict, Optional, Tuple
@@ -91,6 +92,44 @@ def _parse_statement_period(first_page_text: str) -> Tuple[Optional[_dt.date], O
         return _parse_any_date_str(m2.group(1)), _parse_any_date_str(m2.group(2))
 
     return None, None
+
+
+def _parse_period_from_filename(pdf_path: str) -> Tuple[Optional[_dt.date], Optional[_dt.date]]:
+    name = os.path.basename(pdf_path or "")
+    m = re.search(
+        r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*"
+        r"(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+        name,
+    )
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+        return _dt.date(y1, m1, d1), _dt.date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
+def extract_statement_period(pdf_path: str) -> Tuple[Optional[_dt.date], Optional[_dt.date]]:
+    """Public wrapper to extract the statement coverage period (start_date, end_date)."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            text = pdf.pages[0].extract_text() if pdf.pages else ""
+        start, end = _parse_statement_period(text or "")
+        if start or end:
+            return start, end
+        return _parse_period_from_filename(pdf_path)
+    except Exception:
+        return None, None
 
 
 def _parse_statement_balances(first_page_text: str) -> Tuple[Optional[float], Optional[float]]:

@@ -1,4 +1,4 @@
-# Version: rbs.py
+# Version: rbs-1.1.py
 """RBS / Royal Bank of Scotland (Business Current Account) PDF parser.
 
 Expected output columns (used by Main):
@@ -21,6 +21,7 @@ Notes:
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import date
 
@@ -138,6 +139,68 @@ def _parse_period_year(pdf_path: str) -> int | None:
             return None
 
     return None
+
+
+def _parse_period_dates(pdf_path: str) -> tuple[date | None, date | None]:
+    """Try to extract full statement period dates from the 'Period Covered' line on page 1."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            text = pdf.pages[0].extract_text() or ""
+    except Exception:
+        return None, None
+
+    m = re.search(
+        r"Period Covered\s+(?P<d1>\d{2})\s+(?P<m1>[A-Z]{3})\s+(?P<y1>\d{4})\s+to\s+(?P<d2>\d{2})\s+(?P<m2>[A-Z]{3})\s+(?P<y2>\d{4})",
+        text,
+    )
+    if not m:
+        return None, None
+    try:
+        m1 = MONTHS.get(m.group("m1").upper())
+        m2 = MONTHS.get(m.group("m2").upper())
+        if not m1 or not m2:
+            return None, None
+        start = date(int(m.group("y1")), m1, int(m.group("d1")))
+        end = date(int(m.group("y2")), m2, int(m.group("d2")))
+        return start, end
+    except Exception:
+        return None, None
+
+
+def _parse_period_from_filename(pdf_path: str) -> tuple[date | None, date | None]:
+    name = os.path.basename(pdf_path or "")
+    m = re.search(
+        r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*"
+        r"(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+        name,
+    )
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+        return date(y1, m1, d1), date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
+def extract_statement_period(pdf_path: str) -> tuple[date | None, date | None]:
+    """Public wrapper to extract the statement coverage period (start_date, end_date)."""
+    try:
+        start, end = _parse_period_dates(pdf_path)
+        if start or end:
+            return start, end
+        return _parse_period_from_filename(pdf_path)
+    except Exception:
+        return None, None
 
 
 def _infer_year(prev_dt: date | None, dd: int, mm: int, yyyy: int | None, base_year: int | None) -> date:
