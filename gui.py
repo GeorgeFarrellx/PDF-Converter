@@ -1590,51 +1590,7 @@ class App(TkinterDnD.Tk):
 
             any_issue = any_issue or any_cont_issue or any_gap
 
-            log_written = False
             recon_log_path = None
-            try:
-                ensure_folder(LOGS_DIR)
-                if any_issue:
-                    run_log_lines.append("Excel output: (not saved yet)")
-                    run_log_lines.append("")
-
-                    if continuity_results:
-                        run_log_lines.append("Statement continuity check:")
-                        for c in continuity_results:
-                            if _status_startswith(c.get("status"), "OK"):
-                                run_log_lines.append(
-                                    f"  OK: {c.get('prev_pdf')} -> {c.get('next_pdf')} (End {_fmt_money(c.get('prev_end'))} matches Start {_fmt_money(c.get('next_start'))})"
-                                )
-                            elif _status_startswith(c.get("status"), "Mismatch"):
-                                missing = ""
-                                try:
-                                    mf = c.get("missing_from")
-                                    mt = c.get("missing_to")
-                                    if mf and mt and hasattr(mf, "strftime") and hasattr(mt, "strftime"):
-                                        missing = f", Missing dates {mf.strftime('%d/%m/%Y')} - {mt.strftime('%d/%m/%Y')}"
-                                except Exception:
-                                    missing = ""
-
-                                run_log_lines.append(
-                                    f"  MISMATCH: {c.get('prev_pdf')} -> {c.get('next_pdf')} (End {_fmt_money(c.get('prev_end'))} vs Start {_fmt_money(c.get('next_start'))}, Diff {_fmt_money(c.get('diff'))}){missing}"
-                                )
-                            else:
-                                run_log_lines.append(
-                                    f"  Not checked: {c.get('prev_pdf')} -> {c.get('next_pdf')} (balances not found)"
-                                )
-                        run_log_lines.append("")
-
-                    log_name = os.path.splitext(filename)[0] + " - recon log.txt"
-                    log_path = os.path.join(LOGS_DIR, log_name)
-                    log_path = make_unique_path(log_path)
-
-                    with open(log_path, "w", encoding="utf-8") as f:
-                        f.write("\n".join(run_log_lines).rstrip() + "\n")
-                    log_written = True
-                    recon_log_path = log_path
-            except Exception:
-                log_written = False
-                recon_log_path = None
 
             initial_dir = ""
             if out_folder:
@@ -1686,11 +1642,18 @@ class App(TkinterDnD.Tk):
                 "initial_dir": initial_dir,
             }
 
-            any_recon_mismatch = any((r.get("status") or "") == "Mismatch" for r in (recon_results or []))
-            any_cont_mismatch = any(_status_startswith((r.get("status") or ""), "Mismatch") for r in (continuity_results or []))
-            if any_recon_mismatch or any_cont_mismatch:
+            if any_issue:
+                any_recon_mismatch = any((r.get("status") or "") == "Mismatch" for r in (recon_results or []))
+                any_cont_mismatch = any(
+                    _status_startswith((r.get("status") or ""), "Mismatch") for r in (continuity_results or [])
+                )
+                issue_reason = "Mismatch" if (any_recon_mismatch or any_cont_mismatch) else "Issue"
                 try:
-                    self.generate_learning_report(reason="Mismatch")
+                    self.generate_learning_report(reason=issue_reason)
+                except Exception:
+                    pass
+                try:
+                    self.create_support_bundle_zip()
                 except Exception:
                     pass
 
@@ -1740,22 +1703,6 @@ class App(TkinterDnD.Tk):
             try:
                 if self.last_report_data is not None:
                     self.last_report_data["output_xlsx_path"] = output_path
-            except Exception:
-                pass
-
-            try:
-                if any_issue and (not log_written):
-                    ensure_folder(LOGS_DIR)
-                    log_name = os.path.splitext(os.path.basename(output_path))[0] + " - recon log.txt"
-                    log_path = os.path.join(LOGS_DIR, log_name)
-                    log_path = make_unique_path(log_path)
-                    with open(log_path, "w", encoding="utf-8") as f:
-                        f.write("\n".join(run_log_lines).rstrip() + "\n")
-                    try:
-                        if self.last_report_data is not None:
-                            self.last_report_data["log_path"] = log_path
-                    except Exception:
-                        pass
             except Exception:
                 pass
 
