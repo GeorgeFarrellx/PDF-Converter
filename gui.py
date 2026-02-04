@@ -1,4 +1,4 @@
-# Version: 2.06
+# Version: 2.07
 import os
 import subprocess
 import sys
@@ -561,6 +561,9 @@ class App(TkinterDnD.Tk):
                 if learning_report_exists:
                     zf.write(learning_report_path, arcname=os.path.basename(learning_report_path))
                 else:
+                    err = (data.get("learning_report_error") or "").strip()
+                    if err:
+                        zf.writestr("LEARNING_FAILED_INLINE.txt", err)
                     zf.writestr(
                         "LEARNING_REPORT_MISSING.txt",
                         "Learning report was not created or could not be found on disk at bundle time.\n"
@@ -649,8 +652,15 @@ class App(TkinterDnD.Tk):
         )
         client_or_run = sanitize_filename(str(client_or_run)) or "RUN"
 
+        def _cap(s: str, n: int) -> str:
+            s = (s or "").strip()
+            return s[:n].rstrip() if len(s) > n else s
+
+        bank_short = _cap(sanitize_filename(bank), 18) or "Unknown"
+        run_short = _cap(client_or_run, 40) or "RUN"
+
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_name = f"LEARNING - {ts} - {sanitize_filename(bank)} - {client_or_run}.txt"
+        report_name = f"LEARNING - {ts} - {bank_short} - {run_short}.txt"
         report_path = make_unique_path(os.path.join(LOGS_DIR, report_name))
 
         source_pdfs = list(data.get("source_pdfs") or [])
@@ -873,30 +883,27 @@ class App(TkinterDnD.Tk):
             return report_path
 
         except Exception as e:
+            err = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            try:
+                if self.last_report_data is None:
+                    self.last_report_data = {}
+                self.last_report_data["learning_report_error"] = err
+            except Exception:
+                pass
+
             try:
                 ensure_folder(LOGS_DIR)
                 ts_fail = datetime.now().strftime("%Y%m%d_%H%M%S")
-                data = getattr(self, "last_report_data", None) or {}
-                bank_fail = sanitize_filename((data.get("bank") or self.bank_var.get() or "Unknown").strip()) or "Unknown"
-                base_fail = sanitize_filename(str(data.get("bundle_base") or data.get("client_name") or "RUN")) or "RUN"
-                fail_name = f"LEARNING_FAILED - {ts_fail} - {bank_fail} - {base_fail}.txt"
+                fail_name = f"LEARNING_FAILED - {ts_fail}.txt"
                 fail_path = make_unique_path(os.path.join(LOGS_DIR, fail_name))
                 with open(fail_path, "w", encoding="utf-8") as f:
                     f.write("LEARNING REPORT FAILED\n")
                     f.write("=" * 60 + "\n\n")
-                    f.write(f"Type: {type(e).__name__}\n")
-                    f.write(f"Message: {e}\n\n")
-                    f.write("Traceback:\n")
-                    f.write("".join(traceback.format_exception(type(e), e, e.__traceback__)))
-                    f.write("\n")
-
+                    f.write(err)
                 try:
-                    if self.last_report_data is None:
-                        self.last_report_data = {}
                     self.last_report_data["learning_report_path"] = fail_path
                 except Exception:
                     pass
-
                 return fail_path
             except Exception:
                 return None
