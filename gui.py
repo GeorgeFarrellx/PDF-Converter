@@ -1742,6 +1742,10 @@ class App(TkinterDnD.Tk):
                 "initial_dir": initial_dir,
             }
 
+            # Auto-create a support bundle zip whenever reconciliation or continuity has warnings/errors.
+            if any_warn or any_issue:
+                self.create_support_bundle_zip()
+
             if any_issue:
                 any_recon_mismatch = any((r.get("status") or "") == "Mismatch" for r in (recon_results or []))
                 any_cont_mismatch = any(
