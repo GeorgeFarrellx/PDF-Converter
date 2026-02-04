@@ -1,4 +1,4 @@
-# Version: 2.03
+# Version: 2.04
 import os
 import traceback
 import zipfile
@@ -582,8 +582,7 @@ class App(TkinterDnD.Tk):
 
     def generate_learning_report(self, reason: str | None = None, exception: Exception | None = None):
         pdfplumber = _require_pdfplumber(show_error=False)
-        if pdfplumber is None:
-            return None
+        pdfplumber_available = pdfplumber is not None
 
         try:
             ensure_folder(LOGS_DIR)
@@ -1603,7 +1602,17 @@ class App(TkinterDnD.Tk):
 
             any_issue = any_issue or any_cont_issue or any_gap
 
-            recon_log_path = None
+            try:
+                ensure_folder(LOGS_DIR)
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                base = sanitize_filename(os.path.splitext(filename)[0]) or "RUN"
+                recon_log_path = make_unique_path(
+                    os.path.join(LOGS_DIR, f"{base} - recon log - {ts}.txt")
+                )
+                with open(recon_log_path, "w", encoding="utf-8") as f:
+                    f.write("\n".join(run_log_lines).rstrip() + "\n")
+            except Exception:
+                recon_log_path = None
 
             initial_dir = ""
             if out_folder:
