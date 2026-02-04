@@ -1,4 +1,4 @@
-# Version: 2.08
+# Version: 2.09
 import os
 import re
 import subprocess
@@ -21,6 +21,7 @@ except Exception as e:
     )
 
 from core import *  # noqa: F403
+from core import _require_pdfplumber
 
 
 def _read_app_version() -> str:
