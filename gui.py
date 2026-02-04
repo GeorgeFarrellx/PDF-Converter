@@ -1,4 +1,4 @@
-# Version: 2.08
+# Version: 2.07
 import os
 import re
 import subprocess
@@ -510,7 +510,8 @@ class App(TkinterDnD.Tk):
             learning_report_path = data.get("learning_report_path") or ""
             if not learning_report_path:
                 try:
-                    learning_report_path = self.generate_learning_report(reason="Support bundle") or ""
+                    report_path, _, _ = self.generate_learning_report(reason="Support bundle")
+                    learning_report_path = report_path or ""
                 except Exception:
                     learning_report_path = ""
             learning_report_exists = bool(learning_report_path and os.path.exists(learning_report_path))
@@ -567,17 +568,16 @@ class App(TkinterDnD.Tk):
                 if learning_report_exists:
                     ext = os.path.splitext(learning_report_path)[1] or ".txt"
                     zf.write(learning_report_path, arcname=f"Learning Report{ext}")
+                elif data.get("learning_report_inline"):
+                    zf.writestr("LEARNING REPORT.txt", data["learning_report_inline"])
+                elif data.get("learning_report_error"):
+                    zf.writestr("LEARNING_FAILED_INLINE.txt", data["learning_report_error"])
                 else:
-                    err = (data.get("learning_report_error") or "").strip()
                     lines = [
                         "Learning report was not created or could not be found on disk at bundle time.",
                         "If LEARNING_FAILED exists in Logs, it should be included.",
                     ]
-                    if err:
-                        lines.append("")
-                        lines.append("Error:")
-                        lines.append(err)
-                    zf.writestr("Learning Report.txt", "\n".join(lines).rstrip() + "\n")
+                    zf.writestr("LEARNING_REPORT_MISSING.txt", "\n".join(lines).rstrip() + "\n")
 
                 for p in pdf_paths:
                     if not p or not os.path.exists(p):
@@ -622,55 +622,10 @@ class App(TkinterDnD.Tk):
         pdfplumber = _require_pdfplumber(show_error=False)
         pdfplumber_available = pdfplumber is not None
 
-        try:
-            ensure_folder(LOGS_DIR)
-        except Exception as e:
-            # Last-resort: write a failure report so support bundles always include something.
-            try:
-                ensure_folder(LOGS_DIR)
-                ts_fail = datetime.now().strftime("%Y%m%d_%H%M%S")
-                bank_fail = sanitize_filename((self.bank_var.get() or "Unknown").strip()) or "Unknown"
-                fail_name = f"LEARNING_FAILED - {ts_fail} - {bank_fail}.txt"
-                fail_path = make_unique_path(os.path.join(LOGS_DIR, fail_name))
-                with open(fail_path, "w", encoding="utf-8") as f:
-                    f.write("LEARNING REPORT FAILED\n")
-                    f.write("=" * 60 + "\n\n")
-                    f.write("Exception:\n")
-                    f.write(f"Type: {type(e).__name__}\n")
-                    f.write(f"Message: {e}\n\n")
-                    f.write("Traceback:\n")
-                    f.write("".join(traceback.format_exception(type(e), e, e.__traceback__)))
-                    f.write("\n")
-                try:
-                    if self.last_report_data is None:
-                        self.last_report_data = {}
-                    self.last_report_data["learning_report_path"] = fail_path
-                except Exception:
-                    pass
-                return fail_path
-            except Exception:
-                return None
-
         data = self.last_report_data or {}
         bank = (data.get("bank") or self.bank_var.get() or "").strip() or "Unknown"
-        client_or_run = (
-            data.get("bundle_base")
-            or data.get("client_name")
-            or os.path.splitext(data.get("run_filename") or "")[0]
-            or "RUN"
-        )
-        client_or_run = sanitize_filename(str(client_or_run)) or "RUN"
-
-        def _cap(s: str, n: int) -> str:
-            s = (s or "").strip()
-            return s[:n].rstrip() if len(s) > n else s
-
-        bank_short = _cap(sanitize_filename(bank), 18) or "Unknown"
-        run_short = _cap(client_or_run, 40) or "RUN"
-
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_name = f"LEARNING - {ts} - {bank_short} - {run_short}.txt"
-        report_path = make_unique_path(os.path.join(LOGS_DIR, report_name))
+        report_name = f"LEARNING - {ts}.txt"
 
         source_pdfs = list(data.get("source_pdfs") or [])
 
@@ -740,157 +695,150 @@ class App(TkinterDnD.Tk):
             except Exception:
                 return str(v)
 
+        lines = []
         try:
-            with open(report_path, "w", encoding="utf-8") as f:
-                f.write("LEARNING REPORT\n")
-                f.write("=" * 60 + "\n")
-                f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                if main_id:
-                    f.write(f"Main: {main_id}\n")
-                f.write(f"Bank (selected): {bank}\n")
-                if autodetect_result:
-                    f.write(f"Auto-detect (first PDF): {autodetect_result}\n")
-                if parser_file:
-                    f.write(f"Parser file: {parser_file}\n")
-                if reason:
-                    f.write(f"Reason: {reason}\n")
-                f.write("\n")
+            lines.append("LEARNING REPORT")
+            lines.append("=" * 60)
+            lines.append(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            if main_id:
+                lines.append(f"Main: {main_id}")
+            lines.append(f"Bank (selected): {bank}")
+            if autodetect_result:
+                lines.append(f"Auto-detect (first PDF): {autodetect_result}")
+            if parser_file:
+                lines.append(f"Parser file: {parser_file}")
+            if reason:
+                lines.append(f"Reason: {reason}")
+            lines.append("")
 
-                f.write("PDF SUMMARY\n")
-                f.write("-" * 60 + "\n")
-                if not pdfplumber_available:
-                    f.write(
-                        "pdfplumber is not available; skipping PDF text extraction for this report.\n"
-                    )
-                    f.write("\n")
+            lines.append("PDF SUMMARY")
+            lines.append("-" * 60)
+            if not pdfplumber_available:
+                lines.append("pdfplumber is not available; skipping PDF text extraction for this report.")
+                lines.append("")
 
-                for pdf_path in source_pdfs:
-                    f.write(f"PDF: {os.path.basename(pdf_path)}\n")
-                    f.write(f"Path: {pdf_path}\n")
+            for pdf_path in source_pdfs:
+                lines.append(f"PDF: {os.path.basename(pdf_path)}")
+                lines.append(f"Path: {pdf_path}")
 
-                    page_count = 0
-                    empty_pages = 0
-                    per_page_text = []
+                page_count = 0
+                empty_pages = 0
+                per_page_text = []
 
-                    if pdfplumber_available:
-                        try:
-                            with pdfplumber.open(pdf_path) as pdf:
-                                page_count = len(pdf.pages)
-                                for pi, page in enumerate(pdf.pages, start=1):
+                if pdfplumber_available:
+                    try:
+                        with pdfplumber.open(pdf_path) as pdf:
+                            page_count = len(pdf.pages)
+                            for pi, page in enumerate(pdf.pages, start=1):
+                                txt = ""
+                                try:
+                                    txt = page.extract_text() or ""
+                                except Exception:
                                     txt = ""
-                                    try:
-                                        txt = page.extract_text() or ""
-                                    except Exception:
-                                        txt = ""
 
-                                    snap_base = _norm_text_block(txt)
-                                    if len(snap_base) < 50:
-                                        empty_pages += 1
-                                    per_page_text.append((pi, txt))
+                                snap_base = _norm_text_block(txt)
+                                if len(snap_base) < 50:
+                                    empty_pages += 1
+                                per_page_text.append((pi, txt))
 
-                        except Exception as e:
-                            f.write(f"Page count: (error: {e})\n\n")
-                            continue
+                    except Exception as e:
+                        lines.append(f"Page count: (error: {e})")
+                        lines.append("")
+                        continue
 
-                    if pdfplumber_available:
-                        f.write(f"Page count: {page_count}\n")
-                        mostly_empty = (page_count > 0 and (empty_pages / page_count) >= 0.7)
-                        f.write(
-                            f"Extracted text mostly empty: {'YES' if mostly_empty else 'NO'} ({empty_pages}/{page_count} pages low-text)\n"
-                        )
-                        f.write("\n")
+                if pdfplumber_available:
+                    lines.append(f"Page count: {page_count}")
+                    mostly_empty = (page_count > 0 and (empty_pages / page_count) >= 0.7)
+                    lines.append(
+                        "Extracted text mostly empty: "
+                        f"{'YES' if mostly_empty else 'NO'} ({empty_pages}/{page_count} pages low-text)"
+                    )
+                    lines.append("")
 
-                        f.write("Per-page text snapshot:\n")
-                        for (pi, txt) in per_page_text:
-                            snap = _page_snapshot(txt)
-                            f.write("\n")
-                            f.write(f"--- Page {pi} ---\n")
-                            if snap:
-                                f.write(snap + "\n")
-                            else:
-                                f.write("<no extracted text>\n")
-                    else:
-                        f.write("Page count: (skipped - pdfplumber unavailable)\n")
-                        f.write("Per-page text snapshot: (skipped - pdfplumber unavailable)\n")
+                    lines.append("Per-page text snapshot:")
+                    for (pi, txt) in per_page_text:
+                        snap = _page_snapshot(txt)
+                        lines.append("")
+                        lines.append(f"--- Page {pi} ---")
+                        if snap:
+                            lines.append(snap)
+                        else:
+                            lines.append("<no extracted text>")
+                else:
+                    lines.append("Page count: (skipped - pdfplumber unavailable)")
+                    lines.append("Per-page text snapshot: (skipped - pdfplumber unavailable)")
 
-                    f.write("\n" + ("-" * 60) + "\n\n")
+                lines.append("")
+                lines.append("-" * 60)
+                lines.append("")
 
-                f.write("RUN SUMMARY\n")
-                f.write("-" * 60 + "\n")
-                f.write(f"Total transactions: {total_tx}\n")
-                if date_min and date_max:
-                    f.write(f"Date range: {_fmt_date(date_min)} - {_fmt_date(date_max)}\n")
-                f.write("\n")
+            lines.append("RUN SUMMARY")
+            lines.append("-" * 60)
+            lines.append(f"Total transactions: {total_tx}")
+            if date_min and date_max:
+                lines.append(f"Date range: {_fmt_date(date_min)} - {_fmt_date(date_max)}")
+            lines.append("")
 
-                f.write("Statement balances found per PDF:\n")
-                for r in recon_results:
-                    pdf = r.get("pdf") or ""
-                    sb = r.get("start_balance")
-                    eb = r.get("end_balance")
-                    sb_ok = "YES" if sb is not None and sb != "" else "NO"
-                    eb_ok = "YES" if eb is not None and eb != "" else "NO"
-                    f.write(f"- {pdf}: start_found={sb_ok}, end_found={eb_ok}\n")
-                f.write("\n")
+            lines.append("Statement balances found per PDF:")
+            for r in recon_results:
+                pdf = r.get("pdf") or ""
+                sb = r.get("start_balance")
+                eb = r.get("end_balance")
+                sb_ok = "YES" if sb is not None and sb != "" else "NO"
+                eb_ok = "YES" if eb is not None and eb != "" else "NO"
+                lines.append(f"- {pdf}: start_found={sb_ok}, end_found={eb_ok}")
+            lines.append("")
 
-                f.write("Reconciliation results:\n")
-                for r in recon_results:
-                    pdf = r.get("pdf") or ""
-                    st = r.get("status") or ""
-                    diff = r.get("difference")
-                    f.write(f"- {pdf}: {st}")
+            lines.append("Reconciliation results:")
+            for r in recon_results:
+                pdf = r.get("pdf") or ""
+                st = r.get("status") or ""
+                diff = r.get("difference")
+                line = f"- {pdf}: {st}"
+                if diff is not None and diff != "":
+                    try:
+                        line += f" (diff {float(diff):.2f})"
+                    except Exception:
+                        line += f" (diff {diff})"
+                lines.append(line)
+            lines.append("")
+
+            if continuity_results:
+                lines.append("Continuity results:")
+                for c in continuity_results:
+                    prev_pdf = c.get("prev_pdf") or ""
+                    next_pdf = c.get("next_pdf") or ""
+                    st = c.get("status") or ""
+                    diff = c.get("diff")
+                    missing = ""
+                    try:
+                        mf = c.get("missing_from")
+                        mt = c.get("missing_to")
+                        if mf and mt and hasattr(mf, "strftime") and hasattr(mt, "strftime"):
+                            missing = f" | missing {_fmt_date(mf)} - {_fmt_date(mt)}"
+                    except Exception:
+                        missing = ""
+
+                    line = f"- {prev_pdf} -> {next_pdf}: {st}"
                     if diff is not None and diff != "":
                         try:
-                            f.write(f" (diff {float(diff):.2f})")
+                            line += f" (diff {float(diff):.2f})"
                         except Exception:
-                            f.write(f" (diff {diff})")
-                    f.write("\n")
-                f.write("\n")
+                            line += f" (diff {diff})"
+                    if missing:
+                        line += missing
+                    lines.append(line)
+                lines.append("")
 
-                if continuity_results:
-                    f.write("Continuity results:\n")
-                    for c in continuity_results:
-                        prev_pdf = c.get("prev_pdf") or ""
-                        next_pdf = c.get("next_pdf") or ""
-                        st = c.get("status") or ""
-                        diff = c.get("diff")
-                        missing = ""
-                        try:
-                            mf = c.get("missing_from")
-                            mt = c.get("missing_to")
-                            if mf and mt and hasattr(mf, "strftime") and hasattr(mt, "strftime"):
-                                missing = f" | missing {_fmt_date(mf)} - {_fmt_date(mt)}"
-                        except Exception:
-                            missing = ""
-
-                        f.write(f"- {prev_pdf} -> {next_pdf}: {st}")
-                        if diff is not None and diff != "":
-                            try:
-                                f.write(f" (diff {float(diff):.2f})")
-                            except Exception:
-                                f.write(f" (diff {diff})")
-                        if missing:
-                            f.write(missing)
-                        f.write("\n")
-                    f.write("\n")
-
-                if exception is not None:
-                    f.write("EXCEPTION\n")
-                    f.write("-" * 60 + "\n")
-                    f.write(f"Type: {type(exception).__name__}\n")
-                    f.write(f"Message: {exception}\n\n")
-                    tb = "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
-                    f.write(tb)
-                    f.write("\n")
-
-            try:
-                if self.last_report_data is None:
-                    self.last_report_data = {}
-                self.last_report_data["learning_report_path"] = report_path
-            except Exception:
-                pass
-
-            return report_path
-
+            if exception is not None:
+                lines.append("EXCEPTION")
+                lines.append("-" * 60)
+                lines.append(f"Type: {type(exception).__name__}")
+                lines.append(f"Message: {exception}")
+                lines.append("")
+                tb = "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+                lines.append(tb.rstrip())
+                lines.append("")
         except Exception as e:
             err = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             try:
@@ -899,23 +847,34 @@ class App(TkinterDnD.Tk):
                 self.last_report_data["learning_report_error"] = err
             except Exception:
                 pass
+            return None, None, err
 
+        report_text = "\n".join(lines).rstrip() + "\n"
+
+        try:
+            ensure_folder(LOGS_DIR)
+            report_path = make_unique_path(os.path.join(LOGS_DIR, report_name))
+            with open(report_path, "w", encoding="utf-8") as f:
+                f.write(report_text)
+        except Exception as e:
+            err = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             try:
-                ensure_folder(LOGS_DIR)
-                ts_fail = datetime.now().strftime("%Y%m%d_%H%M%S")
-                fail_name = f"LEARNING_FAILED - {ts_fail}.txt"
-                fail_path = make_unique_path(os.path.join(LOGS_DIR, fail_name))
-                with open(fail_path, "w", encoding="utf-8") as f:
-                    f.write("LEARNING REPORT FAILED\n")
-                    f.write("=" * 60 + "\n\n")
-                    f.write(err)
-                try:
-                    self.last_report_data["learning_report_path"] = fail_path
-                except Exception:
-                    pass
-                return fail_path
+                if self.last_report_data is None:
+                    self.last_report_data = {}
+                self.last_report_data["learning_report_inline"] = report_text
+                self.last_report_data["learning_report_error"] = err
             except Exception:
-                return None
+                pass
+            return None, report_text, err
+
+        try:
+            if self.last_report_data is None:
+                self.last_report_data = {}
+            self.last_report_data["learning_report_path"] = report_path
+        except Exception:
+            pass
+
+        return report_path, report_text, None
 
     def clear_list(self):
         self.selected_files = []
