@@ -685,6 +685,11 @@ class App(TkinterDnD.Tk):
 
                 f.write("PDF SUMMARY\n")
                 f.write("-" * 60 + "\n")
+                if not pdfplumber_available:
+                    f.write(
+                        "pdfplumber is not available; skipping PDF text extraction for this report.\n"
+                    )
+                    f.write("\n")
 
                 for pdf_path in source_pdfs:
                     f.write(f"PDF: {os.path.basename(pdf_path)}\n")
@@ -694,41 +699,46 @@ class App(TkinterDnD.Tk):
                     empty_pages = 0
                     per_page_text = []
 
-                    try:
-                        with pdfplumber.open(pdf_path) as pdf:
-                            page_count = len(pdf.pages)
-                            for pi, page in enumerate(pdf.pages, start=1):
-                                txt = ""
-                                try:
-                                    txt = page.extract_text() or ""
-                                except Exception:
+                    if pdfplumber_available:
+                        try:
+                            with pdfplumber.open(pdf_path) as pdf:
+                                page_count = len(pdf.pages)
+                                for pi, page in enumerate(pdf.pages, start=1):
                                     txt = ""
+                                    try:
+                                        txt = page.extract_text() or ""
+                                    except Exception:
+                                        txt = ""
 
-                                snap_base = _norm_text_block(txt)
-                                if len(snap_base) < 50:
-                                    empty_pages += 1
-                                per_page_text.append((pi, txt))
+                                    snap_base = _norm_text_block(txt)
+                                    if len(snap_base) < 50:
+                                        empty_pages += 1
+                                    per_page_text.append((pi, txt))
 
-                    except Exception as e:
-                        f.write(f"Page count: (error: {e})\n\n")
-                        continue
+                        except Exception as e:
+                            f.write(f"Page count: (error: {e})\n\n")
+                            continue
 
-                    f.write(f"Page count: {page_count}\n")
-                    mostly_empty = (page_count > 0 and (empty_pages / page_count) >= 0.7)
-                    f.write(
-                        f"Extracted text mostly empty: {'YES' if mostly_empty else 'NO'} ({empty_pages}/{page_count} pages low-text)\n"
-                    )
-                    f.write("\n")
-
-                    f.write("Per-page text snapshot:\n")
-                    for (pi, txt) in per_page_text:
-                        snap = _page_snapshot(txt)
+                    if pdfplumber_available:
+                        f.write(f"Page count: {page_count}\n")
+                        mostly_empty = (page_count > 0 and (empty_pages / page_count) >= 0.7)
+                        f.write(
+                            f"Extracted text mostly empty: {'YES' if mostly_empty else 'NO'} ({empty_pages}/{page_count} pages low-text)\n"
+                        )
                         f.write("\n")
-                        f.write(f"--- Page {pi} ---\n")
-                        if snap:
-                            f.write(snap + "\n")
-                        else:
-                            f.write("<no extracted text>\n")
+
+                        f.write("Per-page text snapshot:\n")
+                        for (pi, txt) in per_page_text:
+                            snap = _page_snapshot(txt)
+                            f.write("\n")
+                            f.write(f"--- Page {pi} ---\n")
+                            if snap:
+                                f.write(snap + "\n")
+                            else:
+                                f.write("<no extracted text>\n")
+                    else:
+                        f.write("Page count: (skipped - pdfplumber unavailable)\n")
+                        f.write("Per-page text snapshot: (skipped - pdfplumber unavailable)\n")
 
                     f.write("\n" + ("-" * 60) + "\n\n")
 
