@@ -1654,6 +1654,10 @@ class App(TkinterDnD.Tk):
                     pass
                 try:
                     self.create_support_bundle_zip()
+                except Exception:
+                    pass
+                try:
+                    self.create_support_bundle_zip()
                 except Exception as e:
                     messagebox.showwarning(
                         "Support bundle",
