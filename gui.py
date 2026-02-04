@@ -576,6 +576,7 @@ class App(TkinterDnD.Tk):
 
 
     def generate_learning_report(self, reason: str | None = None, exception: Exception | None = None):
+        pdfplumber = _require_pdfplumber(show_error=False)
         if pdfplumber is None:
             return None
 
