@@ -1603,7 +1603,9 @@ class App(TkinterDnD.Tk):
 
             self.last_saved_output_path = None
             any_warn = any((r.get("status") or "") != "OK" for r in (recon_results or [])) or any(
-                not _status_startswith((r.get("status") or ""), "OK") for r in (continuity_results or [])
+                not _status_startswith((c.get("display_status") or c.get("status") or ""), "OK")
+                for c in (continuity_results or [])
+                if isinstance(c, dict)
             )
 
             autodetect_first_pdf = None
@@ -1645,24 +1647,25 @@ class App(TkinterDnD.Tk):
             if any_issue:
                 any_recon_mismatch = any((r.get("status") or "") == "Mismatch" for r in (recon_results or []))
                 any_cont_mismatch = any(
-                    _status_startswith((r.get("status") or ""), "Mismatch") for r in (continuity_results or [])
+                    _status_startswith((c.get("display_status") or c.get("status") or ""), "Mismatch")
+                    for c in (continuity_results or [])
+                    if isinstance(c, dict)
                 )
                 issue_reason = "Mismatch" if (any_recon_mismatch or any_cont_mismatch) else "Issue"
                 try:
                     self.generate_learning_report(reason=issue_reason)
                 except Exception:
                     pass
-                try:
+
+            # Auto-create support bundle when we have an issue OR warnings.
+            try:
+                if any_issue or any_warn:
                     self.create_support_bundle_zip()
-                except Exception:
-                    pass
-                try:
-                    self.create_support_bundle_zip()
-                except Exception as e:
-                    messagebox.showwarning(
-                        "Support bundle",
-                        f"Could not create support bundle automatically:\n{e}",
-                    )
+            except Exception as e:
+                messagebox.showwarning(
+                    "Support bundle",
+                    f"Could not create support bundle automatically:\n{e}",
+                )
 
             proceed = show_reconciliation_popup(
                 self,
