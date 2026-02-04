@@ -1,4 +1,4 @@
-# Version: 2.04
+# Version: 2.05
 import os
 import traceback
 import zipfile
@@ -540,6 +540,12 @@ class App(TkinterDnD.Tk):
 
                 if learning_report_exists:
                     zf.write(learning_report_path, arcname=os.path.basename(learning_report_path))
+                else:
+                    zf.writestr(
+                        "LEARNING_REPORT_MISSING.txt",
+                        "Learning report was not created or could not be found on disk at bundle time.\n"
+                        "If LEARNING_FAILED exists in Logs, it should be included.\n",
+                    )
 
                 for p in pdf_paths:
                     if not p or not os.path.exists(p):
@@ -586,8 +592,32 @@ class App(TkinterDnD.Tk):
 
         try:
             ensure_folder(LOGS_DIR)
-        except Exception:
-            return None
+        except Exception as e:
+            # Last-resort: write a failure report so support bundles always include something.
+            try:
+                ensure_folder(LOGS_DIR)
+                ts_fail = datetime.now().strftime("%Y%m%d_%H%M%S")
+                bank_fail = sanitize_filename((self.bank_var.get() or "Unknown").strip()) or "Unknown"
+                fail_name = f"LEARNING_FAILED - {ts_fail} - {bank_fail}.txt"
+                fail_path = make_unique_path(os.path.join(LOGS_DIR, fail_name))
+                with open(fail_path, "w", encoding="utf-8") as f:
+                    f.write("LEARNING REPORT FAILED\n")
+                    f.write("=" * 60 + "\n\n")
+                    f.write("Exception:\n")
+                    f.write(f"Type: {type(e).__name__}\n")
+                    f.write(f"Message: {e}\n\n")
+                    f.write("Traceback:\n")
+                    f.write("".join(traceback.format_exception(type(e), e, e.__traceback__)))
+                    f.write("\n")
+                try:
+                    if self.last_report_data is None:
+                        self.last_report_data = {}
+                    self.last_report_data["learning_report_path"] = fail_path
+                except Exception:
+                    pass
+                return fail_path
+            except Exception:
+                return None
 
         data = self.last_report_data or {}
         bank = (data.get("bank") or self.bank_var.get() or "").strip() or "Unknown"
