@@ -483,6 +483,11 @@ class App(TkinterDnD.Tk):
                     pass
 
             learning_report_path = data.get("learning_report_path") or ""
+            if not learning_report_path:
+                try:
+                    learning_report_path = self.generate_learning_report(reason="Support bundle") or ""
+                except Exception:
+                    learning_report_path = ""
             learning_report_exists = bool(learning_report_path and os.path.exists(learning_report_path))
 
             pdf_paths = list(data.get("source_pdfs") or [])
