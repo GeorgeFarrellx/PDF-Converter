@@ -1656,6 +1656,13 @@ class App(TkinterDnD.Tk):
                     self.create_support_bundle_zip()
                 except Exception:
                     pass
+                try:
+                    self.create_support_bundle_zip()
+                except Exception as e:
+                    messagebox.showwarning(
+                        "Support bundle",
+                        f"Could not create support bundle automatically:\n{e}",
+                    )
 
             proceed = show_reconciliation_popup(
                 self,
