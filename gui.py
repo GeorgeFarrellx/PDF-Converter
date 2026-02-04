@@ -1,4 +1,4 @@
-# Version: 2.02
+# Version: 2.03
 import os
 import traceback
 import zipfile
@@ -133,12 +133,6 @@ class App(TkinterDnD.Tk):
         self.cleanup_btn = ttk.Button(run_row, text="Clean Up", command=self.clean_up)
         self.cleanup_btn.pack(side="left", padx=10)
 
-        self.show_checks_btn = ttk.Button(run_row, text="Show Checks", command=self.show_last_checks)
-        self.show_checks_btn.pack(side="left", padx=10)
-
-        self.save_again_btn = ttk.Button(run_row, text="Save Output", command=self.save_last_output)
-        self.save_again_btn.pack(side="left", padx=10)
-
         ttk.Separator(root).pack(fill="x", pady=(18, 8))
         ttk.Label(root, text="Status:").pack(anchor="w")
         self.progress = ttk.Progressbar(root, mode="determinate", maximum=100)
@@ -146,11 +140,14 @@ class App(TkinterDnD.Tk):
         self.status_label = ttk.Label(root, textvariable=self.status_var)
         self.status_label.pack(anchor="w", pady=(2, 0))
 
-        help_text = (
-            "Tip: This tool expects PDF statements. It will combine all PDFs you add into one Excel file.\n"
-            "If auto-detect is on, it will set the bank based on the first PDF."
-        )
-        ttk.Label(root, text=help_text, foreground="#555").pack(anchor="w", pady=(12, 0))
+        post_row = ttk.Frame(root)
+        post_row.pack(fill="x", pady=(12, 0))
+
+        self.show_checks_btn = ttk.Button(post_row, text="Show Checks", command=self.show_last_checks)
+        self.show_checks_btn.pack(side="left")
+
+        self.save_again_btn = ttk.Button(post_row, text="Save Output", command=self.save_last_output)
+        self.save_again_btn.pack(side="left", padx=10)
 
     def _wire_dnd(self):
         self.drop_box.drop_target_register(DND_FILES)
