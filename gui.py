@@ -508,6 +508,28 @@ class App(TkinterDnD.Tk):
                         return candidate
                     n += 1
 
+            snapshot_files = []
+            missing_snapshot = []
+
+            gui_path = os.path.abspath(__file__)
+            if os.path.exists(gui_path):
+                snapshot_files.append((gui_path, "CODE_SNAPSHOT/gui.py"))
+            else:
+                missing_snapshot.append("gui.py")
+
+            core_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "core.py")
+            if os.path.exists(core_path):
+                snapshot_files.append((core_path, "CODE_SNAPSHOT/core.py"))
+            else:
+                missing_snapshot.append("core.py")
+
+            parser_path = data.get("parser_file") or ""
+            parser_basename = os.path.basename(parser_path) if parser_path else ""
+            if parser_path and os.path.exists(parser_path):
+                snapshot_files.append((parser_path, f"CODE_SNAPSHOT/{parser_basename}"))
+            else:
+                missing_snapshot.append(parser_basename or "parser file")
+
             with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
                 zf.write(excel_source, arcname=os.path.basename(excel_source))
 
@@ -525,6 +547,15 @@ class App(TkinterDnD.Tk):
                     unique = _unique_zip_name(safe)
                     arcname = "Source PDFs/" + unique
                     zf.write(p, arcname=arcname)
+
+                for local_path, arcname in snapshot_files:
+                    zf.write(local_path, arcname=arcname)
+
+                if missing_snapshot:
+                    zf.writestr(
+                        "CODE_SNAPSHOT/_MISSING_FILES.txt",
+                        "\n".join(sorted(set(missing_snapshot))) + "\n",
+                    )
 
             zip_created = True
 
