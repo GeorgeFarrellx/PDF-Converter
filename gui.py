@@ -582,7 +582,8 @@ class App(TkinterDnD.Tk):
 
     def generate_learning_report(self, reason: str | None = None, exception: Exception | None = None):
         pdfplumber = _require_pdfplumber(show_error=False)
-        pdfplumber_available = pdfplumber is not None
+        if pdfplumber is None:
+            return None
 
         try:
             ensure_folder(LOGS_DIR)
