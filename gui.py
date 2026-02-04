@@ -1590,7 +1590,6 @@ class App(TkinterDnD.Tk):
 
             any_issue = any_issue or any_cont_issue or any_gap
 
-            log_written = False
             recon_log_path = None
 
             initial_dir = ""
@@ -1643,20 +1642,18 @@ class App(TkinterDnD.Tk):
                 "initial_dir": initial_dir,
             }
 
-            if any_issue or any_warn:
+            if any_issue:
+                any_recon_mismatch = any((r.get("status") or "") == "Mismatch" for r in (recon_results or []))
+                any_cont_mismatch = any(
+                    _status_startswith((r.get("status") or ""), "Mismatch") for r in (continuity_results or [])
+                )
+                issue_reason = "Mismatch" if (any_recon_mismatch or any_cont_mismatch) else "Issue"
+                try:
+                    self.generate_learning_report(reason=issue_reason)
+                except Exception:
+                    pass
                 try:
                     self.create_support_bundle_zip()
-                except Exception as e:
-                    messagebox.showwarning(
-                        "Support bundle",
-                        f"Could not create support bundle automatically:\n{e}",
-                    )
-
-            any_recon_mismatch = any((r.get("status") or "") == "Mismatch" for r in (recon_results or []))
-            any_cont_mismatch = any(_status_startswith((r.get("status") or ""), "Mismatch") for r in (continuity_results or []))
-            if any_recon_mismatch or any_cont_mismatch:
-                try:
-                    self.generate_learning_report(reason="Mismatch")
                 except Exception:
                     pass
 
