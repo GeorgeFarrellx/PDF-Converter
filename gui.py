@@ -1,4 +1,4 @@
-# Version: 2.09
+# Version: 2.10
 import os
 import re
 import subprocess
@@ -307,6 +307,11 @@ class App(TkinterDnD.Tk):
 
         data = self.last_report_data or {}
 
+        learning_report_path = data.get("learning_report_path") or ""
+        learning_report_inline = data.get("learning_report_inline") or ""
+        learning_report_error = data.get("learning_report_error") or ""
+        learning_report_generated = bool(data.get("learning_report_generated"))
+
         # Support bundle gating: treat any warnings/failures/NOT CHECKED/balances missing as issues.
         def _status_is_ok(s) -> bool:
             try:
@@ -443,7 +448,9 @@ class App(TkinterDnD.Tk):
                 excel_source = temp_excel_path
                 created_temp_excel = True
 
-            log_path = data.get("log_path") or ""
+            recon_log_path = data.get("log_path") or ""
+            log_path = recon_log_path
+            support_log_path = ""
             log_exists = bool(log_path and os.path.exists(log_path))
 
             # If no log exists (common when continuity is NOT CHECKED), create a lightweight support log now.
@@ -508,11 +515,12 @@ class App(TkinterDnD.Tk):
                 except Exception:
                     pass
 
-            learning_report_path = data.get("learning_report_path") or ""
-            learning_report_inline = data.get("learning_report_inline") or ""
-            learning_report_error = data.get("learning_report_error") or ""
-
-            if not learning_report_path and not learning_report_inline and not learning_report_error:
+            if (
+                not learning_report_generated
+                and not learning_report_path
+                and not learning_report_inline
+                and not learning_report_error
+            ):
                 try:
                     report_path, report_text, report_err = self.generate_learning_report(
                         reason="Support bundle"
@@ -524,8 +532,6 @@ class App(TkinterDnD.Tk):
                     learning_report_error = "".join(
                         traceback.format_exception(type(e), e, e.__traceback__)
                     )
-
-            learning_report_exists = bool(learning_report_path and os.path.exists(learning_report_path))
 
             pdf_paths = list(data.get("source_pdfs") or [])
 
@@ -576,11 +582,10 @@ class App(TkinterDnD.Tk):
                 if log_exists:
                     zf.write(log_path, arcname="Reconciliation Log.txt")
 
-                if learning_report_exists:
-                    ext = os.path.splitext(learning_report_path)[1] or ".txt"
-                    zf.write(learning_report_path, arcname=f"Learning Report{ext}")
-                elif learning_report_inline:
-                    zf.writestr("LEARNING REPORT.txt", learning_report_inline)
+                if learning_report_inline:
+                    zf.writestr("Learning Report.txt", learning_report_inline)
+                elif learning_report_path and os.path.exists(learning_report_path):
+                    zf.write(learning_report_path, arcname="Learning Report.txt")
                 elif learning_report_error:
                     zf.writestr("LEARNING_FAILED_INLINE.txt", learning_report_error)
                 else:
@@ -609,6 +614,13 @@ class App(TkinterDnD.Tk):
                     )
 
             zip_created = True
+
+            for p in [recon_log_path, support_log_path, learning_report_path]:
+                if p and os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except Exception:
+                        pass
 
             if created_temp_excel and temp_excel_path and os.path.exists(temp_excel_path):
                 try:
@@ -861,6 +873,13 @@ class App(TkinterDnD.Tk):
             return None, None, err
 
         report_text = "\n".join(lines).rstrip() + "\n"
+
+        try:
+            if self.last_report_data is None:
+                self.last_report_data = {}
+            self.last_report_data["learning_report_generated"] = True
+        except Exception:
+            pass
 
         try:
             ensure_folder(LOGS_DIR)
@@ -1713,6 +1732,7 @@ class App(TkinterDnD.Tk):
                 "any_warn": bool(any_warn),
                 "log_path": recon_log_path,
                 "learning_report_path": None,
+                "learning_report_generated": False,
                 "output_xlsx_path": None,
                 "bundle_base": os.path.splitext(filename)[0],
                 "bank": bank,
@@ -1814,6 +1834,7 @@ class App(TkinterDnD.Tk):
                         "any_warn": True,
                         "log_path": None,
                         "learning_report_path": None,
+                        "learning_report_generated": False,
                         "output_xlsx_path": None,
                         "bundle_base": "RUN",
                         "bank": bank,
