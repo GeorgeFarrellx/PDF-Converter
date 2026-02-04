@@ -1,4 +1,4 @@
-# Version: 2.07
+# Version: 2.08
 import os
 import subprocess
 import sys
@@ -419,7 +419,8 @@ class App(TkinterDnD.Tk):
                 bundle_base = "RUN"
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        zip_name = f"SUPPORT BUNDLE - {bundle_base} - {ts}.zip"
+        safe_base = sanitize_filename(bundle_base) or "RUN"
+        zip_name = f"{safe_base}.zip"
         zip_path = make_unique_path(os.path.join(LOGS_DIR, zip_name))
 
         transactions = self.last_excel_data.get("transactions") or []
@@ -553,22 +554,26 @@ class App(TkinterDnD.Tk):
                 missing_snapshot.append(parser_basename or "parser file")
 
             with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-                zf.write(excel_source, arcname=os.path.basename(excel_source))
+                excel_arc = f"{safe_base}.xlsx"
+                zf.write(excel_source, arcname=excel_arc)
 
                 if log_exists:
-                    zf.write(log_path, arcname=os.path.basename(log_path))
+                    zf.write(log_path, arcname="Reconciliation Log.txt")
 
                 if learning_report_exists:
-                    zf.write(learning_report_path, arcname=os.path.basename(learning_report_path))
+                    ext = os.path.splitext(learning_report_path)[1] or ".txt"
+                    zf.write(learning_report_path, arcname=f"Learning Report{ext}")
                 else:
                     err = (data.get("learning_report_error") or "").strip()
+                    lines = [
+                        "Learning report was not created or could not be found on disk at bundle time.",
+                        "If LEARNING_FAILED exists in Logs, it should be included.",
+                    ]
                     if err:
-                        zf.writestr("LEARNING_FAILED_INLINE.txt", err)
-                    zf.writestr(
-                        "LEARNING_REPORT_MISSING.txt",
-                        "Learning report was not created or could not be found on disk at bundle time.\n"
-                        "If LEARNING_FAILED exists in Logs, it should be included.\n",
-                    )
+                        lines.append("")
+                        lines.append("Error:")
+                        lines.append(err)
+                    zf.writestr("Learning Report.txt", "\n".join(lines).rstrip() + "\n")
 
                 for p in pdf_paths:
                     if not p or not os.path.exists(p):
