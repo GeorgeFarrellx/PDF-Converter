@@ -1,4 +1,4 @@
-# Version: 2.13
+# Version: 2.14
 import os
 import re
 import subprocess
@@ -62,6 +62,213 @@ def _fmt_money(v) -> str:
             return str(v) if v is not None else ""
         except Exception:
             return ""
+
+
+def show_reconciliation_popup(
+    parent,
+    output_path: str,
+    recon_results: list[dict],
+    coverage_period: str = "",
+    continuity_results: list[dict] | None = None,
+    pre_save: bool = False,
+    open_log_folder_callback=None,
+):
+    continuity_results = continuity_results or []
+
+    any_recon_warn = any((r.get("status") or "") != "OK" for r in (recon_results or []))
+    any_cont_warn = any(
+        not str((r.get("display_status") or r.get("status") or "")).strip().upper().startswith("OK")
+        for r in (continuity_results or [])
+    )
+    any_warn = any_recon_warn or any_cont_warn
+
+    def _norm_date(v):
+        try:
+            if v is None or v == "":
+                return None
+            if hasattr(v, "to_pydatetime"):
+                v = v.to_pydatetime()
+            if hasattr(v, "date") and not isinstance(v, date):
+                return v.date()
+            return v
+        except Exception:
+            return None
+
+    def _recon_sort_key(r):
+        d = _norm_date(r.get("date_min"))
+        d = d or _norm_date(r.get("date_max"))
+        return (d or date.min, str(r.get("pdf") or ""))
+
+    def _fmt_period(ps, pe) -> str:
+        try:
+            if ps and pe and hasattr(ps, "strftime") and hasattr(pe, "strftime"):
+                return f"{ps.strftime('%d/%m/%Y')} - {pe.strftime('%d/%m/%Y')}"
+        except Exception:
+            return ""
+        return ""
+
+    recon_results = sorted(list(recon_results or []), key=_recon_sort_key)
+    period_by_pdf = {
+        str(r.get("pdf") or ""): _fmt_period(r.get("period_start"), r.get("period_end"))
+        for r in (recon_results or [])
+    }
+
+    win = tk.Toplevel(parent)
+    win.transient(parent)
+    win.grab_set()
+
+    win.title("Reconciliation warning" if any_warn else "Success")
+    win.geometry("820x560")
+
+    outer = ttk.Frame(win, padding=14)
+    outer.pack(fill="both", expand=True)
+
+    icon = "✖" if any_warn else "✔"
+    icon_color = "#b00020" if any_warn else "#0b6e0b"
+
+    head = ttk.Frame(outer)
+    head.pack(fill="x")
+
+    ttk.Label(head, text=icon, foreground=icon_color, font=("Segoe UI", 18, "bold")).pack(side="left")
+
+    title_text = "Checks completed with warnings" if any_warn else (
+        "Checks completed" if pre_save else "Excel created successfully"
+    )
+    ttk.Label(head, text=title_text, font=("Segoe UI", 13, "bold")).pack(side="left", padx=(10, 0))
+
+    path_row = ttk.Frame(outer)
+    path_row.pack(fill="x", pady=(10, 0))
+
+    ttk.Label(path_row, text="Output:").pack(side="left")
+    ttk.Label(path_row, text=output_path, foreground="#333").pack(side="left", padx=(6, 0))
+
+    txt = tk.Text(outer, height=22, wrap="word")
+    txt.pack(fill="both", expand=True, pady=(12, 0))
+
+    txt.tag_configure("section", font=("Segoe UI", 10, "bold"))
+    txt.tag_configure("ok", foreground="#0b6e0b")
+    txt.tag_configure("bad", foreground="#b00020")
+    txt.tag_configure("warn", foreground="#8a6d3b")
+    txt.tag_configure("info", foreground="#333")
+
+    if coverage_period:
+        if any_warn:
+            line = (
+                f"The bank statements cover the period from {coverage_period} "
+                "(however, some checks could not be completed or warnings were detected — see below).\n\n"
+            )
+        else:
+            line = f"The bank statements cover the period from {coverage_period}.\n\n"
+
+        txt.insert("end", line, "info")
+
+    txt.insert("end", "Reconciliation check:\n", "section")
+    for r in recon_results:
+        status = (r.get("status") or "").strip()
+        pdf = r.get("pdf") or ""
+
+        ps = r.get("period_start")
+        pe = r.get("period_end")
+        if ps and pe and hasattr(ps, "strftime") and hasattr(pe, "strftime"):
+            period_str = f"Period: {ps.strftime('%d/%m/%Y')} - {pe.strftime('%d/%m/%Y')}"
+        else:
+            period_str = "Period: None"
+
+        if status == "OK":
+            msg = (
+                f"OK: {pdf} "
+                f"(Start {_fmt_money(r.get('start_balance'))}, Net {_fmt_money(r.get('sum_amounts'))}, End {_fmt_money(r.get('end_balance'))})"
+            )
+            tag = "ok"
+        elif status == "Mismatch":
+            msg = (
+                f"MISMATCH: {pdf} "
+                f"(Start {_fmt_money(r.get('start_balance'))}, Net {_fmt_money(r.get('sum_amounts'))}, End {_fmt_money(r.get('end_balance'))}, Diff {_fmt_money(r.get('difference'))})"
+            )
+            tag = "bad"
+        elif status == "Statement balances not found":
+            msg = f"NOT CHECKED: {pdf} (statement balances not found)"
+            tag = "warn"
+        elif status == "Not supported by parser":
+            msg = f"NOT CHECKED: {pdf} (balances not supported by parser)"
+            tag = "warn"
+        else:
+            msg = f"NOT CHECKED: {pdf} ({status or 'not checked'})"
+            tag = "warn"
+
+        txt.insert("end", msg + f" | {period_str}\n", tag)
+
+    txt.insert("end", "\n")
+
+    if continuity_results:
+        txt.insert("end", "Statement continuity check:\n", "section")
+
+        for c in continuity_results:
+            status = (c.get("display_status") or c.get("status") or "").strip()
+            prev_pdf = c.get("prev_pdf") or ""
+            next_pdf = c.get("next_pdf") or ""
+
+            prev_end = c.get("prev_end")
+            next_start = c.get("next_start")
+
+            period_value = _fmt_period(c.get("period_start"), c.get("period_end")) or period_by_pdf.get(next_pdf, "")
+            period_part = f" | Period: {period_value}" if period_value else ""
+
+            if prev_end is None or next_start is None:
+                msg = (
+                    f"NOT CHECKED: {prev_pdf} -> {next_pdf} (balances not found) "
+                    f"[prev_end_raw={c.get('prev_end_raw')!r}, next_start_raw={c.get('next_start_raw')!r}, "
+                    f"prev_end={c.get('prev_end')!r}, next_start={c.get('next_start')!r}]"
+                )
+                msg = msg + period_part
+                tag = "warn"
+            elif status.upper().startswith("OK"):
+                status_prefix = status if status != "OK" else "OK"
+                msg = f"{status_prefix}: {prev_pdf} -> {next_pdf}{period_part} (Balance Match)"
+                tag = "ok"
+            elif status.upper().startswith("MISMATCH"):
+                missing = ""
+                try:
+                    mf = c.get("missing_from")
+                    mt = c.get("missing_to")
+                    if mf and mt and hasattr(mf, "strftime") and hasattr(mt, "strftime"):
+                        missing = f" Missing: {mf.strftime('%d/%m/%Y')} - {mt.strftime('%d/%m/%Y')}"
+                except Exception:
+                    missing = ""
+
+                msg = (
+                    f"MISMATCH: {prev_pdf} -> {next_pdf} "
+                    f"(End {_fmt_money(prev_end)} vs Start {_fmt_money(next_start)}, Diff {_fmt_money(c.get('diff'))}){missing}"
+                )
+                msg = msg + period_part
+                tag = "bad"
+            else:
+                msg = (
+                    f"{status or 'NOT CHECKED'}: {prev_pdf} -> {next_pdf} "
+                    f"(End {_fmt_money(prev_end)} vs Start {_fmt_money(next_start)}, Diff {_fmt_money(c.get('diff'))})"
+                )
+                msg = msg + period_part
+                tag = "warn"
+
+            txt.insert("end", msg + "\n", tag)
+
+        txt.insert("end", "\n")
+
+    btn_row = ttk.Frame(win)
+    btn_row.pack(fill="x", pady=(8, 10))
+
+    close_btn = ttk.Button(btn_row, text="Close", command=win.destroy)
+    close_btn.pack()
+
+    try:
+        close_btn.focus_set()
+        win.bind("<Return>", lambda e: win.destroy())
+        win.bind("<Escape>", lambda e: win.destroy())
+    except Exception:
+        pass
+
+    parent.wait_window(win)
+    return True
 
 
 # ----------------------------
@@ -1873,7 +2080,7 @@ class App(TkinterDnD.Tk):
                 except Exception:
                     pass
 
-            proceed = show_reconciliation_popup(
+            show_reconciliation_popup(
                 self,
                 "(Not saved yet)",
                 recon_results,
@@ -1882,10 +2089,6 @@ class App(TkinterDnD.Tk):
                 pre_save=True,
                 open_log_folder_callback=self.open_log_folder,
             )
-
-            if not proceed:
-                self.set_status("Cancelled.")
-                return
 
             output_path = filedialog.asksaveasfilename(
                 title="Save Excel file",
