@@ -142,6 +142,7 @@ https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/c
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/gui.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/launcher.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/VERSION.txt
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/CHATGPT_CONTEXT.md
 
 ### Parsers
 
