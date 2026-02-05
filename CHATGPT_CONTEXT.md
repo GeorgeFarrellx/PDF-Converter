@@ -98,7 +98,42 @@ Contract rules:
 - Do not assume logs are complete, committed, or authoritative for business logic decisions.
 - Do not assume undocumented parser side effects are acceptable.
 
-## Raw Links
+## OWNERSHIP BOUNDARIES
+
+- `main*.py`: orchestration only (no bank-specific parsing logic).
+- `core*.py`: reconciliation/continuity/support bundle logic (no bank-specific parsing).
+- `gui*.py`: UI only (no parsing/reconciliation logic).
+- `Parsers/*.py`: bank-specific parsing only (no categorisation logic, no reconciliation logic).
+
+## PARSER INTERFACE CONTRACT (MANDATORY)
+
+Each parser must expose:
+- `extract_transactions(pdf_path) -> list[dict]`
+- `extract_statement_balances(pdf_path) -> dict` (start_balance/end_balance or equivalent)
+- `extract_account_holder_name(pdf_path) -> str`
+- `extract_statement_period(pdf_path) -> (date|None, date|None)` (required where supported)
+
+Rules:
+- Text-based PDFs only (NO OCR).
+- Must handle multi-page PDFs.
+- Must not alter parsed raw transaction values after extraction.
+- Must not perform categorisation (categorisation only populates the Category column elsewhere).
+
+## VERSIONING RULES
+
+- If a file is created, renamed, or version-bumped, it MUST be added to `CHATGPT_CONTEXT.md` in the same commit.
+- Parser changes: bump filename version if versioned naming is used (e.g., `bank-1.6.py -> bank-1.7.py`).
+- Do not delete old versions unless explicitly instructed.
+- Keep imports/references consistent when versions change (or remain version-agnostic where already implemented).
+
+## CONTINUITY & RECONCILIATION INVARIANTS
+
+- “Continuity not checked” is an error condition (not a success).
+- “Balances not found” must be treated as a detectable issue.
+- Statement periods should be displayed in chronological order.
+- UI text changes must not change reconciliation/continuity logic.
+
+## FILE LINKS (single source of truth)
 
 ### Root app files
 
