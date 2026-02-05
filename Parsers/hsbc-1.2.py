@@ -385,7 +385,7 @@ def extract_transactions(pdf_path: str):
                 # Only date-leading lines are eligible transaction lines.
                 if not parsed_date:
                     # Continuation line (details column only; never amounts/balances)
-                    if current_txn and left:
+                    if current_txn and left and not paid_out_cell and not paid_in_cell and not balance_cell:
                         current_txn["desc_lines"].append(left)
                     continue
 
