@@ -1,4 +1,4 @@
-# Version: hsbc-1.1.py
+# Version: hsbc-1.2.py
 import os
 import re
 from datetime import date, datetime
@@ -381,10 +381,15 @@ def extract_transactions(pdf_path: str):
                 parsed_date, current_year, last_month, left_after_date = _parse_date_from_left(
                     left, current_year, last_month
                 )
-                if parsed_date:
-                    current_date = parsed_date
-                if current_date is None:
+
+                # Only date-leading lines are eligible transaction lines.
+                if not parsed_date:
+                    # Continuation line (details column only; never amounts/balances)
+                    if current_txn and left:
+                        current_txn["desc_lines"].append(left)
                     continue
+
+                current_date = parsed_date
 
                 # New transaction row start?
                 if left_after_date and _is_row_start(left_after_date):

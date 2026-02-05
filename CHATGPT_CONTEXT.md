@@ -148,7 +148,7 @@ https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/C
 
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/barclays-1.1.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/halifax-1.1.py
-https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/hsbc-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/hsbc-1.2.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/lloyds-1.1.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/lloyds-1.2.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/monzo-1.1.py
