@@ -167,12 +167,20 @@ def show_reconciliation_popup(
         status = (r.get("status") or "").strip()
         pdf = r.get("pdf") or ""
 
-        ps = r.get("period_start")
-        pe = r.get("period_end")
-        if ps and pe and hasattr(ps, "strftime") and hasattr(pe, "strftime"):
-            period_str = f"Period: {ps.strftime('%d/%m/%Y')} - {pe.strftime('%d/%m/%Y')}"
+        transactions = r.get("transactions")
+        if isinstance(transactions, list):
+            txn_count = len(transactions)
         else:
-            period_str = "Period: None"
+            txn_count = 0
+            for count_key in ("txn_count", "transaction_count"):
+                count_val = r.get(count_key)
+                if count_val is None:
+                    continue
+                try:
+                    txn_count = int(count_val)
+                    break
+                except Exception:
+                    continue
 
         if status == "OK":
             msg = (
@@ -196,7 +204,7 @@ def show_reconciliation_popup(
             msg = f"NOT CHECKED: {pdf} ({status or 'not checked'})"
             tag = "warn"
 
-        txt.insert("end", msg + f" | {period_str}\n", tag)
+        txt.insert("end", msg + f" | {txn_count} Transactions\n", tag)
 
     txt.insert("end", "\n")
 
