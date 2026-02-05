@@ -418,30 +418,23 @@ class App(TkinterDnD.Tk):
             return
 
         data = self.last_report_data
-        txt = (data or {}).get("log_text", "")
-        if (txt or "").strip():
-            self._show_checks_text_popup(txt)
-            return
-
-        log_path = (data or {}).get("log_path") or ""
-        if log_path and os.path.exists(log_path):
-            try:
-                with open(log_path, "r", encoding="utf-8") as f:
-                    self._show_checks_text_popup(f.read() or "")
-                return
-            except Exception:
-                pass
-
-        output_path = self.last_saved_output_path or "(Not saved yet)"
-        pre_save = False if self.last_saved_output_path else True
+        recon_results = data.get("recon_results") or []
+        continuity_results = data.get("continuity_results") or []
+        coverage_period = data.get("coverage_period") or ""
+        any_warn = bool(data.get("any_warn"))
+        output_path = (
+            self.last_saved_output_path
+            or data.get("output_xlsx_path")
+            or "(Not saved yet)"
+        )
 
         show_reconciliation_popup(
             self,
             output_path,
-            data.get("recon_results") or [],
-            coverage_period=data.get("coverage_period", "") or "",
-            continuity_results=data.get("continuity_results") or [],
-            pre_save=pre_save,
+            recon_results,
+            coverage_period=coverage_period,
+            continuity_results=continuity_results,
+            pre_save=(output_path == "(Not saved yet)"),
             open_log_folder_callback=self.open_log_folder,
         )
 
