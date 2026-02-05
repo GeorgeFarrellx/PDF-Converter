@@ -274,8 +274,11 @@ def show_reconciliation_popup(
     btn_row = ttk.Frame(win)
     btn_row.pack(fill="x", pady=(8, 10))
 
+    if any_warn and callable(open_log_folder_callback):
+        ttk.Button(btn_row, text="Open Log", command=open_log_folder_callback).pack(side="left", padx=(0, 8))
+
     close_btn = ttk.Button(btn_row, text="Close", command=win.destroy)
-    close_btn.pack()
+    close_btn.pack(side="left")
 
     try:
         close_btn.focus_set()
