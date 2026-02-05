@@ -1400,7 +1400,6 @@ def compute_statement_continuity(recon_results: list[dict]) -> list[dict]:
                 candidates_fail=len(fail_b),
                 candidates_unknown=len(unknown_b),
                 chronology_gate_applied=False,
-                note=chrono_note,
             )
             cur = chosen
             continue
