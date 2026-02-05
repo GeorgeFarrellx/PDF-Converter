@@ -1,4 +1,4 @@
-# Version: 2.11
+# Version: 2.12
 import os
 import re
 import subprocess
@@ -211,6 +211,20 @@ class App(TkinterDnD.Tk):
             return
 
         data = self.last_report_data
+        txt = (data or {}).get("log_text", "")
+        if (txt or "").strip():
+            self._show_checks_text_popup(txt)
+            return
+
+        log_path = (data or {}).get("log_path") or ""
+        if log_path and os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    self._show_checks_text_popup(f.read() or "")
+                return
+            except Exception:
+                pass
+
         output_path = self.last_saved_output_path or "(Not saved yet)"
         pre_save = False if self.last_saved_output_path else True
 
@@ -223,6 +237,25 @@ class App(TkinterDnD.Tk):
             pre_save=pre_save,
             open_log_folder_callback=self.open_log_folder,
         )
+
+    def _show_checks_text_popup(self, txt: str):
+        win = tk.Toplevel(self)
+        win.transient(self)
+        win.grab_set()
+        win.title("Checks Report")
+        win.geometry("860x600")
+
+        outer = ttk.Frame(win, padding=12)
+        outer.pack(fill="both", expand=True)
+
+        box = tk.Text(outer, wrap="word")
+        box.pack(fill="both", expand=True)
+        box.insert("1.0", txt or "")
+        box.configure(state="disabled")
+
+        btn_row = ttk.Frame(outer)
+        btn_row.pack(fill="x", pady=(10, 0))
+        ttk.Button(btn_row, text="Close", command=win.destroy).pack(side="right")
 
     def save_last_output(self):
         if not self.last_excel_data:
@@ -1716,17 +1749,41 @@ class App(TkinterDnD.Tk):
 
             any_issue = any_issue or any_cont_issue or any_gap
 
-            try:
-                ensure_folder(LOGS_DIR)
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                base = sanitize_filename(os.path.splitext(filename)[0]) or "RUN"
-                recon_log_path = make_unique_path(
-                    os.path.join(LOGS_DIR, f"{base} - recon log - {ts}.txt")
-                )
-                with open(recon_log_path, "w", encoding="utf-8") as f:
-                    f.write("\n".join(run_log_lines).rstrip() + "\n")
-            except Exception:
-                recon_log_path = None
+            log_text = "\n".join(run_log_lines).rstrip() + "\n"
+            if self.last_report_data is None:
+                self.last_report_data = {}
+            self.last_report_data["log_text"] = log_text
+
+            all_ok = all((r.get("status") == "OK") for r in recon_results)
+
+            if not continuity_results:
+                cont_ok = False
+            else:
+                cont_ok = True
+                for link in continuity_results:
+                    p = int(link.get("pass", 0))
+                    f = int(link.get("fail", 0))
+                    u = int(link.get("unknown", 0))
+                    if not (p >= 1 and f == 0 and u == 0):
+                        cont_ok = False
+                        break
+
+            full_pass = all_ok and cont_ok
+
+            if not full_pass:
+                try:
+                    ensure_folder(LOGS_DIR)
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    base = sanitize_filename(os.path.splitext(filename)[0]) or "RUN"
+                    recon_log_path = make_unique_path(
+                        os.path.join(LOGS_DIR, f"{base} - recon log - {ts}.txt")
+                    )
+                    with open(recon_log_path, "w", encoding="utf-8") as f:
+                        f.write(log_text)
+                except Exception:
+                    recon_log_path = None
+            else:
+                recon_log_path = ""
 
             initial_dir = ""
             if out_folder:
@@ -1764,6 +1821,7 @@ class App(TkinterDnD.Tk):
                 "source_pdfs": list(self.selected_files or []),
                 "any_warn": bool(any_warn),
                 "log_path": recon_log_path,
+                "log_text": log_text,
                 "learning_report_path": None,
                 "learning_report_inline": "",
                 "learning_report_error": "",
