@@ -1,5 +1,10 @@
 # CHATGPT_CONTEXT.md (Authoritative Entry Point)
 
+## Rules (Single Source of Truth)
+1. `CHATGPT_CONTEXT.md` is the single source of truth for repository file links used for ChatGPT context.
+2. Any new, renamed, or version-bumped file MUST be added here in the same commit.
+3. For `Parsers/`, every `*.py` file in the folder MUST be listed as a raw GitHub link.
+
 This file is the single source of truth for ChatGPT context in this repository and must be used as the primary entry point.
 
 ## Repo Manifest
@@ -42,30 +47,31 @@ Root-level structure and key files/folders visible in this repo:
 
 ### Root app files
 
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/main.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/core.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/gui.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/launcher.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/VERSION.txt
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/main.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/core.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/gui.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/launcher.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/VERSION.txt
 
 ### Parsers
 
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/barclays.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/halifax.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/hsbc.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/lloyds.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/monzo.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/nationwide.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/natwest.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/rbs.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/santander.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/starling.py
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/main/Parsers/tsb.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/barclays-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/halifax-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/hsbc-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/lloyds-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/lloyds-1.2.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/monzo-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/nationwide-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/natwest-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/rbs-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/santander-1.6.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/starling.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/tsb-1.1.py
 
 ### Optional / Non-editable awareness (reference only)
 
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/README.md
-- https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/gitignore
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/README.md
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/gitignore
 
 ## Notes / Rules
 
