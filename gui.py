@@ -219,12 +219,21 @@ def show_reconciliation_popup(
             prev_end = c.get("prev_end")
             next_start = c.get("next_start")
 
-            period_value = _fmt_period(c.get("period_start"), c.get("period_end")) or period_by_pdf.get(next_pdf, "")
+            prev_period = period_by_pdf.get(prev_pdf, "")
+            next_period = period_by_pdf.get(next_pdf, "")
+            if prev_period and next_period:
+                period_value = f"{prev_period} --> {next_period}"
+            elif prev_period:
+                period_value = prev_period
+            elif next_period:
+                period_value = next_period
+            else:
+                period_value = ""
             period_part = f" | Period: {period_value}" if period_value else ""
 
             if prev_end is None or next_start is None:
                 msg = (
-                    f"NOT CHECKED: {prev_pdf} -> {next_pdf} (balances not found) "
+                    f"NOT CHECKED: {prev_pdf} --> {next_pdf} (balances not found) "
                     f"[prev_end_raw={c.get('prev_end_raw')!r}, next_start_raw={c.get('next_start_raw')!r}, "
                     f"prev_end={c.get('prev_end')!r}, next_start={c.get('next_start')!r}]"
                 )
@@ -232,7 +241,7 @@ def show_reconciliation_popup(
                 tag = "warn"
             elif status.upper().startswith("OK"):
                 status_prefix = status if status != "OK" else "OK"
-                msg = f"{status_prefix}: {prev_pdf} -> {next_pdf}{period_part} (Balance Match)"
+                msg = f"{status_prefix}: {prev_pdf} --> {next_pdf}{period_part} (Balance Match)"
                 tag = "ok"
             elif status.upper().startswith("MISMATCH"):
                 missing = ""
@@ -245,14 +254,14 @@ def show_reconciliation_popup(
                     missing = ""
 
                 msg = (
-                    f"MISMATCH: {prev_pdf} -> {next_pdf} "
+                    f"MISMATCH: {prev_pdf} --> {next_pdf} "
                     f"(End {_fmt_money(prev_end)} vs Start {_fmt_money(next_start)}, Diff {_fmt_money(c.get('diff'))}){missing}"
                 )
                 msg = msg + period_part
                 tag = "bad"
             else:
                 msg = (
-                    f"{status or 'NOT CHECKED'}: {prev_pdf} -> {next_pdf} "
+                    f"{status or 'NOT CHECKED'}: {prev_pdf} --> {next_pdf} "
                     f"(End {_fmt_money(prev_end)} vs Start {_fmt_money(next_start)}, Diff {_fmt_money(c.get('diff'))})"
                 )
                 msg = msg + period_part
