@@ -1,4 +1,4 @@
-# Version: 2.12
+# Version: 2.13
 import os
 import re
 import subprocess
@@ -1756,15 +1756,22 @@ class App(TkinterDnD.Tk):
 
             all_ok = all((r.get("status") == "OK") for r in recon_results)
 
+            def _is_ok_status(s: str) -> bool:
+                try:
+                    return str(s or "").strip().upper().startswith("OK")
+                except Exception:
+                    return False
+
             if not continuity_results:
                 cont_ok = False
             else:
                 cont_ok = True
                 for link in continuity_results:
-                    p = int(link.get("pass", 0))
-                    f = int(link.get("fail", 0))
-                    u = int(link.get("unknown", 0))
-                    if not (p >= 1 and f == 0 and u == 0):
+                    if not isinstance(link, dict):
+                        cont_ok = False
+                        break
+                    st = link.get("display_status") or link.get("status") or ""
+                    if not _is_ok_status(st):
                         cont_ok = False
                         break
 
