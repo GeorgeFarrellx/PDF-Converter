@@ -1,4 +1,4 @@
-# Version: monzo-1.1.py
+# Version: monzo.py
 # Monzo (Business Account) statement parser - text-based PDFs (no OCR)
 # Defines:
 #   extract_transactions(pdf_path) -> list[dict]

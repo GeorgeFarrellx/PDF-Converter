@@ -1,4 +1,4 @@
-# Version: rbs-1.1.py
+# Version: rbs.py
 """RBS / Royal Bank of Scotland (Business Current Account) PDF parser.
 
 Expected output columns (used by Main):
