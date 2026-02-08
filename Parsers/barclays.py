@@ -1,4 +1,4 @@
-# Version: barclays-1.1.py
+# Version: barclays.py
 """Barclays (Business Current Account) PDF parser.
 
 Text-based PDFs (no OCR).

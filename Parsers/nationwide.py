@@ -1,4 +1,4 @@
-# Version: nationwide-1.1.py
+# Version: nationwide.py
 import os
 import re
 from datetime import datetime, date

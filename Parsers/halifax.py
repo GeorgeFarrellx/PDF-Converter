@@ -1,4 +1,4 @@
-# Version: halifax-1.1.py
+# Version: halifax.py
 """Halifax (UK) bank statement parser (text-based PDFs only; NO OCR).
 
 This parser is designed for the Halifax statement layout seen in the provided sample PDFs.

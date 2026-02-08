@@ -1,4 +1,4 @@
-# Version: tsb-1.1.py
+# Version: tsb.py
 # TSB (Spend & Save / similar) text-based PDF parser (NO OCR)
 # Requires: pdfplumber
 

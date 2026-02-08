@@ -153,28 +153,28 @@ Rules:
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/launcher.py
 - `main.py`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/main.py
-- `Parsers/barclays-1.1.py`  
-  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/barclays-1.1.py
-- `Parsers/halifax-1.1.py`  
-  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/halifax-1.1.py
+- `Parsers/barclays.py`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/barclays.py
+- `Parsers/halifax.py`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/halifax.py
 - `Parsers/hsbc.py`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/hsbc.py
 - `Parsers/lloyds.py`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/lloyds.py
-- `Parsers/monzo-1.1.py`  
-  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/monzo-1.1.py
-- `Parsers/nationwide-1.1.py`  
-  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/nationwide-1.1.py
-- `Parsers/natwest-1.1.py`  
-  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/natwest-1.1.py
-- `Parsers/rbs-1.1.py`  
-  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/rbs-1.1.py
+- `Parsers/monzo.py`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/monzo.py
+- `Parsers/nationwide.py`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/nationwide.py
+- `Parsers/natwest.py`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/natwest.py
+- `Parsers/rbs.py`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/rbs.py
 - `Parsers/santander.py`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/santander.py
 - `Parsers/starling.py`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/starling.py
-- `Parsers/tsb-1.1.py`  
-  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/tsb-1.1.py
+- `Parsers/tsb.py`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/tsb.py
 
 ### Root app files
 
@@ -187,17 +187,17 @@ https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/C
 
 ### Parsers
 
-https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/barclays-1.1.py
-https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/halifax-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/barclays.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/halifax.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/hsbc.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/lloyds.py
-https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/monzo-1.1.py
-https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/nationwide-1.1.py
-https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/natwest-1.1.py
-https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/rbs-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/monzo.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/nationwide.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/natwest.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/rbs.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/santander.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/starling.py
-https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/tsb-1.1.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/tsb.py
 
 ### Optional / Non-editable awareness (reference only)
 

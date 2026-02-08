@@ -1,4 +1,4 @@
-# Version: natwest-1.1.py
+# Version: natwest.py
 import os
 import re
 import datetime as _dt
