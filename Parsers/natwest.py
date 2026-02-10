@@ -28,6 +28,13 @@ _TXN_START_EXPORT_RE = re.compile(
 _TXN_START_TABLE_RE = re.compile(
     r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\b\s*(?P<rest>.*)$"
 )
+_DATE_PREFIX_RE = re.compile(r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\b")
+_TXN_KEYWORD_RE = re.compile(
+    r"^\s*(Card\s+Transaction|Direct\s+Debit|OnLine\s+Transaction|Automated\s+Credit|Automated\s+Debit|Standing\s+Order|Cash\s+Withdrawal|Charges)\b",
+    re.IGNORECASE,
+)
+_BROUGHT_FWD_RE = re.compile(r"\bBROUGHT\s+FORWARD\b", re.IGNORECASE)
+_SUMMARY_GUARD_RE = re.compile(r"\b(Period\s+Covered|Statement\s+Date)\b", re.IGNORECASE)
 _TABLE_EMBED_TXN_RE = re.compile(r"(?<!\d)(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\b", re.IGNORECASE)
 _CHARGES_LINE_RE = re.compile(
     r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\s+Charges\b(?P<rest>.*)$",
@@ -393,6 +400,119 @@ def extract_transactions(pdf_path) -> List[Dict]:
         period_start_year, period_end_year = period_start_date.year, period_end_date.year
     else:
         period_start_year, period_end_year = _extract_period_years(all_text)
+
+    if has_table_header:
+        parse_lines = _split_embedded_table_lines(all_text.splitlines())
+        pending_rows: List[Dict] = []
+        current_date = None
+        current_desc_lines: List[str] = []
+        last_seen_mon = None
+        current_year = period_end_year if period_end_year is not None else _dt.date.today().year
+
+        def _clamp_table_year(year_value: int) -> int:
+            if period_start_year is not None and year_value < period_start_year:
+                return period_start_year
+            if period_end_year is not None and year_value > period_end_year:
+                return period_end_year
+            return year_value
+
+        def _remove_terminal_money_tokens(raw_text: str, tokens: List[str]) -> str:
+            cleaned = raw_text.rstrip()
+            for token in reversed(tokens[-2:]):
+                cleaned = re.sub(rf"\s*{re.escape(token)}\s*$", "", cleaned)
+            return cleaned.strip()
+
+        for raw_line in parse_lines:
+            line = re.sub(r"\s+", " ", (raw_line or "").strip())
+            if not line:
+                continue
+            if _SUMMARY_GUARD_RE.search(line):
+                continue
+            if _is_ignorable_line(line):
+                continue
+            if _BROUGHT_FWD_RE.search(line):
+                continue
+
+            had_explicit_date = False
+            date_match = _DATE_PREFIX_RE.match(line)
+            if date_match:
+                had_explicit_date = True
+                day = int(date_match.group("day"))
+                mon = (date_match.group("mon") or "").lower()
+                mon_num = _MONTHS.get(mon[:3])
+                if mon_num is not None:
+                    inferred_year = current_year
+                    if last_seen_mon is not None:
+                        if mon_num < last_seen_mon:
+                            inferred_year += 1
+                        elif mon_num > last_seen_mon and last_seen_mon <= 2 and mon_num >= 11:
+                            inferred_year -= 1
+                    inferred_year = _clamp_table_year(inferred_year)
+                    try:
+                        current_date = _dt.date(inferred_year, mon_num, day)
+                        current_year = inferred_year
+                        last_seen_mon = mon_num
+                    except Exception:
+                        current_date = None
+                else:
+                    current_date = None
+                line = line[date_match.end():].strip()
+
+            monies = [m.strip() for m in _MONEY_RE.findall(line) if m and m.strip()]
+            candidate_balance = _parse_money(monies[-1]) if monies else None
+            keyword_match = _TXN_KEYWORD_RE.match(line)
+            is_row_terminator = (
+                len(monies) >= 2
+                and (had_explicit_date or keyword_match is not None)
+                and current_date is not None
+                and candidate_balance is not None
+            )
+
+            if is_row_terminator:
+                line_desc = _remove_terminal_money_tokens(line, monies)
+                desc_parts = [part for part in current_desc_lines if part]
+                if line_desc:
+                    desc_parts.append(line_desc)
+                description = " ".join(desc_parts).strip()
+                raw_type = ""
+                if keyword_match:
+                    raw_type = keyword_match.group(1).strip()
+                pending_rows.append(
+                    {
+                        "Date": current_date,
+                        "Transaction Type": raw_type,
+                        "Description": description,
+                        "Amount": 0.0,
+                        "Balance": float(candidate_balance),
+                        "_raw_type": raw_type,
+                    }
+                )
+                current_desc_lines = []
+            elif line:
+                current_desc_lines.append(line)
+
+        if not pending_rows:
+            return []
+
+        previous_balance = None
+        prev_match = _PREV_BAL_RE.search(all_text)
+        if prev_match:
+            previous_balance = _parse_money(prev_match.group(1))
+        prev_running = previous_balance
+        for i, row in enumerate(pending_rows):
+            if isinstance(prev_running, (int, float)):
+                row["Amount"] = round(float(row["Balance"]) - float(prev_running), 2)
+            elif i > 0:
+                row["Amount"] = round(float(row["Balance"]) - float(pending_rows[i - 1]["Balance"]), 2)
+            prev_running = float(row["Balance"])
+
+        cleaned = []
+        for txn in pending_rows:
+            txn.pop("_raw_type", None)
+            txn["Description"] = _clean_description(txn.get("Description") or "")
+            txn = _apply_global_transaction_type_rules(txn)
+            cleaned.append(txn)
+        return cleaned
 
     current_block = None  # dict with parsed header + lines
     last_seen_mon = None
@@ -787,104 +907,28 @@ def extract_account_holder_name(pdf_path) -> str:
                 break
 
         if header_idx >= 0:
-            candidate_lines = lines_raw[header_idx + 1:]
-
-            immediate_stop_re = re.compile(r"\b(CURRENT\s+ACCOUNT|SUMMARY|STATEMENT\s+DATE|TRANSACTIONS?)\b", re.IGNORECASE)
-            immediate_caps = []
-            for line in candidate_lines:
-                if immediate_stop_re.search(line):
-                    break
-                if re.search(r"\d", line):
-                    break
-                if re.fullmatch(r"[A-Z&/\-\s']+", line):
-                    immediate_caps.append(line)
-                    if len(immediate_caps) >= 3:
-                        break
-                else:
-                    break
-
-            if immediate_caps:
-                name = _normalise_name_text(" ".join(immediate_caps))
-                if name:
-                    return name
-
-            blocked_caps_re = re.compile(r"\b(CURRENT\s+ACCOUNT|SUMMARY|STATEMENT\s+DATE|WELCOME)\b", re.IGNORECASE)
-            trading_lines = []
-            for line in candidate_lines:
-                if blocked_caps_re.search(line):
-                    if trading_lines:
-                        break
-                    continue
-                if re.search(r"\d", line):
-                    if trading_lines:
-                        break
-                    continue
-                if re.fullmatch(r"[A-Z&/\-\s']+", line):
-                    trading_lines.append(line)
-                    if len(trading_lines) >= 3:
-                        break
-                elif trading_lines:
-                    break
-
-            if trading_lines:
-                name = _normalise_name_text(" ".join(trading_lines))
-                if name:
-                    return name
-
             stop_marker_re = re.compile(
-                r"\b(Current\s+Account|Summary|Statement\s+Date|Account\s+name|Account\s+No|Sort\s+code|Transactions?)\b",
+                r"\b(Current\s+Account|Summary|Statement\s+Date|Period\s+Covered|Transactions?)\b",
                 re.IGNORECASE,
             )
-
-            ta_index = -1
-            for idx, line in enumerate(candidate_lines):
-                if "T/A" in line.upper():
-                    ta_index = idx
-                    break
-
-            if ta_index >= 0:
-                trading_lines = []
-                ta_line = candidate_lines[ta_index]
-                ta_split = re.split(r"\bT/A\b", ta_line, flags=re.IGNORECASE)
-                if len(ta_split) > 1:
-                    trailing = _normalise_name_text(ta_split[-1])
-                    if trailing and not re.search(r"\d", trailing) and re.fullmatch(r"[A-Z&/\-\s']+", trailing):
-                        trading_lines.append(trailing)
-
-                for line in candidate_lines[ta_index + 1:]:
-                    if stop_marker_re.search(line):
-                        break
-                    if re.fullmatch(r"[A-Z&/\-\s']+", line) and not re.search(r"\d", line):
-                        trading_lines.append(line)
-                    elif trading_lines:
-                        break
-
-                if trading_lines:
-                    name = _normalise_name_text(" ".join(trading_lines))
-                    if name:
-                        return name
-
             trading_lines = []
-            for line in candidate_lines:
-                if re.fullmatch(r"[A-Z0-9&/\-\s']+", line) and not re.search(r"\d", line):
-                    if "T/A" in line.upper():
-                        continue
+            for line in lines_raw[header_idx + 1:header_idx + 12]:
+                if stop_marker_re.search(line):
+                    break
+                if re.search(r"\d", line):
+                    if trading_lines:
+                        break
+                    continue
+                if re.fullmatch(r"[A-Z&/\-\s']+", line):
                     trading_lines.append(line)
-                elif trading_lines:
+                    continue
+                if trading_lines:
                     break
 
             if trading_lines:
                 name = _normalise_name_text(" ".join(trading_lines))
                 if name:
                     return name
-
-            for line in candidate_lines:
-                if "T/A" in line.upper():
-                    name = _normalise_name_text(re.split(r"\bT/A\b", line, flags=re.IGNORECASE)[0])
-                    if not name:
-                        name = _normalise_name_text(line)
-                    if name:
-                        return name
 
     lines = [re.sub(r"\s+", " ", (line or "")).strip() for line in txt.splitlines()]
     lines = [line for line in lines if line]
@@ -908,6 +952,10 @@ def extract_account_holder_name(pdf_path) -> str:
             candidate = _normalise_name_text(lines[idx + 1])
             if re.match(r"^[A-Z][A-Z\s'\-]{3,}$", candidate, re.IGNORECASE):
                 return candidate
+
+    for line in lines:
+        if re.match(r"^(MR|MRS|MS|MISS|DR)\b", line, re.IGNORECASE) and not re.search(r"\d", line):
+            return _normalise_name_text(line)
 
     blocked_headers = {
         "NATWEST", "STATEMENT", "PAGE", "SORT CODE", "ACCOUNT NUMBER", "TRANSACTIONS", "ACCOUNT"
