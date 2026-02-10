@@ -123,26 +123,22 @@ def _render_barclays(path: Path, suffix: str):
 def _render_hsbc(path: Path, suffix: str):
     a, b, start_a, start_b = _statement_sets()
     txs, start = (a, start_a) if suffix == "a" else (b, start_b)
-    balances = _running_balances(start, txs)
     period = "4 June to 3 July 2024" if suffix == "a" else "1 July to 31 July 2024"
 
     header = "Date Payment type and details Paid out Paid in Balance"
-    paid_out_idx = header.find("Paid out")
-    paid_in_idx = header.find("Paid in")
-    balance_idx = header.find("Balance")
 
-    def _hsbc_row(date_text: str, code: str, description: str, amount: float, balance: float) -> str:
-        left = f"{date_text:<10} {code:<4} {description}".rstrip()
-        left = left[: paid_out_idx - 1]
-        left = f"{left:<{paid_out_idx}}"
-
+    def _hsbc_row(date_text: str, code: str, description: str, amount: float, prev_balance: float) -> tuple[str, float]:
         paid_out = _money_p(-amount) if amount < 0 else ""
         paid_in = _money_p(amount) if amount > 0 else ""
 
-        out_col = f"{paid_out:<{max(1, paid_in_idx - paid_out_idx)}}"
-        in_col = f"{paid_in:<{max(1, balance_idx - paid_in_idx)}}"
-        bal_col = f"£{balance:,.2f}"
-        return f"{left}{out_col}{in_col}{bal_col}"
+        parsed_signed_amount = -abs(amount) if paid_out else abs(amount)
+        next_balance = round(prev_balance + parsed_signed_amount, 2)
+
+        left = f"{date_text:<10} {code:<4} {description:<36}"[:52]
+        out_col = f"{paid_out:<14}"
+        in_col = f"{paid_in:<14}"
+        bal_col = f"£{next_balance:,.2f}"
+        return f"{left}{out_col}{in_col}{bal_col}", next_balance
 
     lines = [
         "HSBC",
@@ -154,13 +150,15 @@ def _render_hsbc(path: Path, suffix: str):
         header,
     ]
 
+    running = round(float(start), 2)
     for i, t in enumerate(txs):
         d = f"{t.date} Jun 24" if suffix == "a" else f"{t.date} Jul 24"
-        lines.append(_hsbc_row(d, t.type_or_code, t.desc, t.amount, balances[i]))
+        row, running = _hsbc_row(d, t.type_or_code, t.desc, t.amount, running)
+        lines.append(row)
         if i == 2:
             lines.append("               CONTINUATION TEST MERCHANT DETAILS")
 
-    lines.append(f"Closing Balance £{balances[-1]:,.2f}")
+    lines.append(f"Closing Balance £{running:,.2f}")
     c = _new_canvas(path)
     _write_lines(c, lines)
     c.save()
