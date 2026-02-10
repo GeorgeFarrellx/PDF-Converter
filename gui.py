@@ -1706,7 +1706,94 @@ class App(TkinterDnD.Tk):
                 return
 
             if not all_transactions:
-                raise ValueError("No transactions found!")
+                log_text = "\n".join(run_log_lines).rstrip() + "\n"
+
+                initial_dir = ""
+                if out_folder:
+                    initial_dir = out_folder
+                else:
+                    try:
+                        initial_dir = os.path.dirname(self.selected_files[0])
+                    except Exception:
+                        initial_dir = ""
+
+                autodetect_first_pdf = None
+                try:
+                    if self.auto_detect_var.get() and self.selected_files:
+                        autodetect_first_pdf = auto_detect_bank_from_pdf(self.selected_files[0])
+                except Exception:
+                    autodetect_first_pdf = None
+
+                parser_file = ""
+                try:
+                    parser_file = getattr(parser, "__file__", "") or ""
+                except Exception:
+                    parser_file = ""
+
+                bundle_base = sanitize_filename(f"{client_name or 'RUN'} - No Transactions") or "RUN - No Transactions"
+
+                self.last_saved_output_path = None
+                self.last_report_data = {
+                    "recon_results": recon_results,
+                    "continuity_results": [],
+                    "coverage_period": "",
+                    "source_pdfs": list(self.selected_files or []),
+                    "any_warn": True,
+                    "log_path": "",
+                    "log_text": log_text,
+                    "learning_report_path": None,
+                    "learning_report_inline": "",
+                    "learning_report_error": "",
+                    "learning_report_generated": False,
+                    "output_xlsx_path": None,
+                    "bundle_base": bundle_base,
+                    "bank": bank,
+                    "autodetect_first_pdf": autodetect_first_pdf,
+                    "parser_file": parser_file,
+                    "client_name": client_name,
+                    "run_filename": "",
+                }
+                self.last_excel_data = {
+                    "transactions": [],
+                    "client_name": client_name,
+                    "filename": "No Transactions Found.xlsx",
+                    "initial_dir": initial_dir,
+                }
+
+                try:
+                    report_path, report_text, report_err = self.generate_learning_report(
+                        reason="No transactions found", write_to_disk=False
+                    )
+                    if self.last_report_data is not None:
+                        self.last_report_data["learning_report_path"] = report_path
+                        self.last_report_data["learning_report_inline"] = report_text or ""
+                        self.last_report_data["learning_report_error"] = report_err or ""
+                except Exception:
+                    pass
+
+                self.create_support_bundle_zip()
+
+                show_reconciliation_popup(
+                    self,
+                    "(Not saved yet)",
+                    recon_results,
+                    coverage_period="",
+                    continuity_results=[],
+                    pre_save=True,
+                    open_log_folder_callback=self.open_log_folder,
+                )
+
+                messagebox.showwarning(
+                    "No transactions found",
+                    "No transactions were extracted from the selected PDFs.\n\n"
+                    "Likely causes:\n"
+                    "• The wrong bank parser is selected\n"
+                    "• The statement format is new/unsupported\n"
+                    "• The PDF is scanned/image-only and has no extractable text\n\n"
+                    "Use Open Log and send the automatically created support bundle ZIP for investigation.",
+                )
+                self.set_status("Done with warnings. No transactions found.")
+                return
 
             def _date_key(x):
                 d = x.get("Date")
