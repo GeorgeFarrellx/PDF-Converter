@@ -29,6 +29,10 @@ _TXN_START_TABLE_RE = re.compile(
     r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\b\s*(?P<rest>.*)$"
 )
 _TABLE_EMBED_TXN_RE = re.compile(r"(?<!\d)(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\b", re.IGNORECASE)
+_CHARGES_LINE_RE = re.compile(
+    r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\s+Charges\b(?P<rest>.*)$",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 # Currency amounts (NatWest export/table can include or omit £)
 _MONEY_RE = re.compile(r"(?:£\s*)?\(?-?[\d,]+\.\d{2}\)?(?!\s*%)")
@@ -528,6 +532,80 @@ def extract_transactions(pdf_path) -> List[Dict]:
 
     finalize_block(current_block)
 
+    if has_table_header:
+        charges_last_seen_mon = None
+        charges_current_year = period_end_year if period_end_year is not None else _dt.date.today().year
+        injected_any = False
+        for cm in _CHARGES_LINE_RE.finditer(all_text):
+            day = int(cm.group("day"))
+            mon = (cm.group("mon") or "").strip().lower()
+            mon_num = _MONTHS.get(mon[:3], None)
+            if mon_num is None:
+                continue
+
+            year = charges_current_year
+            if charges_last_seen_mon is not None and mon_num < charges_last_seen_mon:
+                year += 1
+            if period_start_year is not None and period_end_year is not None:
+                if year < period_start_year:
+                    year = period_start_year
+                if year > period_end_year:
+                    year = period_end_year
+
+            charges_last_seen_mon = mon_num
+            charges_current_year = year
+
+            try:
+                date_obj = _dt.date(year, mon_num, day)
+            except Exception:
+                continue
+
+            full_line = cm.group(0) or ""
+            monies = _MONEY_RE.findall(full_line)
+            monies = [m.strip() for m in monies if m and m.strip()]
+            if len(monies) < 2:
+                continue
+
+            balance_val = _parse_money(monies[-1])
+            if balance_val is None:
+                continue
+
+            matched_existing = False
+            for txn in transactions:
+                txn_balance = txn.get("Balance")
+                txn_desc = (txn.get("Description") or "")
+                if (
+                    txn.get("Date") == date_obj
+                    and isinstance(txn_balance, (int, float))
+                    and round(float(txn_balance), 2) == round(float(balance_val), 2)
+                    and "charges" in txn_desc.lower()
+                ):
+                    matched_existing = True
+                    break
+
+            if matched_existing:
+                continue
+
+            rest = _clean_description(cm.group("rest") or "")
+            description = "Charges"
+            if rest:
+                description = f"Charges {rest}".strip()
+
+            transactions.append(
+                {
+                    "Date": date_obj,
+                    "Transaction Type": "Charges",
+                    "Description": description,
+                    "Amount": 0.0,
+                    "Balance": float(balance_val),
+                    "_raw_type": "CHG",
+                }
+            )
+            injected_any = True
+
+        if injected_any:
+            transactions.sort(key=lambda t: (t.get("Date"), t.get("Balance") if isinstance(t.get("Balance"), (int, float)) else float("inf")))
+
     # If there are no transactions, return empty list
     if not transactions:
         return []
@@ -700,11 +778,30 @@ def extract_account_holder_name(pdf_path) -> str:
                 break
 
         if header_idx >= 0:
-            candidate_lines = []
-            for line in lines_raw[header_idx + 1:]:
-                if re.search(r"\b(Current\s+Account|Summary)\b", line, re.IGNORECASE):
+            candidate_lines = lines_raw[header_idx + 1:]
+
+            blocked_caps_re = re.compile(r"\b(CURRENT\s+ACCOUNT|SUMMARY|STATEMENT\s+DATE|WELCOME)\b", re.IGNORECASE)
+            trading_lines = []
+            for line in candidate_lines:
+                if blocked_caps_re.search(line):
+                    if trading_lines:
+                        break
+                    continue
+                if re.search(r"\d", line):
+                    if trading_lines:
+                        break
+                    continue
+                if re.fullmatch(r"[A-Z&/\-\s']+", line):
+                    trading_lines.append(line)
+                    if len(trading_lines) >= 3:
+                        break
+                elif trading_lines:
                     break
-                candidate_lines.append(line)
+
+            if trading_lines:
+                name = _normalise_name_text(" ".join(trading_lines))
+                if name:
+                    return name
 
             stop_marker_re = re.compile(
                 r"\b(Current\s+Account|Summary|Statement\s+Date|Account\s+name|Account\s+No|Sort\s+code|Transactions?)\b",
