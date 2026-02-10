@@ -28,6 +28,7 @@ _TXN_START_EXPORT_RE = re.compile(
 _TXN_START_TABLE_RE = re.compile(
     r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\b\s*(?P<rest>.*)$"
 )
+_TABLE_EMBED_TXN_RE = re.compile(r"(?<!\d)(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\b", re.IGNORECASE)
 
 # Currency amounts (NatWest export/table can include or omit £)
 _MONEY_RE = re.compile(r"(?:£\s*)?\(?-?[\d,]+\.\d{2}\)?(?!\s*%)")
@@ -247,6 +248,49 @@ def _extract_period_dates(all_text: str) -> (Optional[_dt.date], Optional[_dt.da
         return None, None
 
 
+def _split_embedded_table_lines(lines: List[str]) -> List[str]:
+    split_lines: List[str] = []
+
+    for raw_line in lines:
+        line = (raw_line or "").rstrip("\n")
+        valid_matches = []
+
+        for m in _TABLE_EMBED_TXN_RE.finditer(line):
+            mon = (m.group("mon") or "").lower()
+            if mon[:3] not in _MONTHS:
+                continue
+            start = m.start()
+            if start > 0 and line[start - 1] == "/":
+                continue
+            remainder = line[m.end():]
+            if not re.search(r"\s+[A-Za-z]", remainder):
+                continue
+            valid_matches.append(m)
+
+        if not valid_matches:
+            split_lines.append(line)
+            continue
+
+        if len(valid_matches) == 1 and valid_matches[0].start() == 0:
+            split_lines.append(line)
+            continue
+
+        first_start = valid_matches[0].start()
+        if first_start > 0:
+            prefix = line[:first_start].strip()
+            if prefix:
+                split_lines.append(prefix)
+
+        for i, m in enumerate(valid_matches):
+            seg_start = m.start()
+            seg_end = valid_matches[i + 1].start() if (i + 1) < len(valid_matches) else len(line)
+            segment = line[seg_start:seg_end].strip()
+            if segment:
+                split_lines.append(segment)
+
+    return split_lines
+
+
 def _extract_table_period_dates(all_text: str) -> (Optional[_dt.date], Optional[_dt.date]):
     if not all_text:
         return None, None
@@ -395,8 +439,12 @@ def extract_transactions(pdf_path) -> List[Dict]:
         }
         transactions.append(txn)
 
+    parse_lines = all_text.splitlines()
+    if has_table_header:
+        parse_lines = _split_embedded_table_lines(parse_lines)
+
     # Parse line-by-line, building blocks
-    for raw_line in all_text.splitlines():
+    for raw_line in parse_lines:
         line = raw_line.rstrip("\n")
         if _is_ignorable_line(line):
             continue
@@ -632,6 +680,16 @@ def extract_account_holder_name(pdf_path) -> str:
     except Exception:
         return ""
 
+    def _normalise_name_text(value: str) -> str:
+        text = value or ""
+        text = re.sub(r"\b([A-Z])\s{2,}([A-Z]{2,})\b", r"\1\2", text)
+        text = re.sub(r"\b([A-Z]{2,})\s{2,}([A-Z]{2,})\b", r"\1\2", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        text = re.sub(r"(?<=\b[A-Z])\s+(?=[A-Z]\b)", "", text)
+        while "  " in text:
+            text = text.replace("  ", " ")
+        return text.strip()
+
     if "date description paid in" in txt.lower():
         lines_raw = [(line or "").strip() for line in txt.splitlines()]
         lines_raw = [line for line in lines_raw if line]
@@ -648,6 +706,39 @@ def extract_account_holder_name(pdf_path) -> str:
                     break
                 candidate_lines.append(line)
 
+            stop_marker_re = re.compile(
+                r"\b(Current\s+Account|Summary|Statement\s+Date|Account\s+name|Account\s+No|Sort\s+code|Transactions?)\b",
+                re.IGNORECASE,
+            )
+
+            ta_index = -1
+            for idx, line in enumerate(candidate_lines):
+                if "T/A" in line.upper():
+                    ta_index = idx
+                    break
+
+            if ta_index >= 0:
+                trading_lines = []
+                ta_line = candidate_lines[ta_index]
+                ta_split = re.split(r"\bT/A\b", ta_line, flags=re.IGNORECASE)
+                if len(ta_split) > 1:
+                    trailing = _normalise_name_text(ta_split[-1])
+                    if trailing and not re.search(r"\d", trailing) and re.fullmatch(r"[A-Z&/\-\s']+", trailing):
+                        trading_lines.append(trailing)
+
+                for line in candidate_lines[ta_index + 1:]:
+                    if stop_marker_re.search(line):
+                        break
+                    if re.fullmatch(r"[A-Z&/\-\s']+", line) and not re.search(r"\d", line):
+                        trading_lines.append(line)
+                    elif trading_lines:
+                        break
+
+                if trading_lines:
+                    name = _normalise_name_text(" ".join(trading_lines))
+                    if name:
+                        return name
+
             trading_lines = []
             for line in candidate_lines:
                 if re.fullmatch(r"[A-Z0-9&/\-\s']+", line) and not re.search(r"\d", line):
@@ -658,15 +749,15 @@ def extract_account_holder_name(pdf_path) -> str:
                     break
 
             if trading_lines:
-                name = " ".join(trading_lines)
-                name = re.sub(r"([A-Z]{2,})\s{2,}([A-Z]{2,})", r"\1\2", name)
-                name = re.sub(r"\s+", " ", name).strip()
+                name = _normalise_name_text(" ".join(trading_lines))
                 if name:
                     return name
 
             for line in candidate_lines:
                 if "T/A" in line.upper():
-                    name = re.sub(r"\s+", " ", line).strip()
+                    name = _normalise_name_text(re.split(r"\bT/A\b", line, flags=re.IGNORECASE)[0])
+                    if not name:
+                        name = _normalise_name_text(line)
                     if name:
                         return name
 
@@ -676,20 +767,20 @@ def extract_account_holder_name(pdf_path) -> str:
     for line in lines:
         m = _ACCOUNT_NAME_RE.match(line)
         if m:
-            name = re.sub(r"\s+", " ", (m.group("name") or "")).strip()
+            name = _normalise_name_text(m.group("name") or "")
             if name and name.lower() not in {"transactions"}:
                 return name
 
     normalised_text = "\n".join(lines)
     inline = _ACCOUNT_NAME_INLINE_RE.search(normalised_text)
     if inline:
-        name = re.sub(r"\s+", " ", (inline.group(2) or "")).strip()
+        name = _normalise_name_text(inline.group(2) or "")
         if name and name.lower() not in {"transactions"}:
             return name
 
     for idx, line in enumerate(lines):
         if _ACCOUNT_NAME_NEXT_LINE_LABEL_RE.match(line) and idx + 1 < len(lines):
-            candidate = re.sub(r"\s+", " ", lines[idx + 1]).strip()
+            candidate = _normalise_name_text(lines[idx + 1])
             if re.match(r"^[A-Z][A-Z\s'\-]{3,}$", candidate, re.IGNORECASE):
                 return candidate
 
@@ -706,6 +797,6 @@ def extract_account_holder_name(pdf_path) -> str:
             continue
         if not re.match(r"^[A-Z\s'\-]+$", upper_line):
             continue
-        return re.sub(r"\s+", " ", line).strip()
+        return _normalise_name_text(line)
 
     return ""
