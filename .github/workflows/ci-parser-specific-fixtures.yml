@@ -25,20 +25,23 @@ jobs:
           echo "exit_code=$test_exit" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Build markdown summary
-        run: python scripts/ci_summarize_unittest.py unittest.log > ci_summary.md
-
-      - name: Publish job summary
-        run: cat ci_summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish compact summary (if generated)
+        if: always()
+        shell: bash
+        run: |
+          if [ -f ci_parser_fixture_summary.md ]; then
+            cat ci_parser_fixture_summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload unittest outputs
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: parser-specific-fixtures-unittest
+          if-no-files-found: warn
           path: |
             unittest.log
-            ci_summary.md
+            ci_parser_fixture_summary.md
 
       - name: Fail job if unittest failed
         if: steps.unittest.outputs.exit_code != '0'
