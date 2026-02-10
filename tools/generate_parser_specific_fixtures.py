@@ -126,13 +126,24 @@ def _render_hsbc(path: Path, suffix: str):
     period = "4 June to 3 July 2024" if suffix == "a" else "1 July to 31 July 2024"
 
     header = "Date Payment type and details Paid out Paid in Balance"
+    debit_codes = {"DD", "VIS", "BP", "CHG", "DR", "SO"}
+    credit_codes = {"CR", "BGC"}
 
     def _hsbc_row(date_text: str, code: str, description: str, amount: float, prev_balance: float) -> tuple[str, float]:
-        paid_out = _money_p(-amount) if amount < 0 else ""
-        paid_in = _money_p(amount) if amount > 0 else ""
+        code_u = (code or "").upper()
+        amount_abs = abs(float(amount))
 
-        parsed_signed_amount = -abs(amount) if paid_out else abs(amount)
-        next_balance = round(prev_balance + parsed_signed_amount, 2)
+        if code_u in debit_codes:
+            signed_amount = -amount_abs
+        elif code_u in credit_codes:
+            signed_amount = amount_abs
+        else:
+            signed_amount = -amount_abs if amount < 0 else amount_abs
+
+        paid_out = _money_p(abs(signed_amount)) if signed_amount < 0 else ""
+        paid_in = _money_p(signed_amount) if signed_amount > 0 else ""
+
+        next_balance = round(prev_balance + signed_amount, 2)
 
         desc = description[:35]
         row = f"{date_text:<9} {code:<3} {desc:<40} {paid_out:>12} {paid_in:>12} {f'£{next_balance:,.2f}':>12}"
