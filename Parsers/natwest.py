@@ -52,10 +52,16 @@ _PERIOD_RE = re.compile(
     r"Showing:\s*(?P<d1>\d{2})\s+(?P<m1>[A-Za-z]{3})\s+(?P<y1>\d{4})\s+to\s+(?P<d2>\d{2})\s+(?P<m2>[A-Za-z]{3})\s+(?P<y2>\d{4})",
     re.IGNORECASE
 )
+_TABLE_PERIOD_RE = re.compile(
+    r"\bPeriod\s+Covered\s+(?P<d1>\d{2})\s+(?P<m1>[A-Za-z]{3})\s+(?P<y1>\d{4})\s+to\s+(?P<d2>\d{2})\s+(?P<m2>[A-Za-z]{3})\s+(?P<y2>\d{4})",
+    re.IGNORECASE,
+)
 
 _ACCOUNT_NAME_RE = re.compile(r"^\s*Account\s+name:\s*(?P<name>.+?)\s*$", re.IGNORECASE)
 _OPENING_BALANCE_RE = re.compile(r"\bBROUGHT\s+FORWARD\b.*?(?:£\s*)?(-?[\d,]+\.\d{2})", re.IGNORECASE)
 _CLOSING_BALANCE_RE = re.compile(r"\b(CARRIED\s+FORWARD|BALANCE\s+AT)\b.*?(?:£\s*)?(-?[\d,]+\.\d{2})", re.IGNORECASE)
+_PREV_BAL_RE = re.compile(r"\bPrevious\s+Balance\s+(?:£\s*)?(-?[\d,]+\.\d{2})", re.IGNORECASE)
+_NEW_BAL_RE = re.compile(r"\bNew\s+Balance\s+(?:£\s*)?(-?[\d,]+\.\d{2})", re.IGNORECASE)
 _ACCOUNT_NAME_INLINE_RE = re.compile(r"\b(Account\s+name|Name)\b\s*:\s*([A-Z][A-Z\s'\-]{3,})", re.IGNORECASE)
 _ACCOUNT_NAME_NEXT_LINE_LABEL_RE = re.compile(r"^\s*(Account\s+name|Name)\s*:?\s*$", re.IGNORECASE)
 
@@ -241,6 +247,26 @@ def _extract_period_dates(all_text: str) -> (Optional[_dt.date], Optional[_dt.da
         return None, None
 
 
+def _extract_table_period_dates(all_text: str) -> (Optional[_dt.date], Optional[_dt.date]):
+    if not all_text:
+        return None, None
+    m = _TABLE_PERIOD_RE.search(all_text)
+    if not m:
+        return None, None
+    try:
+        d1 = int(m.group("d1"))
+        m1 = _MONTHS.get(m.group("m1").lower())
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = _MONTHS.get(m.group("m2").lower())
+        y2 = int(m.group("y2"))
+        if not m1 or not m2:
+            return None, None
+        return _dt.date(y1, m1, d1), _dt.date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
 def _parse_period_from_filename(pdf_path: str):
     name = os.path.basename(pdf_path or "")
     m = re.search(
@@ -274,6 +300,11 @@ def extract_statement_period(pdf_path: str):
             for page in pdf.pages:
                 all_text_chunks.append(page.extract_text() or "")
         all_text = "\n".join(all_text_chunks)
+        has_table_header = "date description paid in" in all_text.lower()
+        if has_table_header:
+            start, end = _extract_table_period_dates(all_text)
+            if start or end:
+                return start, end
         start, end = _extract_period_dates(all_text)
         if start or end:
             return start, end
@@ -301,8 +332,15 @@ def extract_transactions(pdf_path) -> List[Dict]:
             all_text_chunks.append(txt)
     all_text = "\n".join(all_text_chunks)
 
-    period_start_year, period_end_year = _extract_period_years(all_text)
     has_table_header = "date description paid in" in all_text.lower()
+    period_start_date = None
+    period_end_date = None
+    if has_table_header:
+        period_start_date, period_end_date = _extract_table_period_dates(all_text)
+    if period_start_date and period_end_date:
+        period_start_year, period_end_year = period_start_date.year, period_end_date.year
+    else:
+        period_start_year, period_end_year = _extract_period_years(all_text)
 
     current_block = None  # dict with parsed header + lines
     last_seen_mon = None
@@ -317,6 +355,9 @@ def extract_transactions(pdf_path) -> List[Dict]:
         desc_lines = block["desc_lines"]
 
         block_text = " ".join([x.strip() for x in desc_lines if x is not None]).strip()
+
+        if has_table_header and re.search(r"\bBROUGHT\s+FORWARD\b", block_text, re.IGNORECASE):
+            return
 
         # Extract money values across the block
         monies = _MONEY_RE.findall(block_text)
@@ -389,15 +430,24 @@ def extract_transactions(pdf_path) -> List[Dict]:
                     year = None
 
             if year is None:
-                year = _infer_year_for_missing_year(
-                    day=day,
-                    mon_num=mon_num,
-                    last_seen_mon=last_seen_mon,
-                    current_year=current_year,
-                    period_start_year=period_start_year,
-                    period_end_year=period_end_year,
-                )
-            # Update month/year tracking for missing-year inference (reverse chronological list)
+                if has_table_header:
+                    year = current_year
+                    if last_seen_mon is not None and mon_num < last_seen_mon:
+                        year += 1
+                    if period_start_year is not None and period_end_year is not None:
+                        if year < period_start_year:
+                            year = period_start_year
+                        if year > period_end_year:
+                            year = period_end_year
+                else:
+                    year = _infer_year_for_missing_year(
+                        day=day,
+                        mon_num=mon_num,
+                        last_seen_mon=last_seen_mon,
+                        current_year=current_year,
+                        period_start_year=period_start_year,
+                        period_end_year=period_end_year,
+                    )
             last_seen_mon = mon_num
             current_year = year
 
@@ -434,42 +484,61 @@ def extract_transactions(pdf_path) -> List[Dict]:
     if not transactions:
         return []
 
-    # Derive signed Amounts from balance deltas when possible (preferred for reconciliation).
-    # The PDF is typically reverse chronological (newest -> oldest):
-    # amount_i = balance_i - balance_{i+1}
-    for i in range(len(transactions) - 1):
-        b0 = transactions[i].get("Balance")
-        b1 = transactions[i + 1].get("Balance")
-        if isinstance(b0, (int, float)) and isinstance(b1, (int, float)):
-            delta = round(float(b0) - float(b1), 2)
-            transactions[i]["Amount"] = delta
+    if has_table_header:
+        summary_start_balance = None
+        prev_match = _PREV_BAL_RE.search(all_text)
+        if prev_match:
+            summary_start_balance = _parse_money(prev_match.group(1))
 
-    # Heuristic sign for final (oldest) transaction if we couldn't delta-derive it.
-    # This only affects the last row because it has no following balance.
-    last = transactions[-1]
-    if last is not None:
-        raw_type = (last.get("_raw_type") or "").strip().upper()
-        desc = (last.get("Description") or "")
-        amt = last.get("Amount")
-        if isinstance(amt, (int, float)):
-            amt_abs = abs(float(amt))
-            sign = None
+        prev_balance = summary_start_balance
+        for i, txn in enumerate(transactions):
+            bcur = txn.get("Balance")
+            if not isinstance(bcur, (int, float)):
+                continue
+            if prev_balance is None and i > 0:
+                bprev_row = transactions[i - 1].get("Balance")
+                if isinstance(bprev_row, (int, float)):
+                    prev_balance = float(bprev_row)
+            if isinstance(prev_balance, (int, float)):
+                txn["Amount"] = round(float(bcur) - float(prev_balance), 2)
+            prev_balance = float(bcur)
+    else:
+        # Derive signed Amounts from balance deltas when possible (preferred for reconciliation).
+        # The PDF is typically reverse chronological (newest -> oldest):
+        # amount_i = balance_i - balance_{i+1}
+        for i in range(len(transactions) - 1):
+            b0 = transactions[i].get("Balance")
+            b1 = transactions[i + 1].get("Balance")
+            if isinstance(b0, (int, float)) and isinstance(b1, (int, float)):
+                delta = round(float(b0) - float(b1), 2)
+                transactions[i]["Amount"] = delta
 
-            if "From A/C" in desc or "FROM A/C" in desc:
-                sign = +1
-            elif "To A/C" in desc or "TO A/C" in desc:
-                sign = -1
-            elif raw_type in {"BAC"}:
-                sign = +1
-            elif raw_type in {"D/D", "CHG"}:
-                sign = -1
+        # Heuristic sign for final (oldest) transaction if we couldn't delta-derive it.
+        # This only affects the last row because it has no following balance.
+        last = transactions[-1]
+        if last is not None:
+            raw_type = (last.get("_raw_type") or "").strip().upper()
+            desc = (last.get("Description") or "")
+            amt = last.get("Amount")
+            if isinstance(amt, (int, float)):
+                amt_abs = abs(float(amt))
+                sign = None
 
-            if sign is not None:
-                last["Amount"] = round(sign * amt_abs, 2)
-            else:
-                # Default to negative for safety (many last-row items are payments out),
-                # but keep as-is if already negative.
-                last["Amount"] = round(float(amt), 2)
+                if "From A/C" in desc or "FROM A/C" in desc:
+                    sign = +1
+                elif "To A/C" in desc or "TO A/C" in desc:
+                    sign = -1
+                elif raw_type in {"BAC"}:
+                    sign = +1
+                elif raw_type in {"D/D", "CHG"}:
+                    sign = -1
+
+                if sign is not None:
+                    last["Amount"] = round(sign * amt_abs, 2)
+                else:
+                    # Default to negative for safety (many last-row items are payments out),
+                    # but keep as-is if already negative.
+                    last["Amount"] = round(float(amt), 2)
 
     # Apply global transaction type rules + final description cleanup
     cleaned = []
@@ -499,6 +568,15 @@ def extract_statement_balances(pdf_path) -> Dict[str, Optional[float]]:
             for page in pdf.pages:
                 all_text_chunks.append(page.extract_text() or "")
         all_text = "\n".join(all_text_chunks)
+        has_table_header = "date description paid in" in all_text.lower()
+
+        if has_table_header:
+            prev_match = _PREV_BAL_RE.search(all_text)
+            new_match = _NEW_BAL_RE.search(all_text)
+            if prev_match and new_match:
+                start_balance = _parse_money(prev_match.group(1))
+                end_balance = _parse_money(new_match.group(1))
+                return {"start_balance": start_balance, "end_balance": end_balance}
 
         opening_matches = list(_OPENING_BALANCE_RE.finditer(all_text))
         if opening_matches:
@@ -553,6 +631,44 @@ def extract_account_holder_name(pdf_path) -> str:
                 txt = pdf.pages[1].extract_text() or ""
     except Exception:
         return ""
+
+    if "date description paid in" in txt.lower():
+        lines_raw = [(line or "").strip() for line in txt.splitlines()]
+        lines_raw = [line for line in lines_raw if line]
+        header_idx = -1
+        for idx, line in enumerate(lines_raw):
+            if "account name" in line.lower() and "account no" in line.lower() and "sort code" in line.lower():
+                header_idx = idx
+                break
+
+        if header_idx >= 0:
+            candidate_lines = []
+            for line in lines_raw[header_idx + 1:]:
+                if re.search(r"\b(Current\s+Account|Summary)\b", line, re.IGNORECASE):
+                    break
+                candidate_lines.append(line)
+
+            trading_lines = []
+            for line in candidate_lines:
+                if re.fullmatch(r"[A-Z0-9&/\-\s']+", line) and not re.search(r"\d", line):
+                    if "T/A" in line.upper():
+                        continue
+                    trading_lines.append(line)
+                elif trading_lines:
+                    break
+
+            if trading_lines:
+                name = " ".join(trading_lines)
+                name = re.sub(r"([A-Z]{2,})\s{2,}([A-Z]{2,})", r"\1\2", name)
+                name = re.sub(r"\s+", " ", name).strip()
+                if name:
+                    return name
+
+            for line in candidate_lines:
+                if "T/A" in line.upper():
+                    name = re.sub(r"\s+", " ", line).strip()
+                    if name:
+                        return name
 
     lines = [re.sub(r"\s+", " ", (line or "")).strip() for line in txt.splitlines()]
     lines = [line for line in lines if line]
