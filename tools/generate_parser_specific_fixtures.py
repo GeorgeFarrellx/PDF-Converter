@@ -135,7 +135,7 @@ def _render_hsbc(path: Path, suffix: str):
         next_balance = round(prev_balance + parsed_signed_amount, 2)
 
         desc = description[:35]
-        row = f"{date_text:<9}{code:<4}{desc:<35}{paid_out:>12}{paid_in:>12}{f'£{next_balance:,.2f}':>12}"
+        row = f"{date_text:<9} {code:<3} {desc:<40} {paid_out:>12} {paid_in:>12} {f'£{next_balance:,.2f}':>12}"
         return row, next_balance
 
     lines = [
