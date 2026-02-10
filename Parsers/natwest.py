@@ -51,6 +51,7 @@ _IGNORE_LINE_RE_LIST = [
     re.compile(r"^\s*©\s*National\s+Westminster\s+Bank\b", re.IGNORECASE),
     re.compile(r"^\s*National\s+Westminster\s+Bank\b", re.IGNORECASE),
     re.compile(r"^\s*Authorised\s+by\s+the\s+Prudential\b", re.IGNORECASE),
+    re.compile(r"^\s*.*\bPeriod\s+Covered\s+\d{2}\s+[A-Za-z]{3}\s+\d{4}\s+to\s+\d{2}\s+[A-Za-z]{3}\s+\d{4}\b.*$", re.IGNORECASE),
 ]
 
 _PERIOD_RE = re.compile(
@@ -257,6 +258,9 @@ def _split_embedded_table_lines(lines: List[str]) -> List[str]:
 
     for raw_line in lines:
         line = (raw_line or "").rstrip("\n")
+        if "period covered" in line.lower():
+            split_lines.append(line)
+            continue
         valid_matches = []
 
         for m in _TABLE_EMBED_TXN_RE.finditer(line):
@@ -458,6 +462,11 @@ def extract_transactions(pdf_path) -> List[Dict]:
         if not m and has_table_header:
             tm = _TXN_START_TABLE_RE.match(line)
             if tm:
+                line_lower = line.lower()
+                if "period covered" in line_lower and re.search(r"\b\d{2}\s+[A-Za-z]{3}\s+\d{4}\s+to\s+\d{2}\s+[A-Za-z]{3}\s+\d{4}\b", line, re.IGNORECASE):
+                    continue
+                if "statement date" in line_lower:
+                    continue
                 m = tm
         if m:
             # Start new transaction block
@@ -779,6 +788,25 @@ def extract_account_holder_name(pdf_path) -> str:
 
         if header_idx >= 0:
             candidate_lines = lines_raw[header_idx + 1:]
+
+            immediate_stop_re = re.compile(r"\b(CURRENT\s+ACCOUNT|SUMMARY|STATEMENT\s+DATE|TRANSACTIONS?)\b", re.IGNORECASE)
+            immediate_caps = []
+            for line in candidate_lines:
+                if immediate_stop_re.search(line):
+                    break
+                if re.search(r"\d", line):
+                    break
+                if re.fullmatch(r"[A-Z&/\-\s']+", line):
+                    immediate_caps.append(line)
+                    if len(immediate_caps) >= 3:
+                        break
+                else:
+                    break
+
+            if immediate_caps:
+                name = _normalise_name_text(" ".join(immediate_caps))
+                if name:
+                    return name
 
             blocked_caps_re = re.compile(r"\b(CURRENT\s+ACCOUNT|SUMMARY|STATEMENT\s+DATE|WELCOME)\b", re.IGNORECASE)
             trading_lines = []
