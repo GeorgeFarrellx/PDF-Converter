@@ -100,6 +100,63 @@ def _lines_for(bank: str, txns: list[Txn], opening: float, closing: float, ps: d
     return lines
 
 
+def _write_halifax_pdf(path: Path, txns: list[Txn], opening: float, closing: float, ps: date, pe: date) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(path), pagesize=A4)
+    c.setFont("Courier", 10)
+
+    # Header lines
+    c.drawString(36, 810, "TEST CLIENT")
+    c.drawString(36, 796, "Sort code 00-00-00  Account number 00000000")
+    c.drawString(36, 782, f"CURRENT ACCOUNT {ps:%d %B %Y} to {pe:%d %B %Y}")
+    c.drawString(36, 768, f"Balance on {ps:%d %B %Y} £{opening:,.2f}")
+    c.drawString(36, 754, "Your Transactions")
+
+    # Fixed-x table columns for Halifax coordinate parser
+    x_date = 60
+    x_desc = 140
+    x_type = 320
+    x_in = 380
+    x_out = 450
+    x_bal = 520
+
+    y = 740
+    c.drawString(x_date, y, "Date")
+    c.drawString(x_desc, y, "Description")
+    c.drawString(x_type, y, "Type")
+    c.drawString(x_in, y, "Money in")
+    c.drawString(x_out, y, "Money out")
+    c.drawString(x_bal, y, "Balance")
+
+    y -= 14
+    bal = opening
+    for idx, t in enumerate(txns):
+        bal = round(bal + t.amount, 2)
+        tx_type = "CR" if t.amount > 0 else "DD"
+        money_in = f"{abs(t.amount):,.2f}" if t.amount > 0 else ""
+        money_out = f"{abs(t.amount):,.2f}" if t.amount < 0 else ""
+        # Keep non-numeric description; add one continuation row for multiline coverage.
+        desc = "Returned Direct Debit utility" if "Returned Direct Debit" in t.desc else "Apple Pay coffee" if "APPLE PAY" in t.desc else t.desc.replace("£", "")
+
+        c.drawString(x_date, y, f"{t.d:%d %b}")
+        c.drawString(x_desc, y, desc[:26])
+        c.drawString(x_type, y, tx_type)
+        if money_in:
+            c.drawString(x_in, y, money_in)
+        if money_out:
+            c.drawString(x_out, y, money_out)
+        c.drawString(x_bal, y, f"{bal:,.2f}")
+
+        if idx == 0:
+            y -= 12
+            c.drawString(x_desc, y, "Multiline statement detail")
+
+        y -= 14
+
+    c.drawString(36, y - 6, f"Balance on {pe:%d %B %Y} £{closing:,.2f}")
+    c.save()
+
+
 def _write_pdf(path: Path, lines: Iterable[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(path), pagesize=A4)
@@ -121,11 +178,17 @@ def generate_all(out_dir: str = "tests/fixtures_synthetic", seed: int = 1) -> No
         start = date(2024, 4, 1 + i)
         opening = 1000.0 + i * 25
         txns_a, close_a = _mk_txns(start, opening, seed + i)
-        _write_pdf(root / bank / "statement_a.pdf", _lines_for(bank, txns_a, opening, close_a, start, start + timedelta(days=9)))
+        if bank == "halifax":
+            _write_halifax_pdf(root / bank / "statement_a.pdf", txns_a, opening, close_a, start, start + timedelta(days=9))
+        else:
+            _write_pdf(root / bank / "statement_a.pdf", _lines_for(bank, txns_a, opening, close_a, start, start + timedelta(days=9)))
 
         start_b = start + timedelta(days=3)
         txns_b, close_b = _mk_txns(start_b, close_a, seed + 100 + i)
-        _write_pdf(root / bank / "statement_b.pdf", _lines_for(bank, txns_b, close_a, close_b, start_b, start_b + timedelta(days=9)))
+        if bank == "halifax":
+            _write_halifax_pdf(root / bank / "statement_b.pdf", txns_b, close_a, close_b, start_b, start_b + timedelta(days=9))
+        else:
+            _write_pdf(root / bank / "statement_b.pdf", _lines_for(bank, txns_b, close_a, close_b, start_b, start_b + timedelta(days=9)))
 
 
 if __name__ == "__main__":
