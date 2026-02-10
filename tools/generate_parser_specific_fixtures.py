@@ -134,11 +134,9 @@ def _render_hsbc(path: Path, suffix: str):
         parsed_signed_amount = -abs(amount) if paid_out else abs(amount)
         next_balance = round(prev_balance + parsed_signed_amount, 2)
 
-        left = f"{date_text:<10} {code:<4} {description:<36}"[:52]
-        out_col = f"{paid_out:<14}"
-        in_col = f"{paid_in:<14}"
-        bal_col = f"£{next_balance:,.2f}"
-        return f"{left}{out_col}{in_col}{bal_col}", next_balance
+        desc = description[:35]
+        row = f"{date_text:<9}{code:<4}{desc:<35}{paid_out:>12}{paid_in:>12}{f'£{next_balance:,.2f}':>12}"
+        return row, next_balance
 
     lines = [
         "HSBC",
