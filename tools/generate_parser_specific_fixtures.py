@@ -73,7 +73,11 @@ def _lines_for(bank: str, txns: list[Txn], opening: float, closing: float, ps: d
         outv = f"{abs(t.amount):.2f}" if t.amount < 0 else ""
         inv = f"{abs(t.amount):.2f}" if t.amount > 0 else ""
         code = "DD" if t.amount < 0 else "CR"
-        if bank == "hsbc":
+        if bank == "barclays":
+            outv = f"{abs(t.amount):,.2f}" if t.amount < 0 else ""
+            inv = f"{abs(t.amount):,.2f}" if t.amount > 0 else ""
+            lines.append(f"{t.d:%d %b} {t.desc:<28} {outv:>9} {inv:>9} {bal:>10,.2f}")
+        elif bank == "hsbc":
             lines.append(f"{t.d:%d %b %y} {t.ttype} {t.desc:<26} {outv:>9} {inv:>9} {bal:>9.2f}")
         elif bank in {"natwest", "rbs"}:
             lines.append(f"{t.d:%d %b %Y} {code} {t.desc} £{abs(t.amount):,.2f} £{bal:,.2f}")
