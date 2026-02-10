@@ -54,6 +54,10 @@ _PERIOD_RE = re.compile(
 )
 
 _ACCOUNT_NAME_RE = re.compile(r"^\s*Account\s+name:\s*(?P<name>.+?)\s*$", re.IGNORECASE)
+_OPENING_BALANCE_RE = re.compile(r"\bBROUGHT\s+FORWARD\b.*?(?:£\s*)?(-?[\d,]+\.\d{2})", re.IGNORECASE)
+_CLOSING_BALANCE_RE = re.compile(r"\b(CARRIED\s+FORWARD|BALANCE\s+AT)\b.*?(?:£\s*)?(-?[\d,]+\.\d{2})", re.IGNORECASE)
+_ACCOUNT_NAME_INLINE_RE = re.compile(r"\b(Account\s+name|Name)\b\s*:\s*([A-Z][A-Z\s'\-]{3,})", re.IGNORECASE)
+_ACCOUNT_NAME_NEXT_LINE_LABEL_RE = re.compile(r"^\s*(Account\s+name|Name)\s*:?\s*$", re.IGNORECASE)
 
 
 def _is_ignorable_line(line: str) -> bool:
@@ -487,28 +491,49 @@ def extract_statement_balances(pdf_path) -> Dict[str, Optional[float]]:
       - start_balance = balance before the earliest transaction (computed from oldest balance - oldest amount)
     If balances are missing, returns None appropriately.
     """
-    txns = extract_transactions(pdf_path)
-    if not txns:
-        return {"start_balance": None, "end_balance": None}
-
-    # end_balance: balance of first row with a balance
-    end_balance = None
-    for t in txns:
-        b = t.get("Balance")
-        if isinstance(b, (int, float)):
-            end_balance = float(b)
-            break
-
-    # start_balance: for the oldest txn, balance_before = balance_after - amount
     start_balance = None
-    oldest = None
-    for t in reversed(txns):
-        b = t.get("Balance")
-        a = t.get("Amount")
-        if isinstance(b, (int, float)) and isinstance(a, (int, float)):
-            oldest = t
-            start_balance = round(float(b) - float(a), 2)
-            break
+    end_balance = None
+    try:
+        all_text_chunks = []
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                all_text_chunks.append(page.extract_text() or "")
+        all_text = "\n".join(all_text_chunks)
+
+        opening_matches = list(_OPENING_BALANCE_RE.finditer(all_text))
+        if opening_matches:
+            start_balance = _parse_money(opening_matches[0].group(1))
+
+        closing_matches = list(_CLOSING_BALANCE_RE.finditer(all_text))
+        if closing_matches:
+            end_balance = _parse_money(closing_matches[-1].group(2))
+    except Exception:
+        pass
+
+    if start_balance is not None and end_balance is not None:
+        return {"start_balance": start_balance, "end_balance": end_balance}
+
+    try:
+        txns = extract_transactions(pdf_path)
+    except Exception:
+        txns = []
+
+    if not txns:
+        return {"start_balance": start_balance, "end_balance": end_balance}
+
+    if end_balance is None:
+        for t in txns:
+            b = t.get("Balance")
+            if isinstance(b, (int, float)):
+                end_balance = float(b)
+                break
+
+    if start_balance is None:
+        oldest = txns[-1]
+        oldest_balance = oldest.get("Balance")
+        oldest_amount = oldest.get("Amount")
+        if isinstance(oldest_balance, (int, float)) and isinstance(oldest_amount, (int, float)):
+            start_balance = round(float(oldest_balance) - float(oldest_amount), 2)
 
     return {"start_balance": start_balance, "end_balance": end_balance}
 
@@ -518,16 +543,53 @@ def extract_account_holder_name(pdf_path) -> str:
     Best-effort extraction of the client/account name.
     NatWest export includes: "Account name: <NAME>"
     """
-    with pdfplumber.open(pdf_path) as pdf:
-        # Usually on first page
-        for page in pdf.pages[:2]:
-            txt = page.extract_text() or ""
-            for line in txt.splitlines():
-                m = _ACCOUNT_NAME_RE.match(line.strip())
-                if m:
-                    name = (m.group("name") or "").strip()
-                    # Avoid generic headings
-                    if name and name.lower() not in {"transactions"}:
-                        return name
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            if not pdf.pages:
+                return ""
+
+            txt = pdf.pages[0].extract_text() or ""
+            if not txt.strip() and len(pdf.pages) > 1:
+                txt = pdf.pages[1].extract_text() or ""
+    except Exception:
+        return ""
+
+    lines = [re.sub(r"\s+", " ", (line or "")).strip() for line in txt.splitlines()]
+    lines = [line for line in lines if line]
+
+    for line in lines:
+        m = _ACCOUNT_NAME_RE.match(line)
+        if m:
+            name = re.sub(r"\s+", " ", (m.group("name") or "")).strip()
+            if name and name.lower() not in {"transactions"}:
+                return name
+
+    normalised_text = "\n".join(lines)
+    inline = _ACCOUNT_NAME_INLINE_RE.search(normalised_text)
+    if inline:
+        name = re.sub(r"\s+", " ", (inline.group(2) or "")).strip()
+        if name and name.lower() not in {"transactions"}:
+            return name
+
+    for idx, line in enumerate(lines):
+        if _ACCOUNT_NAME_NEXT_LINE_LABEL_RE.match(line) and idx + 1 < len(lines):
+            candidate = re.sub(r"\s+", " ", lines[idx + 1]).strip()
+            if re.match(r"^[A-Z][A-Z\s'\-]{3,}$", candidate, re.IGNORECASE):
+                return candidate
+
+    blocked_headers = {
+        "NATWEST", "STATEMENT", "PAGE", "SORT CODE", "ACCOUNT NUMBER", "TRANSACTIONS", "ACCOUNT"
+    }
+    for line in lines:
+        upper_line = line.upper()
+        if any(h in upper_line for h in blocked_headers):
+            continue
+        if re.search(r"\d", line):
+            continue
+        if " " not in line:
+            continue
+        if not re.match(r"^[A-Z\s'\-]+$", upper_line):
+            continue
+        return re.sub(r"\s+", " ", line).strip()
 
     return ""
