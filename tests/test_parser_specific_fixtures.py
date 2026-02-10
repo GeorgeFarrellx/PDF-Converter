@@ -1,7 +1,6 @@
 import importlib
-import io
+import traceback
 import unittest
-from contextlib import redirect_stdout
 from pathlib import Path
 
 import pdfplumber
@@ -17,57 +16,78 @@ class TestParserSpecificFixtures(unittest.TestCase):
     def test_all_bank_parsers(self):
         summaries = []
         for bank in BANKS:
-            parser_path = f"Parsers.{bank}"
-            module = importlib.import_module(parser_path)
-            pdf_path = Path("tests/fixtures_synthetic") / bank / "statement_a.pdf"
+            with self.subTest(bank=bank):
+                parser_path = f"Parsers.{bank}"
+                pdf_path = Path("tests/fixtures_synthetic") / bank / "statement_a.pdf"
 
-            try:
-                txns = module.extract_transactions(str(pdf_path))
-            except Exception as exc:
-                self.fail(f"{bank} failed extract_transactions: {exc}\n{self._debug_text(pdf_path)}")
-
-            self.assertGreaterEqual(
-                len(txns),
-                5,
-                f"{bank} expected >=5 txns, got {len(txns)}\n{self._debug_text(pdf_path)}",
-            )
-
-            amounts = []
-            for txn in txns:
-                for key in ["Date", "Transaction Type", "Description", "Amount", "Balance"]:
-                    self.assertIn(key, txn, f"{bank} missing key {key} in txn {txn}")
-                self.assertIsNotNone(txn["Amount"], f"{bank} Amount is None\n{self._debug_text(pdf_path)}")
                 try:
-                    amounts.append(float(txn["Amount"]))
+                    module = importlib.import_module(parser_path)
                 except Exception as exc:
-                    self.fail(f"{bank} Amount not castable: {txn['Amount']} ({exc})\n{self._debug_text(pdf_path)}")
+                    self._fail(bank, parser_path, pdf_path, "failed to import parser module", exc)
 
-            start = end = diff = None
-            if hasattr(module, "extract_statement_balances"):
                 try:
-                    bal = module.extract_statement_balances(str(pdf_path)) or {}
+                    txns = module.extract_transactions(str(pdf_path))
+                except Exception as exc:
+                    self._fail(bank, parser_path, pdf_path, "failed extract_transactions", exc)
+
+                if len(txns) < 5:
+                    self._fail(bank, parser_path, pdf_path, f"expected >=5 txns, got {len(txns)}")
+
+                amounts = []
+                for txn in txns:
+                    for key in ["Date", "Transaction Type", "Description", "Amount", "Balance"]:
+                        if key not in txn:
+                            self._fail(bank, parser_path, pdf_path, f"missing key {key} in txn {txn}")
+                    if txn["Amount"] is None:
+                        self._fail(bank, parser_path, pdf_path, f"Amount is None in txn {txn}")
+                    try:
+                        amounts.append(float(txn["Amount"]))
+                    except Exception as exc:
+                        self._fail(bank, parser_path, pdf_path, f"Amount not castable: {txn['Amount']}", exc)
+
+                start = end = diff = None
+                if hasattr(module, "extract_statement_balances"):
+                    try:
+                        bal = module.extract_statement_balances(str(pdf_path)) or {}
+                    except Exception as exc:
+                        self._fail(bank, parser_path, pdf_path, "failed extract_statement_balances", exc)
+
                     start = bal.get("start_balance")
                     end = bal.get("end_balance")
                     if start is not None and end is not None:
                         diff = round((float(start) + sum(amounts)) - float(end), 2)
-                        self.assertLessEqual(abs(diff), 0.01, f"{bank} reconciliation diff {diff}\n{self._debug_text(pdf_path)}")
-                except Exception as exc:
-                    self.fail(f"{bank} failed extract_statement_balances: {exc}\n{self._debug_text(pdf_path)}")
+                        if abs(diff) > 0.01:
+                            self._fail(bank, parser_path, pdf_path, f"reconciliation diff {diff}")
 
-            if hasattr(module, "extract_account_holder_name"):
-                try:
-                    name = (module.extract_account_holder_name(str(pdf_path)) or "").strip()
-                    self.assertTrue(name, f"{bank} empty account holder\n{self._debug_text(pdf_path)}")
-                except Exception as exc:
-                    self.fail(f"{bank} failed extract_account_holder_name: {exc}\n{self._debug_text(pdf_path)}")
+                if hasattr(module, "extract_account_holder_name"):
+                    try:
+                        name = (module.extract_account_holder_name(str(pdf_path)) or "").strip()
+                    except Exception as exc:
+                        self._fail(bank, parser_path, pdf_path, "failed extract_account_holder_name", exc)
+                    if not name:
+                        self._fail(bank, parser_path, pdf_path, "empty account holder")
 
-            summaries.append((bank, parser_path, len(txns), start, end, diff))
+                summaries.append((bank, parser_path, len(txns), start, end, diff))
 
         for bank, parser_path, count, start, end, diff in summaries:
             extra = ""
             if start is not None and end is not None:
                 extra = f", start={start}, end={end}, diff={diff}"
             print(f"PASS {bank} ({parser_path}) tx_count={count}{extra}")
+
+    def _fail(self, bank: str, parser_path: str, pdf_path: Path, message: str, exc: Exception | None = None) -> None:
+        err = ""
+        if exc is not None:
+            err = f"\nexception: {exc}\ntraceback:\n{traceback.format_exc()}"
+
+        self.fail(
+            f"=== FAIL: {bank} ===\n"
+            f"parser: {parser_path}\n"
+            f"pdf: {pdf_path}\n"
+            f"message: {message}{err}\n"
+            f"=== FIXTURE TEXT (first 40 lines) ===\n"
+            f"{self._debug_text(pdf_path)}"
+        )
 
     @staticmethod
     def _debug_text(pdf_path: Path) -> str:

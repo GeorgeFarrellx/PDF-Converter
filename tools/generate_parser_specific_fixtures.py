@@ -107,10 +107,12 @@ def _write_halifax_pdf(path: Path, txns: list[Txn], opening: float, closing: flo
 
     # Header lines
     c.drawString(36, 810, "TEST CLIENT")
-    c.drawString(36, 796, "Sort code 00-00-00  Account number 00000000")
-    c.drawString(36, 782, f"CURRENT ACCOUNT {ps:%d %B %Y} to {pe:%d %B %Y}")
-    c.drawString(36, 768, f"Balance on {ps:%d %B %Y} £{opening:,.2f}")
-    c.drawString(36, 754, "Your Transactions")
+    c.drawString(36, 796, "Document requested by")
+    c.drawString(36, 782, "TEST CLIENT")
+    c.drawString(36, 768, "Sort code 00-00-00  Account number 00000000")
+    c.drawString(36, 754, f"CURRENT ACCOUNT {ps:%d %B %Y} to {pe:%d %B %Y}")
+    c.drawString(36, 740, f"Balance on {ps:%d %B %Y} £{opening:,.2f}")
+    c.drawString(36, 726, "Your Transactions")
 
     # Fixed-x table columns for Halifax coordinate parser
     x_date = 60
@@ -120,7 +122,7 @@ def _write_halifax_pdf(path: Path, txns: list[Txn], opening: float, closing: flo
     x_out = 450
     x_bal = 520
 
-    y = 740
+    y = 712
     c.drawString(x_date, y, "Date")
     c.drawString(x_desc, y, "Description")
     c.drawString(x_type, y, "Type")
