@@ -2,6 +2,7 @@ name: CI Parser Specific Fixtures
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
@@ -25,13 +26,14 @@ jobs:
           echo "exit_code=$test_exit" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Publish compact summary (if generated)
+      - name: Build compact summary from unittest log
+        if: always()
+        run: python scripts/ci_summarize_unittest.py unittest.log > ci_parser_fixture_summary.md
+
+      - name: Publish compact summary
         if: always()
         shell: bash
-        run: |
-          if [ -f ci_parser_fixture_summary.md ]; then
-            cat ci_parser_fixture_summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: cat ci_parser_fixture_summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload unittest outputs
         uses: actions/upload-artifact@v4

@@ -20,6 +20,7 @@ BANKS = [
 
 FAIL_RE = re.compile(r"^=== FAIL: ([a-z]+) ===\s*$")
 PASS_RE = re.compile(r"^PASS ([a-z]+) \(([^)]*)\).*$")
+END_BLOCK_RE = re.compile(r"^=+\s*$")
 
 
 def _md_escape(text: str) -> str:
@@ -69,7 +70,7 @@ def summarize(log_text: str) -> str:
                 bank_data["fixture"] = line.split(":", 1)[1].strip()
             elif line.startswith("message:") and not bank_data["message"]:
                 bank_data["message"] = line.split(":", 1)[1].strip()
-            elif line.startswith("=== FIXTURE TEXT"):
+            elif line.startswith("=== FIXTURE TEXT") or END_BLOCK_RE.match(line):
                 current_fail_bank = None
 
     passed = sum(1 for bank in BANKS if data.get(bank, {}).get("status") == "PASS")

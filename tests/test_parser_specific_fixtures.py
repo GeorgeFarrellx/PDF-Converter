@@ -1,6 +1,4 @@
 import importlib
-import os
-import traceback
 import unittest
 from pathlib import Path
 
@@ -125,11 +123,6 @@ class TestParserSpecificFixtures(unittest.TestCase):
         summary_md = "\n".join(md_lines) + "\n"
         Path("ci_parser_fixture_summary.md").write_text(summary_md, encoding="utf-8")
 
-        step_summary = os.environ.get("GITHUB_STEP_SUMMARY", "").strip()
-        if step_summary:
-            with open(step_summary, "a", encoding="utf-8") as f:
-                f.write("\n")
-                f.write(summary_md)
 
     @staticmethod
     def _md(value: str) -> str:
@@ -153,18 +146,13 @@ class TestParserSpecificFixtures(unittest.TestCase):
         fixture_text = self._debug_text(pdf_path)
         self._record_failure(bank, parser_path, pdf_path, message, fixture_text)
 
-        err = ""
-        if exc is not None:
-            err = f"\nexception: {exc}\ntraceback:\n{traceback.format_exc()}"
-
+        err = f"; error={exc}" if exc is not None else ""
         self.fail(
             "========================================\n"
             f"=== FAIL: {bank} ===\n"
             f"parser: {parser_path}\n"
             f"pdf: {pdf_path}\n"
             f"message: {message}{err}\n"
-            "=== FIXTURE TEXT (first 40 lines) ===\n"
-            f"{fixture_text}\n"
             "========================================"
         )
 
