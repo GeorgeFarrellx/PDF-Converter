@@ -30,7 +30,7 @@ _TXN_START_TABLE_RE = re.compile(
 )
 
 # Currency amounts (NatWest export/table can include or omit £)
-_MONEY_RE = re.compile(r"(?:£\s*)?\(?-?[\d,]+\.\d{2}\)?")
+_MONEY_RE = re.compile(r"(?:£\s*)?\(?-?[\d,]+\.\d{2}\)?(?!\s*%)")
 
 # Header/footer noise lines to ignore
 _IGNORE_LINE_RE_LIST = [
@@ -39,6 +39,10 @@ _IGNORE_LINE_RE_LIST = [
     re.compile(r"^\s*Date\s+Description\s+Paid\s+In\(£\)\s+Withdrawn\(£\)\s+Balance\(£\)\s*$", re.IGNORECASE),
     re.compile(r"^\s*Transactions\s*$", re.IGNORECASE),
     re.compile(r"^\s*BROUGHT\s+FORWARD\b.*$", re.IGNORECASE),
+    re.compile(r"^\s*Debit\s+interest\s+details\b.*$", re.IGNORECASE),
+    re.compile(r"^\s*Overdraft\s+Limit\b.*$", re.IGNORECASE),
+    re.compile(r"^\s*Overdraft\s+Rate\b.*$", re.IGNORECASE),
+    re.compile(r"^\s*(?:UNARRANGED|ARRANGED)\b.*$", re.IGNORECASE),
     re.compile(r"^\s*©\s*National\s+Westminster\s+Bank\b", re.IGNORECASE),
     re.compile(r"^\s*National\s+Westminster\s+Bank\b", re.IGNORECASE),
     re.compile(r"^\s*Authorised\s+by\s+the\s+Prudential\b", re.IGNORECASE),
