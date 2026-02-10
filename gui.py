@@ -692,14 +692,53 @@ class App(TkinterDnD.Tk):
         temp_excel_path = ""
         created_temp_excel = False
         zip_created = False
+        excel_creation_error = ""
+
+        def _create_empty_support_excel(output_path: str, client_name_for_header: str = ""):
+            try:
+                from openpyxl import Workbook
+            except Exception as e:
+                _show_dependency_error(
+                    "openpyxl is required for support bundle Excel output.\n\n"
+                    "Install it with:\n"
+                    "  python -m pip install openpyxl\n\n"
+                    f"Original error: {e}"
+                )
+                return None
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Transaction Data"
+
+            headers = ["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Category"]
+            ws.append(headers)
+
+            left_text = (client_name_for_header or "").strip()
+            center_text = "Transaction Data"
+            right_text = ""
+            for hdr in (ws.oddHeader, ws.evenHeader, ws.firstHeader):
+                hdr.left.text = left_text
+                hdr.center.text = center_text
+                hdr.right.text = right_text
+
+            ensure_folder(os.path.dirname(output_path))
+            wb.save(output_path)
+            return output_path
 
         try:
             if not excel_source:
                 temp_excel_name = f"SUPPORT EXCEL - {bundle_base} - {ts}.xlsx"
                 temp_excel_path = make_unique_path(os.path.join(LOGS_DIR, temp_excel_name))
-                save_transactions_to_excel(transactions, temp_excel_path, client_name=client_name)
-                excel_source = temp_excel_path
-                created_temp_excel = True
+                try:
+                    if transactions:
+                        save_transactions_to_excel(transactions, temp_excel_path, client_name=client_name)
+                    else:
+                        _create_empty_support_excel(temp_excel_path, client_name_for_header=client_name)
+                    excel_source = temp_excel_path
+                    created_temp_excel = True
+                except Exception as e:
+                    excel_source = ""
+                    excel_creation_error = "".join(traceback.format_exception(type(e), e, e.__traceback__))
 
             recon_log_path = data.get("log_path") or ""
             log_path = recon_log_path
@@ -830,7 +869,15 @@ class App(TkinterDnD.Tk):
 
             with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
                 excel_arc = f"{safe_base}.xlsx"
-                zf.write(excel_source, arcname=excel_arc)
+                if excel_source and os.path.exists(excel_source):
+                    zf.write(excel_source, arcname=excel_arc)
+                elif excel_creation_error:
+                    zf.writestr("EXCEL_CREATION_FAILED.txt", excel_creation_error)
+                else:
+                    zf.writestr(
+                        "EXCEL_CREATION_FAILED.txt",
+                        "Support bundle could not include an Excel file because no source Excel was available.\n",
+                    )
 
                 if log_exists:
                     zf.write(log_path, arcname="Reconciliation Log.txt")
