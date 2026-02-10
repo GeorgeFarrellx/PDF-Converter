@@ -19,18 +19,26 @@ _MONTHS = {
 
 # Start of a transaction row (NatWest export)
 # Example: "31 Mar 2025 D/D UK FUELS LTD , 0111... £443.98 £24,746.07"
-_TXN_START_RE = re.compile(
+_TXN_START_EXPORT_RE = re.compile(
     r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\s+(?:(?P<year>\d{4})\s+)?(?P<type>[A-Z/]{2,4})\b"
 )
 
-# Currency amounts (NatWest export uses £, sometimes appears like "£3,088.88")
-_MONEY_RE = re.compile(r"£\s*\(?-?[\d,]+\.\d{2}\)?")
+# Start of a transaction row (NatWest statement table)
+# Example: "12 APR Card Transaction ... 24.32 333.36"
+_TXN_START_TABLE_RE = re.compile(
+    r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\b\s*(?P<rest>.*)$"
+)
+
+# Currency amounts (NatWest export/table can include or omit £)
+_MONEY_RE = re.compile(r"(?:£\s*)?\(?-?[\d,]+\.\d{2}\)?")
 
 # Header/footer noise lines to ignore
 _IGNORE_LINE_RE_LIST = [
     re.compile(r"^\s*Page\s+\d+\s+of\s+\d+\s*$", re.IGNORECASE),
     re.compile(r"^\s*Date\s+Type\s+Description\s+Paid\s+in\s+Paid\s+out\s+Balance\s*$", re.IGNORECASE),
+    re.compile(r"^\s*Date\s+Description\s+Paid\s+In\(£\)\s+Withdrawn\(£\)\s+Balance\(£\)\s*$", re.IGNORECASE),
     re.compile(r"^\s*Transactions\s*$", re.IGNORECASE),
+    re.compile(r"^\s*BROUGHT\s+FORWARD\b.*$", re.IGNORECASE),
     re.compile(r"^\s*©\s*National\s+Westminster\s+Bank\b", re.IGNORECASE),
     re.compile(r"^\s*National\s+Westminster\s+Bank\b", re.IGNORECASE),
     re.compile(r"^\s*Authorised\s+by\s+the\s+Prudential\b", re.IGNORECASE),
@@ -65,6 +73,9 @@ def _parse_money(s: str) -> Optional[float]:
         neg = True
         t = t.replace("(", "").replace(")", "")
     t = t.replace("£", "").replace(",", "").strip()
+    if t.startswith("-"):
+        neg = True
+        t = t[1:].strip()
     if not t:
         return None
     try:
@@ -283,6 +294,7 @@ def extract_transactions(pdf_path) -> List[Dict]:
     all_text = "\n".join(all_text_chunks)
 
     period_start_year, period_end_year = _extract_period_years(all_text)
+    has_table_header = "date description paid in" in all_text.lower()
 
     current_block = None  # dict with parsed header + lines
     last_seen_mon = None
@@ -340,7 +352,12 @@ def extract_transactions(pdf_path) -> List[Dict]:
         if _is_ignorable_line(line):
             continue
 
-        m = _TXN_START_RE.match(line)
+        m = _TXN_START_EXPORT_RE.match(line)
+        raw_type = ""
+        if not m and has_table_header:
+            tm = _TXN_START_TABLE_RE.match(line)
+            if tm:
+                m = tm
         if m:
             # Start new transaction block
             finalize_block(current_block)
@@ -348,8 +365,8 @@ def extract_transactions(pdf_path) -> List[Dict]:
             day = int(m.group("day"))
             mon = (m.group("mon") or "").strip().lower()
             mon_num = _MONTHS.get(mon[:3], None)
-            raw_type = (m.group("type") or "").strip()
-            year_str = m.group("year")
+            raw_type = (m.groupdict().get("type") or "").strip()
+            year_str = m.groupdict().get("year")
             year = None
 
             if mon_num is None:
