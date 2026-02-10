@@ -64,19 +64,26 @@ def _normalise_digit_splits_in_line(s: str) -> str:
     return s
 
 
-def _extract_amount_and_balance_from_line(line: str, paid_out_idx: int, paid_in_idx: int):
+def _extract_amount_and_balance_from_line(line: str, paid_out_idx: int, paid_in_idx: int, balance_idx: int):
     """
     Robustly pull the transaction amount (signed) and optional balance from a table line.
 
-    HSBC text extraction can place the amount slightly left/right of column boundaries,
-    so we do NOT rely on fixed slicing (which can split "1,150.88" into "1" and ",150.88").
-
-    Rules:
-    - If 2+ money values exist on the line, the rightmost is treated as Balance,
-      and the second-rightmost as the transaction amount.
-    - Sign is inferred from whether the amount sits in Paid out (<= paid_in_idx) or Paid in (> paid_in_idx).
+    Prefer explicit Paid out / Paid in column parsing first, then fall back to the
+    existing token-position heuristic when column slices cannot be parsed.
     """
     line_n = _normalise_digit_splits_in_line(line)
+
+    paid_out_val = _money_from_cell(line_n[paid_out_idx:paid_in_idx])
+    paid_in_val = _money_from_cell(line_n[paid_in_idx:balance_idx])
+    balance = _money_from_cell(line_n[balance_idx:])
+
+    if paid_out_val is not None and paid_in_val is None:
+        return -abs(paid_out_val), balance
+    if paid_in_val is not None and paid_out_val is None:
+        return abs(paid_in_val), balance
+    if paid_out_val is not None and paid_in_val is not None:
+        # Rare edge case: both columns contain values. Net the Paid in and Paid out values.
+        return paid_in_val - paid_out_val, balance
 
     matches = []
     slack = max(0, paid_out_idx - 5)
@@ -90,10 +97,10 @@ def _extract_amount_and_balance_from_line(line: str, paid_out_idx: int, paid_in_
     matches.sort(key=lambda x: x[0])
 
     if len(matches) >= 2:
-        balance = matches[-1][2]
+        if balance is None:
+            balance = matches[-1][2]
         amt_match = matches[-2]
     else:
-        balance = None
         amt_match = matches[-1]
 
     amt_val = amt_match[2]
@@ -403,7 +410,7 @@ def extract_transactions(pdf_path: str):
                 # Amount appears in Paid out / Paid in column => finalise txn
                 if current_txn:
                     signed_amt, bal_val = _extract_amount_and_balance_from_line(
-                        line, paid_out_idx, paid_in_idx
+                        line, paid_out_idx, paid_in_idx, balance_idx
                     )
 
                     if signed_amt is not None:
