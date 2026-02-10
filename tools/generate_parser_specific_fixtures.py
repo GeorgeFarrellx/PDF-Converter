@@ -125,6 +125,25 @@ def _render_hsbc(path: Path, suffix: str):
     txs, start = (a, start_a) if suffix == "a" else (b, start_b)
     balances = _running_balances(start, txs)
     period = "4 June to 3 July 2024" if suffix == "a" else "1 July to 31 July 2024"
+
+    header = "Date Payment type and details Paid out Paid in Balance"
+    paid_out_idx = header.find("Paid out")
+    paid_in_idx = header.find("Paid in")
+    balance_idx = header.find("Balance")
+
+    def _hsbc_row(date_text: str, code: str, description: str, amount: float, balance: float) -> str:
+        left = f"{date_text:<10} {code:<4} {description}".rstrip()
+        left = left[: paid_out_idx - 1]
+        left = f"{left:<{paid_out_idx}}"
+
+        paid_out = _money_p(-amount) if amount < 0 else ""
+        paid_in = _money_p(amount) if amount > 0 else ""
+
+        out_col = f"{paid_out:<{max(1, paid_in_idx - paid_out_idx)}}"
+        in_col = f"{paid_in:<{max(1, balance_idx - paid_in_idx)}}"
+        bal_col = f"£{balance:,.2f}"
+        return f"{left}{out_col}{in_col}{bal_col}"
+
     lines = [
         "HSBC",
         "TEST CLIENT",
@@ -132,15 +151,15 @@ def _render_hsbc(path: Path, suffix: str):
         "Account number: 00000000",
         period,
         f"Opening Balance £{start:,.2f}",
-        "Date Payment type and details Paid out Paid in Balance",
+        header,
     ]
+
     for i, t in enumerate(txs):
         d = f"{t.date} Jun 24" if suffix == "a" else f"{t.date} Jul 24"
-        out = _money_p(-t.amount) if t.amount < 0 else ""
-        inn = _money_p(t.amount) if t.amount > 0 else ""
-        lines.append(f"{d:<10} {t.type_or_code:<4} {t.desc:<34} {out:<10} {inn:<10} £{balances[i]:,.2f}")
+        lines.append(_hsbc_row(d, t.type_or_code, t.desc, t.amount, balances[i]))
         if i == 2:
             lines.append("               CONTINUATION TEST MERCHANT DETAILS")
+
     lines.append(f"Closing Balance £{balances[-1]:,.2f}")
     c = _new_canvas(path)
     _write_lines(c, lines)
