@@ -212,6 +212,7 @@ def auto_detect_bank_from_pdf(pdf_path: str) -> str | None:
 
         footer_low = (last_footer or "").lower()
         natwest_probe = t + (chr(10) + footer_low if footer_low else "")
+        zempler_probe = t + (chr(10) + footer_low if footer_low else "")
 
         if "hsbc" in t or "hsbc uk" in t or "hsbc bank" in t:
             return "HSBC"
@@ -290,7 +291,7 @@ def auto_detect_bank_from_pdf(pdf_path: str) -> str | None:
         ):
             return "Barclays"
 
-        if "zempler" in t:
+        if "zempler" in zempler_probe:
             return "Zempler Bank"
 
     except Exception:
