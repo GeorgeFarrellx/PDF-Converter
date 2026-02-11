@@ -1371,17 +1371,30 @@ class App(TkinterDnD.Tk):
             items = []
             failures = []
 
-            for i, pdf_path in enumerate(self.selected_files, start=1):
-                self.set_status(
-                    f"Reading statement dates {i}/{len(self.selected_files)}: {os.path.basename(pdf_path)}"
-                )
+            def _coerce_date(value):
+                try:
+                    if hasattr(value, "to_pydatetime"):
+                        value = value.to_pydatetime()
+                except Exception:
+                    return None
+                if isinstance(value, datetime):
+                    return value.date()
+                if isinstance(value, date):
+                    return value
+                return None
 
+            def _get_period_dates(pdf_path):
                 dmin = None
                 dmax = None
 
-                if bank == "Barclays":
+                if callable(getattr(parser, "extract_statement_period", None)):
                     try:
-                        dmin, dmax = extract_barclays_statement_period(pdf_path)
+                        period = parser.extract_statement_period(pdf_path)
+                        if isinstance(period, (tuple, list)) and len(period) >= 2:
+                            pstart = _coerce_date(period[0])
+                            pend = _coerce_date(period[1])
+                            if pstart and pend:
+                                dmin, dmax = pstart, pend
                     except Exception:
                         dmin, dmax = None, None
 
@@ -1395,12 +1408,20 @@ class App(TkinterDnD.Tk):
                         failures.append(os.path.basename(pdf_path))
                         dmin, dmax = None, None
 
-                period = ""
+                period_str = ""
                 try:
                     if dmin and dmax:
-                        period = f"{dmin.strftime('%d.%m.%y')} - {dmax.strftime('%d.%m.%y')}"
+                        period_str = f"{dmin.strftime('%d.%m.%y')} - {dmax.strftime('%d.%m.%y')}"
                 except Exception:
-                    period = ""
+                    period_str = ""
+
+                return dmin, dmax, period_str
+
+            for i, pdf_path in enumerate(self.selected_files, start=1):
+                self.set_status(
+                    f"Reading statement dates {i}/{len(self.selected_files)}: {os.path.basename(pdf_path)}"
+                )
+                dmin, dmax, period = _get_period_dates(pdf_path)
 
                 items.append(
                     {
