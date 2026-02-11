@@ -175,6 +175,8 @@ Rules:
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/starling.py
 - `Parsers/tsb.py`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/tsb.py
+- `Parsers/zempler.py`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/zempler.py
 
 ### Root app files
 
@@ -198,6 +200,7 @@ https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/P
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/santander.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/starling.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/tsb.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Parsers/zempler.py
 
 ### Optional / Non-editable awareness (reference only)
 

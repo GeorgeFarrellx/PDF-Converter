@@ -36,6 +36,7 @@ BANK_OPTIONS = [
     "Monzo",
     "Santander",
     "HSBC",
+    "Zempler Bank",
 ]
 
 
@@ -89,7 +90,10 @@ def make_unique_path(path: str) -> str:
 
 
 def normalize_bank_name_for_module(bank: str) -> str:
-    return bank.strip().lower()
+    normalized = bank.strip().lower()
+    if normalized == "zempler bank":
+        return "zempler"
+    return normalized
 
 
 def load_parser_module(bank: str):
@@ -285,6 +289,9 @@ def auto_detect_bank_from_pdf(pdf_path: str) -> str | None:
             )
         ):
             return "Barclays"
+
+        if "zempler" in t:
+            return "Zempler Bank"
 
     except Exception:
         return None
