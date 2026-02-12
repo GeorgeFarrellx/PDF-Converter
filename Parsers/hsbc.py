@@ -70,7 +70,12 @@ def _extract_amount_and_balance_from_line(line: str, paid_out_idx: int, paid_in_
     """
     line_n = _normalise_digit_splits_in_line(line)
 
-    matches = [(m.start(), m.end(), _to_float(m.group(0))) for m in MONEY_RE.finditer(line_n)]
+    slack_start = max(0, paid_out_idx - 5)
+    matches = [
+        (m.start(), m.end(), _to_float(m.group(0)))
+        for m in MONEY_RE.finditer(line_n)
+        if m.start() >= slack_start
+    ]
 
     if not matches:
         return None, None
