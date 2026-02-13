@@ -1,4 +1,4 @@
-# Version: 2.14
+# Version: 2.15
 import os
 import re
 import subprocess
@@ -1877,7 +1877,40 @@ class App(TkinterDnD.Tk):
             date_min = min(date_values) if date_values else None
             date_max = max(date_values) if date_values else None
 
-            filename = build_output_filename(client_name, date_min, date_max)
+            def _coerce_to_date(v):
+                try:
+                    if v is None or v == "":
+                        return None
+                    if hasattr(v, "to_pydatetime"):
+                        v = v.to_pydatetime()
+                    if isinstance(v, datetime):
+                        return v.date()
+                    if isinstance(v, date):
+                        return v
+                    if hasattr(v, "date"):
+                        dv = v.date()
+                        if isinstance(dv, date):
+                            return dv
+                except Exception:
+                    return None
+                return None
+
+            period_starts = []
+            period_ends = []
+            for rec in (recon_results or []):
+                ps = _coerce_to_date(rec.get("period_start"))
+                pe = _coerce_to_date(rec.get("period_end"))
+                if ps and pe:
+                    period_starts.append(ps)
+                    period_ends.append(pe)
+
+            statement_period_start = min(period_starts) if period_starts else None
+            statement_period_end = max(period_ends) if period_ends else None
+
+            if statement_period_start and statement_period_end:
+                filename = build_output_filename(client_name, statement_period_start, statement_period_end)
+            else:
+                filename = build_output_filename(client_name, date_min, date_max)
 
             self.set_status("Running continuity checks...")
             continuity_results = compute_statement_continuity(recon_results)
