@@ -1,4 +1,4 @@
-# Version: 2.15
+# Version: 2.16
 import os
 import re
 import subprocess
@@ -70,17 +70,20 @@ def show_reconciliation_popup(
     recon_results: list[dict],
     coverage_period: str = "",
     continuity_results: list[dict] | None = None,
+    audit_results: list[dict] | None = None,
     pre_save: bool = False,
     open_log_folder_callback=None,
 ):
     continuity_results = continuity_results or []
+    audit_results = audit_results or []
 
     any_recon_warn = any((r.get("status") or "") != "OK" for r in (recon_results or []))
     any_cont_warn = any(
         not str((r.get("display_status") or r.get("status") or "")).strip().upper().startswith("OK")
         for r in (continuity_results or [])
     )
-    any_warn = any_recon_warn or any_cont_warn
+    any_audit_warn = any((a.get("status") or "") != "OK" for a in (audit_results or []))
+    any_warn = any_recon_warn or any_cont_warn or any_audit_warn
 
     def _norm_date(v):
         try:
@@ -271,6 +274,41 @@ def show_reconciliation_popup(
 
         txt.insert("end", "\n")
 
+    if audit_results:
+        txt.insert("end", "Audit checks:\n", "section")
+        audit_by_pdf = {
+            str(a.get("pdf") or ""): a
+            for a in (audit_results or [])
+            if isinstance(a, dict)
+        }
+        for r in recon_results:
+            pdf = str(r.get("pdf") or "")
+            a = audit_by_pdf.get(pdf, {})
+            overall = str(a.get("status") or "WARN")
+            bw_status = str(a.get("balance_walk_status") or "NOT CHECKED")
+            bw_summary = str(a.get("balance_walk_summary") or "")
+            rs_status = str(a.get("row_shape_status") or "WARN")
+            rs_summary = str(a.get("row_shape_summary") or "")
+
+            if overall == "OK":
+                tag = "ok"
+            elif overall == "MISMATCH":
+                tag = "bad"
+            else:
+                tag = "warn"
+
+            bw_part = f"Balance Walk: {bw_status}"
+            if bw_summary:
+                bw_part = bw_part + f" ({bw_summary})"
+            rs_part = f"Row Shape Sanity: {rs_status}"
+            if rs_summary and rs_status != "OK":
+                rs_part = rs_part + f" ({rs_summary})"
+
+            msg = f"{overall}: {pdf} | {bw_part} | {rs_part}"
+            txt.insert("end", msg + "\n", tag)
+
+        txt.insert("end", "\n")
+
     btn_row = ttk.Frame(win)
     btn_row.pack(fill="x", pady=(8, 10))
 
@@ -454,6 +492,7 @@ class App(TkinterDnD.Tk):
             recon_results,
             coverage_period=coverage_period,
             continuity_results=continuity_results,
+            audit_results=data.get("audit_results") or [],
             pre_save=(output_path == "(Not saved yet)"),
             open_log_folder_callback=self.open_log_folder,
         )
@@ -635,6 +674,35 @@ class App(TkinterDnD.Tk):
             except Exception:
                 pass
 
+        # Audit results: anything other than OK is an issue.
+        if not has_issue:
+            try:
+                for a in (data.get("audit_results") or []):
+                    if not isinstance(a, dict):
+                        continue
+                    st = a.get("status") or ""
+                    if (not _status_is_ok(st)) or _text_has_issue_markers(st):
+                        has_issue = True
+                        break
+            except Exception:
+                pass
+
+        try:
+            for a in (data.get("audit_results") or []):
+                if not isinstance(a, dict):
+                    continue
+                st = a.get("status") or ""
+                if _status_is_ok(st):
+                    continue
+                pdf = a.get("pdf") or "PDF"
+                issue_reasons.append(
+                    f"Audit: {pdf} | Balance Walk {a.get('balance_walk_status') or 'NOT CHECKED'}"
+                    f" ({a.get('balance_walk_summary') or ''}) | Row Shape Sanity {a.get('row_shape_status') or 'WARN'}"
+                    f" ({a.get('row_shape_summary') or ''})"
+                )
+        except Exception:
+            pass
+
         # Explicit balance-missing gate: if any PDF lacks start/end balances, continuity may show "Not checked".
         # Treat this as an issue so support bundles include logs.
         try:
@@ -752,6 +820,7 @@ class App(TkinterDnD.Tk):
 
                 recon = data.get("recon_results") or []
                 cont = data.get("continuity_results") or []
+                audit = data.get("audit_results") or []
 
                 lines = []
                 lines.append(f"Support log generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -794,6 +863,19 @@ class App(TkinterDnD.Tk):
                         lines.append(f"- {prev_pdf} -> {next_pdf}: {st}")
                     else:
                         lines.append(f"- {c}")
+                lines.append("")
+
+                lines.append("Audit summary:")
+                for a in audit:
+                    if not isinstance(a, dict):
+                        lines.append(f"- {a}")
+                        continue
+                    pdf = a.get("pdf") or ""
+                    lines.append(
+                        f"- {pdf}: Balance Walk {a.get('balance_walk_status') or 'NOT CHECKED'}"
+                        f" ({a.get('balance_walk_summary') or ''}) | Row Shape Sanity {a.get('row_shape_status') or 'WARN'}"
+                        f" ({a.get('row_shape_summary') or ''}) | Overall {a.get('status') or 'WARN'}"
+                    )
                 lines.append("")
 
                 with open(support_log_path, "w", encoding="utf-8") as f:
@@ -1518,6 +1600,7 @@ class App(TkinterDnD.Tk):
 
             all_transactions = []
             recon_results = []
+            audit_results = []
             per_pdf_txns: dict[str, list[dict]] = {}
             remove_txn_ids: set[int] = set()
             pdf_by_name: dict[str, str] = {os.path.basename(p): p for p in (self.selected_files or [])}
@@ -1613,6 +1696,12 @@ class App(TkinterDnD.Tk):
                 per_pdf_txns[pdf_path] = txns
                 all_transactions.extend(txns)
                 rec = reconcile_statement(parser, pdf_path, txns)
+                audit = run_audit_checks_basic(
+                    os.path.basename(pdf_path),
+                    txns,
+                    rec.get("start_balance"),
+                    rec.get("end_balance"),
+                )
 
                 # Provide txns to core continuity logic (overlap resolution uses these when present).
                 rec["transactions"] = txns
@@ -1680,6 +1769,7 @@ class App(TkinterDnD.Tk):
                     rec["fingerprint"] = None
 
                 recon_results.append(rec)
+                audit_results.append(audit)
 
                 run_log_lines.append(f"{os.path.basename(pdf_path)}")
                 run_log_lines.append(f"  Transactions: {len(txns)}")
@@ -1702,6 +1792,12 @@ class App(TkinterDnD.Tk):
                     )
                     if rec.get("status") == "Mismatch":
                         run_log_lines.append(f"  Diff: {_fmt_money(rec.get('difference'))}")
+                run_log_lines.append(
+                    f"  Balance Walk: {audit.get('balance_walk_status')} | {audit.get('balance_walk_summary') or ''}"
+                )
+                run_log_lines.append(
+                    f"  Row Shape Sanity: {audit.get('row_shape_status')} | {audit.get('row_shape_summary') or ''}"
+                )
                 run_log_lines.append("")
 
             self.set_status("Running reconciliation checks...")
@@ -1803,6 +1899,7 @@ class App(TkinterDnD.Tk):
                 self.last_saved_output_path = None
                 self.last_report_data = {
                     "recon_results": recon_results,
+                    "audit_results": audit_results,
                     "continuity_results": [],
                     "coverage_period": "",
                     "source_pdfs": list(self.selected_files or []),
@@ -1847,6 +1944,7 @@ class App(TkinterDnD.Tk):
                     recon_results,
                     coverage_period="",
                     continuity_results=[],
+                    audit_results=audit_results,
                     pre_save=True,
                     open_log_folder_callback=self.open_log_folder,
                 )
@@ -2156,6 +2254,8 @@ class App(TkinterDnD.Tk):
             )
 
             any_issue = any_issue or any_cont_issue or any_gap
+            any_audit_issue = any((a.get("status") or "") != "OK" for a in (audit_results or []))
+            any_issue = any_issue or any_audit_issue
 
             log_text = "\n".join(run_log_lines).rstrip() + "\n"
             if self.last_report_data is None:
@@ -2184,6 +2284,8 @@ class App(TkinterDnD.Tk):
                         break
 
             full_pass = all_ok and cont_ok
+            audit_ok = all((a.get("status") == "OK") for a in (audit_results or []))
+            full_pass = all_ok and cont_ok and audit_ok
 
             if not full_pass:
                 try:
@@ -2215,6 +2317,8 @@ class App(TkinterDnD.Tk):
                 for c in (continuity_results or [])
                 if isinstance(c, dict)
             )
+            any_audit_warn = any((a.get("status") or "") != "OK" for a in (audit_results or []))
+            any_warn = any_warn or any_audit_warn
 
             autodetect_first_pdf = None
             try:
@@ -2231,6 +2335,7 @@ class App(TkinterDnD.Tk):
 
             self.last_report_data = {
                 "recon_results": recon_results,
+                "audit_results": audit_results,
                 "continuity_results": continuity_results,
                 "coverage_period": coverage_period,
                 "source_pdfs": list(self.selected_files or []),
@@ -2287,6 +2392,7 @@ class App(TkinterDnD.Tk):
                 recon_results,
                 coverage_period=coverage_period,
                 continuity_results=continuity_results,
+                audit_results=audit_results,
                 pre_save=True,
                 open_log_folder_callback=self.open_log_folder,
             )
@@ -2340,6 +2446,7 @@ class App(TkinterDnD.Tk):
                 if self.last_report_data is None:
                     self.last_report_data = {
                         "recon_results": [],
+                        "audit_results": [],
                         "continuity_results": [],
                         "coverage_period": "",
                         "source_pdfs": list(self.selected_files or []),
