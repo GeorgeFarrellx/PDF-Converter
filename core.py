@@ -1,4 +1,4 @@
-# Version: 2.03
+# Version: 2.04
 import os
 import glob
 import re
@@ -826,6 +826,203 @@ def reconcile_statement(parser, pdf_path: str, transactions: list[dict]) -> dict
     except Exception:
         result["status"] = "Error during reconciliation"
         return result
+
+
+def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balance, end_balance) -> dict:
+    def _parse_money(v):
+        if v is None or v == "":
+            return None
+        try:
+            s = str(v).strip()
+        except Exception:
+            return None
+        if not s:
+            return None
+
+        s = s.replace("\u00a0", " ").replace("£", "").replace(",", "")
+        s = s.replace("\u2212", "-").replace("\u2013", "-").replace("\u2014", "-").strip()
+        s = re.sub(r"\s+", " ", s)
+
+        neg = False
+        if s.startswith("(") and s.endswith(")"):
+            neg = True
+            s = s[1:-1].strip()
+
+        s = re.sub(r"\b(CR|DR|CREDIT|DEBIT)\b\.?$", "", s, flags=re.IGNORECASE).strip()
+        s = s.replace(" ", "")
+        if not s:
+            return None
+
+        try:
+            n = float(s)
+        except Exception:
+            return None
+        if neg:
+            n = -abs(n)
+        return round(n, 2)
+
+    def _is_blank(v):
+        if v is None:
+            return True
+        try:
+            return str(v).strip() == ""
+        except Exception:
+            return True
+
+    row_count = len(transactions or [])
+    start_val = _parse_money(start_balance)
+    end_val = _parse_money(end_balance)
+
+    parseable_balance_rows = 0
+    checked_rows = 0
+    missing_or_bad_walk_rows = 0
+    mismatch_examples = []
+    running = start_val
+    last_checked_balance = None
+
+    for idx, txn in enumerate(transactions or [], start=1):
+        amt = _parse_money((txn or {}).get("Amount"))
+        bal = _parse_money((txn or {}).get("Balance"))
+
+        if bal is not None:
+            parseable_balance_rows += 1
+
+        if amt is None or bal is None:
+            missing_or_bad_walk_rows += 1
+            continue
+
+        if running is None:
+            continue
+
+        expected = round(running + amt, 2)
+        if abs(expected - bal) > 0.01:
+            if len(mismatch_examples) < 5:
+                mismatch_examples.append(
+                    {
+                        "row": idx,
+                        "expected": expected,
+                        "actual": bal,
+                    }
+                )
+        running = bal
+        last_checked_balance = bal
+        checked_rows += 1
+
+    balance_walk_status = "OK"
+    balance_walk_summary = ""
+    balance_walk_details = {
+        "row_count": row_count,
+        "checked_rows": checked_rows,
+        "parseable_balance_rows": parseable_balance_rows,
+        "missing_or_bad_rows": missing_or_bad_walk_rows,
+        "mismatch_examples": mismatch_examples,
+        "end_balance_check": None,
+    }
+
+    if start_val is None or parseable_balance_rows == 0 or missing_or_bad_walk_rows > 0:
+        balance_walk_status = "NOT CHECKED"
+        reasons = []
+        if start_val is None:
+            reasons.append("start balance missing/unparseable")
+        if parseable_balance_rows == 0:
+            reasons.append("no parseable row balances")
+        if missing_or_bad_walk_rows > 0:
+            reasons.append(f"{missing_or_bad_walk_rows} rows missing/unparseable amount or balance")
+        balance_walk_summary = "; ".join(reasons)
+    else:
+        if mismatch_examples:
+            balance_walk_status = "MISMATCH"
+            balance_walk_summary = f"{len(mismatch_examples)} row mismatches"
+        else:
+            balance_walk_summary = f"{checked_rows} rows checked"
+
+        if end_val is not None and last_checked_balance is not None:
+            end_diff = round(last_checked_balance - end_val, 2)
+            end_ok = abs(end_diff) <= 0.01
+            balance_walk_details["end_balance_check"] = {
+                "last_checked_balance": last_checked_balance,
+                "end_balance": end_val,
+                "diff": end_diff,
+                "ok": end_ok,
+            }
+            if not end_ok:
+                balance_walk_status = "MISMATCH"
+                if balance_walk_summary:
+                    balance_walk_summary = balance_walk_summary + "; "
+                balance_walk_summary = balance_walk_summary + f"end balance mismatch ({end_diff:+.2f})"
+
+    missing_date = 0
+    missing_type = 0
+    missing_description = 0
+    bad_amount = 0
+    bad_balance = 0
+
+    missing_date_rows = []
+    missing_type_rows = []
+    missing_description_rows = []
+    bad_amount_rows = []
+    bad_balance_rows = []
+
+    for idx, txn in enumerate(transactions or [], start=1):
+        t = txn or {}
+        if _is_blank(t.get("Date")):
+            missing_date += 1
+            if len(missing_date_rows) < 8:
+                missing_date_rows.append(idx)
+        if _is_blank(t.get("Transaction Type")):
+            missing_type += 1
+            if len(missing_type_rows) < 8:
+                missing_type_rows.append(idx)
+        if _is_blank(t.get("Description")):
+            missing_description += 1
+            if len(missing_description_rows) < 8:
+                missing_description_rows.append(idx)
+        if _parse_money(t.get("Amount")) is None:
+            bad_amount += 1
+            if len(bad_amount_rows) < 8:
+                bad_amount_rows.append(idx)
+        if _parse_money(t.get("Balance")) is None:
+            bad_balance += 1
+            if len(bad_balance_rows) < 8:
+                bad_balance_rows.append(idx)
+
+    total_shape_issues = missing_date + missing_type + missing_description + bad_amount + bad_balance
+    if total_shape_issues == 0:
+        row_shape_status = "OK"
+        row_shape_summary = "all required fields parseable"
+    else:
+        row_shape_status = "WARN"
+        row_shape_summary = (
+            f"missing Date {missing_date}, Type {missing_type}, Description {missing_description}, "
+            f"bad Amount {bad_amount}, bad Balance {bad_balance}"
+        )
+
+    row_shape_details = {
+        "row_count": row_count,
+        "missing_date": {"count": missing_date, "rows": missing_date_rows},
+        "missing_type": {"count": missing_type, "rows": missing_type_rows},
+        "missing_description": {"count": missing_description, "rows": missing_description_rows},
+        "bad_amount": {"count": bad_amount, "rows": bad_amount_rows},
+        "bad_balance": {"count": bad_balance, "rows": bad_balance_rows},
+    }
+
+    if balance_walk_status == "MISMATCH":
+        overall_status = "MISMATCH"
+    elif row_shape_status == "WARN" or balance_walk_status == "NOT CHECKED":
+        overall_status = "WARN"
+    else:
+        overall_status = "OK"
+
+    return {
+        "pdf": pdf_name,
+        "balance_walk_status": balance_walk_status,
+        "balance_walk_summary": balance_walk_summary,
+        "balance_walk_details": balance_walk_details,
+        "row_shape_status": row_shape_status,
+        "row_shape_summary": row_shape_summary,
+        "row_shape_details": row_shape_details,
+        "status": overall_status,
+    }
 
 
 def _overlap_dedupe_continuity_resolution(
