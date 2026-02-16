@@ -406,6 +406,7 @@ def extract_transactions(pdf_path) -> List[Dict]:
         pending_rows: List[Dict] = []
         current_date = None
         current_desc_lines: List[str] = []
+        current_raw_type = ""
         last_seen_mon = None
         current_year = period_end_year if period_end_year is not None else _dt.date.today().year
 
@@ -461,11 +462,18 @@ def extract_transactions(pdf_path) -> List[Dict]:
             monies = [m.strip() for m in _MONEY_RE.findall(line) if m and m.strip()]
             candidate_balance = _parse_money(monies[-1]) if monies else None
             keyword_match = _TXN_KEYWORD_RE.match(line)
+            if keyword_match:
+                current_raw_type = keyword_match.group(1).strip()
             is_row_terminator = (
                 len(monies) >= 2
-                and (had_explicit_date or keyword_match is not None)
                 and current_date is not None
                 and candidate_balance is not None
+                and (
+                    had_explicit_date
+                    or keyword_match is not None
+                    or current_raw_type
+                    or current_desc_lines
+                )
             )
 
             if is_row_terminator:
@@ -474,7 +482,7 @@ def extract_transactions(pdf_path) -> List[Dict]:
                 if line_desc:
                     desc_parts.append(line_desc)
                 description = " ".join(desc_parts).strip()
-                raw_type = ""
+                raw_type = current_raw_type
                 if keyword_match:
                     raw_type = keyword_match.group(1).strip()
                 pending_rows.append(
@@ -488,6 +496,7 @@ def extract_transactions(pdf_path) -> List[Dict]:
                     }
                 )
                 current_desc_lines = []
+                current_raw_type = ""
             elif line:
                 current_desc_lines.append(line)
 
@@ -795,6 +804,12 @@ def extract_transactions(pdf_path) -> List[Dict]:
                     # but keep as-is if already negative.
                     last["Amount"] = round(float(amt), 2)
 
+        if len(transactions) >= 2:
+            first_date = transactions[0].get("Date")
+            last_date = transactions[-1].get("Date")
+            if isinstance(first_date, _dt.date) and isinstance(last_date, _dt.date) and first_date > last_date:
+                transactions.reverse()
+
     # Apply global transaction type rules + final description cleanup
     cleaned = []
     for txn in transactions:
@@ -854,19 +869,33 @@ def extract_statement_balances(pdf_path) -> Dict[str, Optional[float]]:
     if not txns:
         return {"start_balance": start_balance, "end_balance": end_balance}
 
+    earliest_txn = txns[0]
+    latest_txn = txns[-1]
+    first_date = earliest_txn.get("Date")
+    last_date = latest_txn.get("Date")
+    if not (isinstance(first_date, _dt.date) and isinstance(last_date, _dt.date) and first_date <= last_date):
+        earliest_txn = txns[-1]
+        latest_txn = txns[0]
+
     if end_balance is None:
-        for t in txns:
-            b = t.get("Balance")
+        latest_index = txns.index(latest_txn)
+        for i in range(latest_index, -1, -1):
+            b = txns[i].get("Balance")
             if isinstance(b, (int, float)):
                 end_balance = float(b)
                 break
+        if end_balance is None:
+            for i in range(latest_index + 1, len(txns)):
+                b = txns[i].get("Balance")
+                if isinstance(b, (int, float)):
+                    end_balance = float(b)
+                    break
 
     if start_balance is None:
-        oldest = txns[-1]
-        oldest_balance = oldest.get("Balance")
-        oldest_amount = oldest.get("Amount")
-        if isinstance(oldest_balance, (int, float)) and isinstance(oldest_amount, (int, float)):
-            start_balance = round(float(oldest_balance) - float(oldest_amount), 2)
+        earliest_balance = earliest_txn.get("Balance")
+        earliest_amount = earliest_txn.get("Amount")
+        if isinstance(earliest_balance, (int, float)) and isinstance(earliest_amount, (int, float)):
+            start_balance = round(float(earliest_balance) - float(earliest_amount), 2)
 
     return {"start_balance": start_balance, "end_balance": end_balance}
 
