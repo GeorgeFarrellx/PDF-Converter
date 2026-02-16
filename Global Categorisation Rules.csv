@@ -1,99 +1,313 @@
 Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
-10,Groceries,contains,TESCO,DEBIT,,True,Supermarkets & grocery delivery
-11,Groceries,contains,TESCO STORES,DEBIT,,True,Supermarkets & grocery delivery
-12,Groceries,contains,SAINSBURY,DEBIT,,True,Supermarkets & grocery delivery
-13,Groceries,contains,SAINSBURYS,DEBIT,,True,Supermarkets & grocery delivery
-14,Groceries,contains,ASDA,DEBIT,,True,Supermarkets & grocery delivery
-15,Groceries,contains,MORRISONS,DEBIT,,True,Supermarkets & grocery delivery
-16,Groceries,contains,ALDI,DEBIT,,True,Supermarkets & grocery delivery
-17,Groceries,contains,LIDL,DEBIT,,True,Supermarkets & grocery delivery
-18,Groceries,contains,CO-OP,DEBIT,,True,Supermarkets & grocery delivery
-19,Groceries,contains,WAITROSE,DEBIT,,True,Supermarkets & grocery delivery
-20,Groceries,contains,OCADO,DEBIT,,True,Supermarkets & grocery delivery
-21,Groceries,contains,ICELAND,DEBIT,,True,Supermarkets & grocery delivery
-22,Groceries,contains,MARKS & SPENCER,DEBIT,,True,Food retail
-23,Groceries,contains,M&S,DEBIT,,True,Food retail
-24,Groceries,contains,COSTCO,DEBIT,,True,Food retail / bulk
-30,Eating Out,contains,MCDONALD,DEBIT,,True,Fast food
-31,Eating Out,contains,KFC,DEBIT,,True,Fast food
-32,Eating Out,contains,BURGER KING,DEBIT,,True,Fast food
-33,Eating Out,contains,SUBWAY,DEBIT,,True,Fast food
-34,Eating Out,contains,GREGGS,DEBIT,,True,Fast food
-35,Eating Out,contains,COSTA,DEBIT,,True,Coffee
-36,Eating Out,contains,STARBUCKS,DEBIT,,True,Coffee
-37,Eating Out,contains,PRET,DEBIT,,True,Coffee / lunch
-38,Eating Out,contains,CAFFE NERO,DEBIT,,True,Coffee
-39,Eating Out,contains,NANDO,DEBIT,,True,Restaurants
-40,Eating Out,contains,UBER EATS,DEBIT,,True,Takeaway delivery
-41,Eating Out,contains,DELIVEROO,DEBIT,,True,Takeaway delivery
-42,Eating Out,contains,JUST EAT,DEBIT,,True,Takeaway delivery
-50,Transport,contains,TFL,DEBIT,,True,Public transport
-51,Transport,contains,TRANSPORT FOR LONDON,DEBIT,,True,Public transport
-52,Transport,contains,UBER,DEBIT,,True,Rideshare
-53,Transport,contains,BOLT,DEBIT,,True,Rideshare
-54,Transport,contains,NATIONAL RAIL,DEBIT,,True,Trains
-55,Transport,contains,TRAINLINE,DEBIT,,True,Trains
-56,Transport,contains,STAGECOACH,DEBIT,,True,Buses
-57,Transport,contains,ARRIVA,DEBIT,,True,Buses
-58,Transport,contains,SHELL,DEBIT,,True,Fuel
-59,Transport,contains,BP,DEBIT,,True,Fuel
-60,Transport,contains,ESSO,DEBIT,,True,Fuel
-61,Transport,contains,TESCO FUEL,DEBIT,,True,Fuel
-62,Transport,contains,ASDA FUEL,DEBIT,,True,Fuel
-70,Shopping,contains,AMAZON,DEBIT,,True,Online shopping
-71,Shopping,contains,AMZN,DEBIT,,True,Online shopping
-72,Shopping,contains,EBAY,DEBIT,,True,Online shopping
-73,Shopping,contains,ETSY,DEBIT,,True,Online shopping
-74,Shopping,contains,ARGOS,DEBIT,,True,Retail
-75,Shopping,contains,NEXT,DEBIT,,True,Retail
-76,Shopping,contains,PRIMARK,DEBIT,,True,Retail
-77,Shopping,contains,JD SPORTS,DEBIT,,True,Retail
-78,Shopping,contains,SPORTSDIRECT,DEBIT,,True,Retail
-79,Shopping,contains,APPLE.COM/BILL,DEBIT,,True,Digital purchases
-80,Shopping,contains,GOOGLE,DEBIT,,True,Digital purchases
-81,Shopping,contains,PAYPAL,DEBIT,,True,Online payments (often needs review)
-90,Bills,contains,BRITISH GAS,DEBIT,,True,Utilities
-91,Bills,contains,OCTOPUS,DEBIT,,True,Utilities
-92,Bills,contains,EON,DEBIT,,True,Utilities
-93,Bills,contains,EDF,DEBIT,,True,Utilities
-94,Bills,contains,SCOTTISH POWER,DEBIT,,True,Utilities
-95,Bills,contains,TV LICENSING,DEBIT,,True,TV licence
-96,Bills,contains,VIRGIN MEDIA,DEBIT,,True,Internet/TV
-97,Bills,contains,SKY,DEBIT,,True,Internet/TV
-98,Bills,contains,BT,DEBIT,,True,Internet/Phone
-99,Bills,contains,EE,DEBIT,,True,Mobile
-100,Bills,contains,O2,DEBIT,,True,Mobile
-101,Bills,contains,VODAFONE,DEBIT,,True,Mobile
-102,Bills,contains,THREE,DEBIT,,True,Mobile
-110,Rent/Mortgage,contains,RENT,DEBIT,,True,Rent (generic)
-111,Rent/Mortgage,contains,MORTGAGE,DEBIT,,True,Mortgage (generic)
-120,Income,contains,SALARY,CREDIT,,True,Salary
-121,Income,contains,PAYROLL,CREDIT,,True,Salary
-122,Income,contains,HMRC,CREDIT,,True,Tax refund / credits
-123,Income,contains,UNIVERSAL CREDIT,CREDIT,,True,Benefits
-124,Income,contains,PENSION,CREDIT,,True,Pension
-130,Transfers,contains,TRANSFER,ANY,,True,Transfers (often needs review)
-131,Transfers,contains,FASTER PAYMENT,ANY,,True,Transfers (often needs review)
-132,Transfers,contains,BACS,ANY,,True,Transfers (often needs review)
-140,Banking Fees,contains,FEE,DEBIT,,True,Bank fees
-141,Banking Fees,contains,CHARGE,DEBIT,,True,Bank fees
-142,Banking Fees,contains,OVERDRAFT,DEBIT,,True,Bank fees
-150,Subscriptions,contains,NETFLIX,DEBIT,,True,Subscriptions
-151,Subscriptions,contains,SPOTIFY,DEBIT,,True,Subscriptions
-152,Subscriptions,contains,DISNEY,DEBIT,,True,Subscriptions
-153,Subscriptions,contains,AMAZON PRIME,DEBIT,,True,Subscriptions
-154,Subscriptions,contains,APPLE,DEBIT,,True,Subscriptions (Apple - review)
-155,Subscriptions,contains,GOOGLE PLAY,DEBIT,,True,Subscriptions (Google - review)
-160,Health/Fitness,contains,GYM,DEBIT,,True,Health/Fitness
-161,Health/Fitness,contains,PUREGYM,DEBIT,,True,Health/Fitness
-162,Health/Fitness,contains,THE GYM,DEBIT,,True,Health/Fitness
-170,Insurance,contains,INSURANCE,DEBIT,,True,Insurance (generic)
-171,Insurance,contains,AVIVA,DEBIT,,True,Insurance
-172,Insurance,contains,DIRECT LINE,DEBIT,,True,Insurance
-173,Insurance,contains,LV=,DEBIT,,True,Insurance
-180,Childcare,contains,NURSERY,DEBIT,,True,Childcare
-181,Childcare,contains,CHILDCARE,DEBIT,,True,Childcare
-190,Tax,contains,HMRC,DEBIT,,True,Tax payments
-191,Tax,contains,SELF ASSESSMENT,DEBIT,,True,Tax payments
-192,Tax,contains,VAT,DEBIT,,True,Tax payments
-193,Tax,contains,CORPORATION TAX,DEBIT,,True,Tax payments
+10,Groceries,contains,TESCO,DEBIT,,TRUE,Supermarkets & grocery delivery
+11,Groceries,contains,TESCO STORES,DEBIT,,TRUE,Supermarkets & grocery delivery
+12,Groceries,contains,SAINSBURY,DEBIT,,TRUE,Supermarkets & grocery delivery
+13,Groceries,contains,SAINSBURYS,DEBIT,,TRUE,Supermarkets & grocery delivery
+14,Groceries,contains,ASDA,DEBIT,,TRUE,Supermarkets & grocery delivery
+15,Groceries,contains,MORRISONS,DEBIT,,TRUE,Supermarkets & grocery delivery
+16,Groceries,contains,ALDI,DEBIT,,TRUE,Supermarkets & grocery delivery
+17,Groceries,contains,LIDL,DEBIT,,TRUE,Supermarkets & grocery delivery
+18,Groceries,contains,WAITROSE,DEBIT,,TRUE,Supermarkets & grocery delivery
+19,Groceries,contains,M&S FOOD,DEBIT,,TRUE,Supermarkets & grocery delivery
+20,Groceries,contains,MARKS & SPENCER,DEBIT,,TRUE,Supermarkets & grocery delivery
+21,Groceries,contains,ICELAND,DEBIT,,TRUE,Supermarkets & grocery delivery
+22,Groceries,contains,CO-OP,DEBIT,,TRUE,Supermarkets & grocery delivery
+23,Groceries,contains,CO OPERATIVE,DEBIT,,TRUE,Supermarkets & grocery delivery
+24,Groceries,contains,SPAR,DEBIT,,TRUE,Supermarkets & grocery delivery
+25,Groceries,contains,BUDGENS,DEBIT,,TRUE,Supermarkets & grocery delivery
+26,Groceries,contains,COSTCUTTER,DEBIT,,TRUE,Supermarkets & grocery delivery
+27,Groceries,contains,WHOLE FOODS,DEBIT,,TRUE,Supermarkets & grocery delivery
+28,Groceries,contains,OCADO,DEBIT,,TRUE,Supermarkets & grocery delivery
+29,Groceries,contains,DELIVEROO HOP,DEBIT,,TRUE,Supermarkets & grocery delivery
+30,Groceries,contains,AMAZON FRESH,DEBIT,,TRUE,Supermarkets & grocery delivery
+40,Stationary,contains,WHSMITH,DEBIT,,TRUE,Corner shops/newsagents
+41,Groceries,contains,MCCOLLS,DEBIT,,TRUE,Corner shops/newsagents
+42,Groceries,contains,PREMIER,DEBIT,,TRUE,Corner shops/newsagents
+43,Groceries,contains,NISA,DEBIT,,TRUE,Corner shops/newsagents
+44,Groceries,contains,NEWSAGENT,DEBIT,,TRUE,Corner shops/newsagents
+50,Fuel,contains,SHELL,DEBIT,,TRUE,Petrol/diesel
+51,Fuel,contains,BP,DEBIT,,TRUE,Petrol/diesel
+52,Fuel,contains,ESSO,DEBIT,,TRUE,Petrol/diesel
+53,Fuel,contains,TEXACO,DEBIT,,TRUE,Petrol/diesel
+54,Fuel,contains,JET,DEBIT,,TRUE,Petrol/diesel
+55,Fuel,contains,ASDA PETROL,DEBIT,,TRUE,Petrol/diesel
+56,Fuel,contains,TESCO FUEL,DEBIT,,TRUE,Petrol/diesel
+57,Fuel,contains,SAINSBURY'S FUEL,DEBIT,,TRUE,Petrol/diesel
+58,Fuel,contains,MORRISONS FUEL,DEBIT,,TRUE,Petrol/diesel
+59,Fuel,contains,COSTCO FUEL,DEBIT,,TRUE,Petrol/diesel
+70,Food & Drink,contains,STARBUCKS,DEBIT,,TRUE,Coffee shops & quick bites
+71,Food & Drink,contains,COSTA,DEBIT,,TRUE,Coffee shops & quick bites
+72,Food & Drink,contains,CAFFE NERO,DEBIT,,TRUE,Coffee shops & quick bites
+73,Food & Drink,contains,CAFFÈ NERO,DEBIT,,TRUE,Coffee shops & quick bites
+74,Food & Drink,contains,PRET,DEBIT,,TRUE,Coffee shops & quick bites
+75,Food & Drink,contains,PRET A MANGER,DEBIT,,TRUE,Coffee shops & quick bites
+76,Food & Drink,contains,GREGGS,DEBIT,,TRUE,Coffee shops & quick bites
+77,Food & Drink,contains,NEROS,DEBIT,,TRUE,Coffee shops & quick bites
+78,Food & Drink,contains,COFFEE,DEBIT,,TRUE,Coffee shops & quick bites
+90,Food & Drink,contains,MCDONALD,DEBIT,,TRUE,Restaurants / fast food
+91,Food & Drink,contains,KFC,DEBIT,,TRUE,Restaurants / fast food
+92,Food & Drink,contains,BURGER KING,DEBIT,,TRUE,Restaurants / fast food
+93,Food & Drink,contains,SUBWAY,DEBIT,,TRUE,Restaurants / fast food
+94,Food & Drink,contains,NANDO,DEBIT,,TRUE,Restaurants / fast food
+95,Food & Drink,contains,PIZZA HUT,DEBIT,,TRUE,Restaurants / fast food
+96,Food & Drink,contains,DOMINO,DEBIT,,TRUE,Restaurants / fast food
+97,Food & Drink,contains,FIVE GUYS,DEBIT,,TRUE,Restaurants / fast food
+98,Food & Drink,contains,WAGAMAMA,DEBIT,,TRUE,Restaurants / fast food
+99,Food & Drink,contains,ZIZZI,DEBIT,,TRUE,Restaurants / fast food
+100,Food & Drink,contains,ASK ITALIAN,DEBIT,,TRUE,Restaurants / fast food
+101,Food & Drink,contains,FRANKIE & BENNY,DEBIT,,TRUE,Restaurants / fast food
+102,Food & Drink,contains,WEATHERSPOON,DEBIT,,TRUE,Restaurants / fast food
+103,Food & Drink,contains,JD WETHERSPOON,DEBIT,,TRUE,Restaurants / fast food
+104,Food & Drink,contains,HARVESTER,DEBIT,,TRUE,Restaurants / fast food
+105,Food & Drink,contains,MILLER & CARTER,DEBIT,,TRUE,Restaurants / fast food
+120,Food & Drink,contains,DELIVEROO,DEBIT,,TRUE,Delivery platforms
+121,Food & Drink,contains,JUST EAT,DEBIT,,TRUE,Delivery platforms
+122,Food & Drink,contains,UBER EATS,DEBIT,,TRUE,Delivery platforms
+123,Food & Drink,contains,FOODHUB,DEBIT,,TRUE,Delivery platforms
+140,Travel,contains,TFL,DEBIT,,TRUE,Public transport
+141,Travel,contains,TRANSPORT FOR LONDON,DEBIT,,TRUE,Public transport
+142,Travel,contains,TRAINLINE,DEBIT,,TRUE,Public transport
+143,Travel,contains,NATIONAL RAIL,DEBIT,,TRUE,Public transport
+144,Travel,contains,AVANTI,DEBIT,,TRUE,Public transport
+145,Travel,contains,GWR,DEBIT,,TRUE,Public transport
+146,Travel,contains,LNER,DEBIT,,TRUE,Public transport
+147,Travel,contains,SOUTHERN RAILWAY,DEBIT,,TRUE,Public transport
+148,Travel,contains,THAMESLINK,DEBIT,,TRUE,Public transport
+149,Travel,contains,GREAT NORTHERN,DEBIT,,TRUE,Public transport
+150,Travel,contains,SOUTHEASTERN,DEBIT,,TRUE,Public transport
+151,Travel,contains,CHILTERN,DEBIT,,TRUE,Public transport
+152,Travel,contains,CROSSCOUNTRY,DEBIT,,TRUE,Public transport
+153,Travel,contains,NORTHERN RAIL,DEBIT,,TRUE,Public transport
+154,Travel,contains,SCOTRAIL,DEBIT,,TRUE,Public transport
+155,Travel,contains,MERSEYRAIL,DEBIT,,TRUE,Public transport
+156,Travel,contains,NATIONAL EXPRESS,DEBIT,,TRUE,Public transport
+157,Travel,contains,MEGABUS,DEBIT,,TRUE,Public transport
+158,Travel,contains,STAGECOACH,DEBIT,,TRUE,Public transport
+159,Travel,contains,ARRIVA,DEBIT,,TRUE,Public transport
+160,Travel,contains,FIRST BUS,DEBIT,,TRUE,Public transport
+180,Travel,contains,UBER,DEBIT,,TRUE,Taxis and ride-hailing
+181,Travel,contains,BOLT,DEBIT,,TRUE,Taxis and ride-hailing
+182,Travel,contains,FREE NOW,DEBIT,,TRUE,Taxis and ride-hailing
+183,Travel,contains,OLA,DEBIT,,TRUE,Taxis and ride-hailing
+184,Travel,contains,ADDISON LEE,DEBIT,,TRUE,Taxis and ride-hailing
+200,Travel,contains,RINGGO,DEBIT,,TRUE,Parking and road charges
+201,Travel,contains,PAYBYPHONE,DEBIT,,TRUE,Parking and road charges
+202,Travel,contains,APCOA,DEBIT,,TRUE,Parking and road charges
+203,Travel,contains,NCP,DEBIT,,TRUE,Parking and road charges
+204,Travel,contains,EURO CAR PARKS,DEBIT,,TRUE,Parking and road charges
+205,Travel,contains,Q-PARK,DEBIT,,TRUE,Parking and road charges
+206,Travel,contains,CONGESTION CHARGE,DEBIT,,TRUE,Parking and road charges
+207,Travel,contains,DART CHARGE,DEBIT,,TRUE,Parking and road charges
+208,Travel,contains,MERSEYFLOW,DEBIT,,TRUE,Parking and road charges
+209,Travel,contains,M6TOLL,DEBIT,,TRUE,Parking and road charges
+220,Travel (Airlines),contains,EASYJET,DEBIT,,TRUE,Airlines
+221,Travel (Airlines),contains,RYANAIR,DEBIT,,TRUE,Airlines
+222,Travel (Airlines),contains,BRITISH AIRWAYS,DEBIT,,TRUE,Airlines
+223,Travel (Airlines),contains,BA.COM,DEBIT,,TRUE,Airlines
+224,Travel (Airlines),contains,JET2,DEBIT,,TRUE,Airlines
+225,Travel (Airlines),contains,TUI,DEBIT,,TRUE,Airlines
+226,Travel (Airlines),contains,WIZZ AIR,DEBIT,,TRUE,Airlines
+227,Travel (Airlines),contains,VIRGIN ATLANTIC,DEBIT,,TRUE,Airlines
+228,Travel (Airlines),contains,AER LINGUS,DEBIT,,TRUE,Airlines
+229,Travel (Airlines),contains,EMIRATES,DEBIT,,TRUE,Airlines
+230,Travel (Airlines),contains,QATAR AIRWAYS,DEBIT,,TRUE,Airlines
+231,Travel (Airlines),contains,KLM,DEBIT,,TRUE,Airlines
+232,Travel (Airlines),contains,LUFTHANSA,DEBIT,,TRUE,Airlines
+260,Accomodation,contains,BOOKING.COM,ANY,,TRUE,Hotels & accommodation
+261,Accomodation,contains,AIRBNB,ANY,,TRUE,Hotels & accommodation
+262,Accomodation,contains,HOTELS.COM,ANY,,TRUE,Hotels & accommodation
+263,Accomodation,contains,EXPEDIA,ANY,,TRUE,Hotels & accommodation
+264,Accomodation,contains,PREMIER INN,ANY,,TRUE,Hotels & accommodation
+265,Accomodation,contains,TRAVELODGE,ANY,,TRUE,Hotels & accommodation
+266,Accomodation,contains,HILTON,ANY,,TRUE,Hotels & accommodation
+267,Accomodation,contains,MARRIOTT,ANY,,TRUE,Hotels & accommodation
+268,Accomodation,contains,IHG,ANY,,TRUE,Hotels & accommodation
+269,Accomodation,contains,HOLIDAY INN,ANY,,TRUE,Hotels & accommodation
+300,Utilities,contains,OCTOPUS,DEBIT,,TRUE,Energy providers
+301,Utilities,contains,BRITISH GAS,DEBIT,,TRUE,Energy providers
+302,Utilities,contains,EDF,DEBIT,,TRUE,Energy providers
+303,Utilities,contains,E.ON,DEBIT,,TRUE,Energy providers
+304,Utilities,contains,EON,DEBIT,,TRUE,Energy providers
+305,Utilities,contains,SCOTTISHPOWER,DEBIT,,TRUE,Energy providers
+306,Utilities,contains,OVO,DEBIT,,TRUE,Energy providers
+307,Utilities,contains,SSE,DEBIT,,TRUE,Energy providers
+308,Utilities,contains,UTILITY WAREHOUSE,DEBIT,,TRUE,Energy providers
+309,Utilities,contains,BULB,DEBIT,,TRUE,Energy providers
+330,Utilities,contains,THAMES WATER,DEBIT,,TRUE,Water providers
+331,Utilities,contains,SEVERN TRENT,DEBIT,,TRUE,Water providers
+332,Utilities,contains,UNITED UTILITIES,DEBIT,,TRUE,Water providers
+333,Utilities,contains,SOUTHERN WATER,DEBIT,,TRUE,Water providers
+334,Utilities,contains,ANGLIAN WATER,DEBIT,,TRUE,Water providers
+335,Utilities,contains,YORKSHIRE WATER,DEBIT,,TRUE,Water providers
+336,Utilities,contains,WESSEX WATER,DEBIT,,TRUE,Water providers
+337,Utilities,contains,NORTHUMBRIAN WATER,DEBIT,,TRUE,Water providers
+360,Telecoms / Internet,contains,VIRGIN MEDIA,DEBIT,,TRUE,Phone/internet
+361,Telecoms / Internet,contains,BT,DEBIT,,TRUE,Phone/internet
+362,Telecoms / Internet,contains,BT GROUP,DEBIT,,TRUE,Phone/internet
+363,Telecoms / Internet,contains,SKY,DEBIT,,TRUE,Phone/internet
+364,Telecoms / Internet,contains,SKY DIGITAL,DEBIT,,TRUE,Phone/internet
+365,Telecoms / Internet,contains,TALKTALK,DEBIT,,TRUE,Phone/internet
+366,Telephone,contains,VODAFONE,DEBIT,,TRUE,Phone/internet
+367,Telephone,contains,O2,DEBIT,,TRUE,Phone/internet
+368,Telephone,contains,EE,DEBIT,,TRUE,Phone/internet
+369,Telecoms / Internet,contains,THREE,DEBIT,,TRUE,Phone/internet
+370,Telecoms / Internet,contains,PLUSNET,DEBIT,,TRUE,Phone/internet
+371,Telecoms / Internet,contains,GIGACLEAR,DEBIT,,TRUE,Phone/internet
+372,Telecoms / Internet,contains,HYPEROPTIC,DEBIT,,TRUE,Phone/internet
+400,Personal,contains,NETFLIX,DEBIT,,TRUE,Streaming/media subscriptions
+401,Personal,contains,SPOTIFY,DEBIT,,TRUE,Streaming/media subscriptions
+402,Personal,contains,DISNEY,DEBIT,,TRUE,Streaming/media subscriptions
+403,Personal,contains,DISNEY PLUS,DEBIT,,TRUE,Streaming/media subscriptions
+404,Amazon,contains,AMAZON PRIME,DEBIT,,TRUE,Streaming/media subscriptions
+405,Personal,contains,PRIME VIDEO,DEBIT,,TRUE,Streaming/media subscriptions
+406,Software,contains,APPLE.COM/BILL,DEBIT,,TRUE,Streaming/media subscriptions
+407,Personal,contains,YOUTUBE PREMIUM,DEBIT,,TRUE,Streaming/media subscriptions
+408,Personal,contains,NOWTV,DEBIT,,TRUE,Streaming/media subscriptions
+409,Personal,contains,NOW TV,DEBIT,,TRUE,Streaming/media subscriptions
+410,Personal,contains,ITVX,DEBIT,,TRUE,Streaming/media subscriptions
+411,Personal,contains,BRITBOX,DEBIT,,TRUE,Streaming/media subscriptions
+450,Software,contains,MICROSOFT,DEBIT,,TRUE,Software/SaaS subscriptions
+451,Software,contains,MICROSOFT 365,DEBIT,,TRUE,Software/SaaS subscriptions
+452,Software,contains,OFFICE 365,DEBIT,,TRUE,Software/SaaS subscriptions
+453,Software,contains,ADOBE,DEBIT,,TRUE,Software/SaaS subscriptions
+454,Software,contains,CANVA,DEBIT,,TRUE,Software/SaaS subscriptions
+455,Software,contains,DROPBOX,DEBIT,,TRUE,Software/SaaS subscriptions
+456,Software,contains,GOOGLE WORKSPACE,DEBIT,,TRUE,Software/SaaS subscriptions
+457,Software,contains,GOOGLE PLAY,DEBIT,,TRUE,Software/SaaS subscriptions
+458,Software,contains,ICLOUD,DEBIT,,TRUE,Software/SaaS subscriptions
+459,Software,contains,ZOOM,DEBIT,,TRUE,Software/SaaS subscriptions
+460,Software,contains,SLACK,DEBIT,,TRUE,Software/SaaS subscriptions
+461,Software,contains,ATLASSIAN,DEBIT,,TRUE,Software/SaaS subscriptions
+462,Software,contains,JIRA,DEBIT,,TRUE,Software/SaaS subscriptions
+463,Software,contains,CONFLUENCE,DEBIT,,TRUE,Software/SaaS subscriptions
+464,Software,contains,NOTION,DEBIT,,TRUE,Software/SaaS subscriptions
+465,Software,contains,GITHUB,DEBIT,,TRUE,Software/SaaS subscriptions
+466,Software,contains,OPENAI,DEBIT,,TRUE,Software/SaaS subscriptions
+467,Software,contains,CHATGPT,DEBIT,,TRUE,Software/SaaS subscriptions
+468,Software,contains,FIGMA,DEBIT,,TRUE,Software/SaaS subscriptions
+520,Shopping (Online),contains,AMAZON,DEBIT,,TRUE,E-commerce and retailers
+521,Shopping (Online),contains,AMZN,DEBIT,,TRUE,E-commerce and retailers
+522,Shopping (Online),contains,EBAY,DEBIT,,TRUE,E-commerce and retailers
+523,Shopping (Online),contains,ETSY,DEBIT,,TRUE,E-commerce and retailers
+524,Shopping (Online),contains,ALIEXPRESS,DEBIT,,TRUE,E-commerce and retailers
+525,Shopping (Online),contains,TEMU,DEBIT,,TRUE,E-commerce and retailers
+526,Shopping (Online),contains,SHEIN,DEBIT,,TRUE,E-commerce and retailers
+527,Shopping (Online),contains,ARGOS,DEBIT,,TRUE,E-commerce and retailers
+528,Shopping (Online),contains,JOHN LEWIS,DEBIT,,TRUE,E-commerce and retailers
+529,Computer Equipment,contains,CURRYS,DEBIT,,TRUE,E-commerce and retailers
+530,Computer Equipment,contains,CURRYS PC WORLD,DEBIT,,TRUE,E-commerce and retailers
+531,Shopping (Online),contains,AO.COM,DEBIT,,TRUE,E-commerce and retailers
+532,Shopping (Online),contains,VERY,DEBIT,,TRUE,E-commerce and retailers
+533,Protective Clothing,contains,NEXT,DEBIT,,TRUE,E-commerce and retailers
+534,Protective Clothing,contains,ASOS,DEBIT,,TRUE,E-commerce and retailers
+535,Shopping (Online),contains,ZALANDO,DEBIT,,TRUE,E-commerce and retailers
+560,Protective Clothing,contains,PRIMARK,DEBIT,,TRUE,Retail and high street
+561,Protective Clothing,contains,TK MAXX,DEBIT,,TRUE,Retail and high street
+562,Protective Clothing,contains,H&M,DEBIT,,TRUE,Retail and high street
+563,Protective Clothing,contains,ZARA,DEBIT,,TRUE,Retail and high street
+564,Groceries,contains,M&S,DEBIT,,TRUE,Retail and high street
+565,Groceries,contains,MARKS & SPENCER,DEBIT,,TRUE,Retail and high street
+566,Personal,contains,BOOTS,DEBIT,,TRUE,Retail and high street
+567,Personal,contains,SUPERDRUG,DEBIT,,TRUE,Retail and high street
+568,Personal,contains,THE BODY SHOP,DEBIT,,TRUE,Retail and high street
+569,Repairs & Renewals,contains,IKEA,DEBIT,,TRUE,Retail and high street
+570,Repairs & Renewals,contains,B&Q,DEBIT,,TRUE,Retail and high street
+571,Shopping (High Street),contains,SCREWFIX,DEBIT,,TRUE,Retail and high street
+572,Shopping (High Street),contains,WICKES,DEBIT,,TRUE,Retail and high street
+573,Shopping (High Street),contains,HOMEBASE,DEBIT,,TRUE,Retail and high street
+574,Shopping (High Street),contains,DUNELM,DEBIT,,TRUE,Retail and high street
+600,Personal ,contains,NHS,DEBIT,,TRUE,Healthcare and pharmacy
+601,Personal ,contains,DENTAL,DEBIT,,TRUE,Healthcare and pharmacy
+602,Personal ,contains,DENTIST,DEBIT,,TRUE,Healthcare and pharmacy
+603,Protective Clothing,contains,OPTICIAN,DEBIT,,TRUE,Healthcare and pharmacy
+604,Protective Clothing,contains,SPECSAVERS,DEBIT,,TRUE,Healthcare and pharmacy
+605,Protective Clothing,contains,VISION EXPRESS,DEBIT,,TRUE,Healthcare and pharmacy
+606,Personal ,contains,BOOTS,DEBIT,,TRUE,Healthcare and pharmacy
+607,Personal ,contains,SUPERDRUG,DEBIT,,TRUE,Healthcare and pharmacy
+608,Personal ,contains,PHARMACY,DEBIT,,TRUE,Healthcare and pharmacy
+630,Personal ,contains,PUREGYM,DEBIT,,TRUE,Gyms and fitness
+631,Personal ,contains,THE GYM,DEBIT,,TRUE,Gyms and fitness
+632,Personal ,contains,DAVID LLOYD,DEBIT,,TRUE,Gyms and fitness
+633,Personal ,contains,Nuffield Health,DEBIT,,TRUE,Gyms and fitness
+634,Personal ,contains,PELOTON,DEBIT,,TRUE,Gyms and fitness
+660,Bank Charges,contains,ACCOUNT FEE,DEBIT,,TRUE,Bank charges and fees
+661,Bank Charges,contains,MONTHLY FEE,DEBIT,,TRUE,Bank charges and fees
+662,Bank Charges,contains,SERVICE CHARGE,DEBIT,,TRUE,Bank charges and fees
+663,Bank Charges,contains,CHARGES,DEBIT,,TRUE,Bank charges and fees
+664,Bank Charges,contains,CARD FEE,DEBIT,,TRUE,Bank charges and fees
+665,Bank Charges,contains,OVERDRAFT FEE,DEBIT,,TRUE,Bank charges and fees
+666,Bank Charges,contains,PAID REFERRAL,DEBIT,,TRUE,Bank charges and fees
+667,Bank Charges,contains,UNPAID ITEM FEE,DEBIT,,TRUE,Bank charges and fees
+680,Personal,contains,CASH WITHDRAWAL,DEBIT,,TRUE,ATM cash withdrawals
+681,Personal,contains,ATM,DEBIT,,TRUE,ATM cash withdrawals
+682,Personal,contains,CASH MACHINE,DEBIT,,TRUE,ATM cash withdrawals
+700,Payment Processor,contains,PAYPAL,ANY,,TRUE,Payment processors / platforms
+701,Payment Processor,contains,STRIPE,ANY,,TRUE,Payment processors / platforms
+702,Payment Processor,contains,SQUARE,ANY,,TRUE,Payment processors / platforms
+703,Payment Processor,contains,SUMUP,ANY,,TRUE,Payment processors / platforms
+704,Payment Processor,contains,IZETTLE,ANY,,TRUE,Payment processors / platforms
+705,Payment Processor,contains,GO CARDLESS,ANY,,TRUE,Payment processors / platforms
+706,Payment Processor,contains,GOCARDLESS,ANY,,TRUE,Payment processors / platforms
+707,Payment Processor,contains,WORLD PAY,ANY,,TRUE,Payment processors / platforms
+708,Payment Processor,contains,WORLDPAY,ANY,,TRUE,Payment processors / platforms
+709,Payment Processor,contains,SHOPIFY PAYMENTS,ANY,,TRUE,Payment processors / platforms
+710,Payment Processor,contains,KLARNA,ANY,,TRUE,Payment processors / platforms
+711,Payment Processor,contains,CLEARPAY,ANY,,TRUE,Payment processors / platforms
+740,Insurance,contains,AVIVA,DEBIT,,TRUE,Insurance premiums
+741,Insurance,contains,DIRECT LINE,DEBIT,,TRUE,Insurance premiums
+742,Insurance,contains,ADMIRAL,DEBIT,,TRUE,Insurance premiums
+743,Insurance,contains,LV=,DEBIT,,TRUE,Insurance premiums
+744,Insurance,contains,HASTINGS,DEBIT,,TRUE,Insurance premiums
+745,Insurance,contains,CHURCHILL,DEBIT,,TRUE,Insurance premiums
+746,Insurance,contains,AXA,DEBIT,,TRUE,Insurance premiums
+747,Insurance,contains,MORE THAN,DEBIT,,TRUE,Insurance premiums
+748,Insurance,contains,PRUDENTIAL,DEBIT,,TRUE,Insurance premiums
+749,Insurance,contains,LEGAL & GENERAL,DEBIT,,TRUE,Insurance premiums
+780,Rent / Mortgage,contains,RENT,DEBIT,,TRUE,Often needs tailoring per client
+781,Rent / Mortgage,contains,MORTGAGE,DEBIT,,TRUE,Often needs tailoring per client
+782,Rent / Mortgage,contains,LANDLORD,DEBIT,,TRUE,Often needs tailoring per client
+783,Rent / Mortgage,contains,LETTING,DEBIT,,TRUE,Often needs tailoring per client
+784,Rent / Mortgage,contains,RIGHTMOVE,DEBIT,,TRUE,Often needs tailoring per client
+820,Council Tax,contains,COUNCIL TAX,DEBIT,,TRUE,Local authority tax
+840,HMRC / Tax,contains,HMRC,DEBIT,,TRUE,UK tax payments
+841,HMRC / Tax,contains,H M R C,DEBIT,,TRUE,UK tax payments
+842,HMRC / Tax,contains,PAYE,DEBIT,,TRUE,UK tax payments
+843,HMRC / Tax,contains,VAT,DEBIT,,TRUE,UK tax payments
+844,HMRC / Tax,contains,SELF ASSESSMENT,DEBIT,,TRUE,UK tax payments
+845,HMRC / Tax,contains,CORPORATION TAX,DEBIT,,TRUE,UK tax payments
+900,Benefits (Income),contains,DWP,CREDIT,,TRUE,Government benefits/pension
+901,Benefits (Income),contains,UNIVERSAL CREDIT,CREDIT,,TRUE,Government benefits/pension
+902,Benefits (Income),contains,CHILD BENEFIT,CREDIT,,TRUE,Government benefits/pension
+903,Benefits (Income),contains,PENSION,CREDIT,,TRUE,Government benefits/pension
+920,Interest (Income),contains,INTEREST,CREDIT,,TRUE,Bank interest
+960,Charitable Donations,contains,JUSTGIVING,DEBIT,,TRUE,Charitable donations
+961,Charitable Donations,contains,CAF,DEBIT,,TRUE,Charitable donations
+962,Charitable Donations,contains,CANCER RESEARCH,DEBIT,,TRUE,Charitable donations
+963,Charitable Donations,contains,Oxfam,DEBIT,,TRUE,Charitable donations
+964,Charitable Donations,contains,RED CROSS,DEBIT,,TRUE,Charitable donations
+965,Charitable Donations,contains,UNICEF,DEBIT,,TRUE,Charitable donations
+980,Postage,contains,ROYAL MAIL,DEBIT,,TRUE,Shipping/couriers
+981,Postage,contains,POST OFFICE,DEBIT,,TRUE,Shipping/couriers
+982,Postage,contains,DPD,DEBIT,,TRUE,Shipping/couriers
+983,Postage,contains,EVRI,DEBIT,,TRUE,Shipping/couriers
+984,Postage,contains,HERMES,DEBIT,,TRUE,Shipping/couriers
+985,Postage,contains,DHL,DEBIT,,TRUE,Shipping/couriers
+986,Postage,contains,UPS,DEBIT,,TRUE,Shipping/couriers
+987,Postage,contains,FEDEX,DEBIT,,TRUE,Shipping/couriers
+1000,Advertising,contains,FACEBOOK,DEBIT,,TRUE,Advertising spend
+1001,Advertising,contains,META,DEBIT,,TRUE,Advertising spend
+1002,Advertising,contains,GOOGLE ADS,DEBIT,,TRUE,Advertising spend
+1003,Advertising,contains,GOOGLEAD,DEBIT,,TRUE,Advertising spend
+1004,Advertising,contains,ADWORDS,DEBIT,,TRUE,Advertising spend
+1005,Advertising,contains,TIKTOK,DEBIT,,TRUE,Advertising spend
+1006,Advertising,contains,LINKEDIN,DEBIT,,TRUE,Advertising spend
+1007,Advertising,contains,X ADS,DEBIT,,TRUE,Advertising spend
+1008,Advertising,contains,TWITTER,DEBIT,,TRUE,Advertising spend
+1040,Accountancy,contains,ACCOUNTANT,DEBIT,,TRUE,Professional fees (often needs tailoring)
+1041,Accountancy,contains,ACCOUNTANCY,DEBIT,,TRUE,Professional fees (often needs tailoring)
+1042,Legal Fees,contains,LAWYER,DEBIT,,TRUE,Professional fees (often needs tailoring)
+1043,Legal Fees,contains,SOLICITOR,DEBIT,,TRUE,Professional fees (often needs tailoring)
+1044,Legal Fees,contains,BARRISTER,DEBIT,,TRUE,Professional fees (often needs tailoring)
+1045,Accountancy,contains,BOOKKEEP,DEBIT,,TRUE,Professional fees (often needs tailoring)
+1046,Professional Services,contains,CONSULT,DEBIT,,TRUE,Professional fees (often needs tailoring)
+1047,Professional Services,contains,ADVISORY,DEBIT,,TRUE,Professional fees (often needs tailoring)
