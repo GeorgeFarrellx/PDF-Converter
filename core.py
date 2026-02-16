@@ -582,6 +582,152 @@ def find_duplicate_statements(recon_results: list[dict]) -> list[list[dict]]:
 # Excel output
 # ----------------------------
 
+def _find_rules_file(folder: str, base_name: str) -> str | None:
+    if not folder:
+        return None
+    xlsx_path = os.path.join(folder, f"{base_name}.xlsx")
+    if os.path.exists(xlsx_path):
+        return xlsx_path
+    csv_path = os.path.join(folder, f"{base_name}.csv")
+    if os.path.exists(csv_path):
+        return csv_path
+    return None
+
+
+def _load_rules(path: str, pd) -> list[dict]:
+    if path.lower().endswith(".csv"):
+        df = pd.read_csv(path)
+    else:
+        excel = pd.ExcelFile(path)
+        sheet_name = "Category Rules" if "Category Rules" in excel.sheet_names else excel.sheet_names[0]
+        df = pd.read_excel(path, sheet_name=sheet_name)
+
+    records: list[dict] = []
+
+    def _as_bool(v, default: bool = True) -> bool:
+        if v is None:
+            return default
+        if isinstance(v, bool):
+            return v
+        s = str(v).strip().lower()
+        if s in {"", "nan"}:
+            return default
+        if s in {"true", "1", "yes", "y", "on"}:
+            return True
+        if s in {"false", "0", "no", "n", "off"}:
+            return False
+        return default
+
+    def _as_priority(v) -> int:
+        if v is None:
+            return 9999
+        try:
+            s = str(v).strip()
+            if not s or s.lower() == "nan":
+                return 9999
+            return int(float(s))
+        except Exception:
+            return 9999
+
+    for _, row in df.iterrows():
+        priority = _as_priority(row.get("Priority") if "Priority" in row else None)
+        category = str(row.get("Category") if "Category" in row else "").strip()
+        match_type = str(row.get("Match Type") if "Match Type" in row else "").strip()
+        pattern = str(row.get("Pattern") if "Pattern" in row else "").strip()
+        direction = str(row.get("Direction") if "Direction" in row else "").strip()
+        txn_type_contains = str(row.get("Txn Type Contains") if "Txn Type Contains" in row else "").strip()
+        active = _as_bool(row.get("Active") if "Active" in row else None, default=True)
+
+        if not active:
+            continue
+        if not category or category.lower() == "nan":
+            continue
+        if not pattern or pattern.lower() == "nan":
+            continue
+
+        records.append(
+            {
+                "Priority": priority,
+                "Category": category,
+                "Match Type": match_type,
+                "Pattern": pattern,
+                "Direction": direction,
+                "Txn Type Contains": txn_type_contains,
+            }
+        )
+
+    records.sort(key=lambda r: r.get("Priority", 9999))
+    return records
+
+
+def _rule_matches(txn: dict, rule: dict) -> bool:
+    description = str(txn.get("Description", "") or "")
+    txn_type = str(txn.get("Transaction Type", "") or "")
+    pattern = str(rule.get("Pattern", "") or "")
+    if not pattern:
+        return False
+
+    txn_type_contains = str(rule.get("Txn Type Contains", "") or "").strip()
+    if txn_type_contains and txn_type_contains.lower() != "nan":
+        if txn_type_contains.lower() not in txn_type.lower():
+            return False
+
+    direction = str(rule.get("Direction", "") or "").strip().upper()
+    if direction and direction != "ANY":
+        try:
+            amount = float(txn.get("Amount", 0) or 0)
+        except Exception:
+            amount = 0.0
+        if direction == "DEBIT" and amount >= 0:
+            return False
+        if direction == "CREDIT" and amount <= 0:
+            return False
+
+    match_type = str(rule.get("Match Type", "") or "").strip().lower() or "contains"
+    desc_cmp = description.strip()
+    patt_cmp = pattern.strip()
+    desc_low = desc_cmp.lower()
+    patt_low = patt_cmp.lower()
+
+    if match_type == "exact":
+        return desc_low == patt_low
+    if match_type == "startswith":
+        return desc_low.startswith(patt_low)
+    if match_type == "endswith":
+        return desc_low.endswith(patt_low)
+    if match_type == "regex":
+        try:
+            return re.search(patt_cmp, desc_cmp, re.IGNORECASE) is not None
+        except Exception:
+            return False
+    return patt_low in desc_low
+
+
+def _apply_categorisation(transactions: list[dict], output_path: str, pd) -> None:
+    global_folder = os.path.dirname(os.path.abspath(__file__))
+    client_folder = os.path.dirname(output_path) if output_path else ""
+
+    client_rules_path = _find_rules_file(client_folder, "Client Categorisation Rules")
+    global_rules_path = _find_rules_file(global_folder, "Global Categorisation Rules")
+
+    rules: list[dict] = []
+    if client_rules_path:
+        rules.extend(_load_rules(client_rules_path, pd))
+    if global_rules_path:
+        rules.extend(_load_rules(global_rules_path, pd))
+
+    for txn in transactions:
+        if not isinstance(txn, dict):
+            continue
+        if "Category" not in txn:
+            txn["Category"] = ""
+        if str(txn.get("Category", "") or "").strip():
+            continue
+        for rule in rules:
+            if _rule_matches(txn, rule):
+                txn["Category"] = rule.get("Category", "")
+                break
+
 def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = ""):
     if not transactions:
         raise ValueError("No transactions found!")
@@ -599,6 +745,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             f"Original error: {e}"
         )
         return None
+
+    try:
+        _apply_categorisation(transactions, output_path, pd)
+    except Exception:
+        pass
 
     df = pd.DataFrame(transactions)
     if "T/N" not in df.columns:

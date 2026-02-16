@@ -145,6 +145,8 @@ Rules:
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/VERSION.txt
 - `core.py`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/core.py
+- `Global Categorisation Rules.csv`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Global%20Categorisation%20Rules.csv
 - `gitignore`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/gitignore
 - `gui.py`  

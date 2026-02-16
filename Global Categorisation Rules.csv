@@ -1,0 +1,99 @@
+Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
+10,Groceries,contains,TESCO,DEBIT,,True,Supermarkets & grocery delivery
+11,Groceries,contains,TESCO STORES,DEBIT,,True,Supermarkets & grocery delivery
+12,Groceries,contains,SAINSBURY,DEBIT,,True,Supermarkets & grocery delivery
+13,Groceries,contains,SAINSBURYS,DEBIT,,True,Supermarkets & grocery delivery
+14,Groceries,contains,ASDA,DEBIT,,True,Supermarkets & grocery delivery
+15,Groceries,contains,MORRISONS,DEBIT,,True,Supermarkets & grocery delivery
+16,Groceries,contains,ALDI,DEBIT,,True,Supermarkets & grocery delivery
+17,Groceries,contains,LIDL,DEBIT,,True,Supermarkets & grocery delivery
+18,Groceries,contains,CO-OP,DEBIT,,True,Supermarkets & grocery delivery
+19,Groceries,contains,WAITROSE,DEBIT,,True,Supermarkets & grocery delivery
+20,Groceries,contains,OCADO,DEBIT,,True,Supermarkets & grocery delivery
+21,Groceries,contains,ICELAND,DEBIT,,True,Supermarkets & grocery delivery
+22,Groceries,contains,MARKS & SPENCER,DEBIT,,True,Food retail
+23,Groceries,contains,M&S,DEBIT,,True,Food retail
+24,Groceries,contains,COSTCO,DEBIT,,True,Food retail / bulk
+30,Eating Out,contains,MCDONALD,DEBIT,,True,Fast food
+31,Eating Out,contains,KFC,DEBIT,,True,Fast food
+32,Eating Out,contains,BURGER KING,DEBIT,,True,Fast food
+33,Eating Out,contains,SUBWAY,DEBIT,,True,Fast food
+34,Eating Out,contains,GREGGS,DEBIT,,True,Fast food
+35,Eating Out,contains,COSTA,DEBIT,,True,Coffee
+36,Eating Out,contains,STARBUCKS,DEBIT,,True,Coffee
+37,Eating Out,contains,PRET,DEBIT,,True,Coffee / lunch
+38,Eating Out,contains,CAFFE NERO,DEBIT,,True,Coffee
+39,Eating Out,contains,NANDO,DEBIT,,True,Restaurants
+40,Eating Out,contains,UBER EATS,DEBIT,,True,Takeaway delivery
+41,Eating Out,contains,DELIVEROO,DEBIT,,True,Takeaway delivery
+42,Eating Out,contains,JUST EAT,DEBIT,,True,Takeaway delivery
+50,Transport,contains,TFL,DEBIT,,True,Public transport
+51,Transport,contains,TRANSPORT FOR LONDON,DEBIT,,True,Public transport
+52,Transport,contains,UBER,DEBIT,,True,Rideshare
+53,Transport,contains,BOLT,DEBIT,,True,Rideshare
+54,Transport,contains,NATIONAL RAIL,DEBIT,,True,Trains
+55,Transport,contains,TRAINLINE,DEBIT,,True,Trains
+56,Transport,contains,STAGECOACH,DEBIT,,True,Buses
+57,Transport,contains,ARRIVA,DEBIT,,True,Buses
+58,Transport,contains,SHELL,DEBIT,,True,Fuel
+59,Transport,contains,BP,DEBIT,,True,Fuel
+60,Transport,contains,ESSO,DEBIT,,True,Fuel
+61,Transport,contains,TESCO FUEL,DEBIT,,True,Fuel
+62,Transport,contains,ASDA FUEL,DEBIT,,True,Fuel
+70,Shopping,contains,AMAZON,DEBIT,,True,Online shopping
+71,Shopping,contains,AMZN,DEBIT,,True,Online shopping
+72,Shopping,contains,EBAY,DEBIT,,True,Online shopping
+73,Shopping,contains,ETSY,DEBIT,,True,Online shopping
+74,Shopping,contains,ARGOS,DEBIT,,True,Retail
+75,Shopping,contains,NEXT,DEBIT,,True,Retail
+76,Shopping,contains,PRIMARK,DEBIT,,True,Retail
+77,Shopping,contains,JD SPORTS,DEBIT,,True,Retail
+78,Shopping,contains,SPORTSDIRECT,DEBIT,,True,Retail
+79,Shopping,contains,APPLE.COM/BILL,DEBIT,,True,Digital purchases
+80,Shopping,contains,GOOGLE,DEBIT,,True,Digital purchases
+81,Shopping,contains,PAYPAL,DEBIT,,True,Online payments (often needs review)
+90,Bills,contains,BRITISH GAS,DEBIT,,True,Utilities
+91,Bills,contains,OCTOPUS,DEBIT,,True,Utilities
+92,Bills,contains,EON,DEBIT,,True,Utilities
+93,Bills,contains,EDF,DEBIT,,True,Utilities
+94,Bills,contains,SCOTTISH POWER,DEBIT,,True,Utilities
+95,Bills,contains,TV LICENSING,DEBIT,,True,TV licence
+96,Bills,contains,VIRGIN MEDIA,DEBIT,,True,Internet/TV
+97,Bills,contains,SKY,DEBIT,,True,Internet/TV
+98,Bills,contains,BT,DEBIT,,True,Internet/Phone
+99,Bills,contains,EE,DEBIT,,True,Mobile
+100,Bills,contains,O2,DEBIT,,True,Mobile
+101,Bills,contains,VODAFONE,DEBIT,,True,Mobile
+102,Bills,contains,THREE,DEBIT,,True,Mobile
+110,Rent/Mortgage,contains,RENT,DEBIT,,True,Rent (generic)
+111,Rent/Mortgage,contains,MORTGAGE,DEBIT,,True,Mortgage (generic)
+120,Income,contains,SALARY,CREDIT,,True,Salary
+121,Income,contains,PAYROLL,CREDIT,,True,Salary
+122,Income,contains,HMRC,CREDIT,,True,Tax refund / credits
+123,Income,contains,UNIVERSAL CREDIT,CREDIT,,True,Benefits
+124,Income,contains,PENSION,CREDIT,,True,Pension
+130,Transfers,contains,TRANSFER,ANY,,True,Transfers (often needs review)
+131,Transfers,contains,FASTER PAYMENT,ANY,,True,Transfers (often needs review)
+132,Transfers,contains,BACS,ANY,,True,Transfers (often needs review)
+140,Banking Fees,contains,FEE,DEBIT,,True,Bank fees
+141,Banking Fees,contains,CHARGE,DEBIT,,True,Bank fees
+142,Banking Fees,contains,OVERDRAFT,DEBIT,,True,Bank fees
+150,Subscriptions,contains,NETFLIX,DEBIT,,True,Subscriptions
+151,Subscriptions,contains,SPOTIFY,DEBIT,,True,Subscriptions
+152,Subscriptions,contains,DISNEY,DEBIT,,True,Subscriptions
+153,Subscriptions,contains,AMAZON PRIME,DEBIT,,True,Subscriptions
+154,Subscriptions,contains,APPLE,DEBIT,,True,Subscriptions (Apple - review)
+155,Subscriptions,contains,GOOGLE PLAY,DEBIT,,True,Subscriptions (Google - review)
+160,Health/Fitness,contains,GYM,DEBIT,,True,Health/Fitness
+161,Health/Fitness,contains,PUREGYM,DEBIT,,True,Health/Fitness
+162,Health/Fitness,contains,THE GYM,DEBIT,,True,Health/Fitness
+170,Insurance,contains,INSURANCE,DEBIT,,True,Insurance (generic)
+171,Insurance,contains,AVIVA,DEBIT,,True,Insurance
+172,Insurance,contains,DIRECT LINE,DEBIT,,True,Insurance
+173,Insurance,contains,LV=,DEBIT,,True,Insurance
+180,Childcare,contains,NURSERY,DEBIT,,True,Childcare
+181,Childcare,contains,CHILDCARE,DEBIT,,True,Childcare
+190,Tax,contains,HMRC,DEBIT,,True,Tax payments
+191,Tax,contains,SELF ASSESSMENT,DEBIT,,True,Tax payments
+192,Tax,contains,VAT,DEBIT,,True,Tax payments
+193,Tax,contains,CORPORATION TAX,DEBIT,,True,Tax payments
