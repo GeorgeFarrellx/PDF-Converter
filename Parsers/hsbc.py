@@ -1,4 +1,4 @@
-# Version: hsbc-1.3.py
+# Version: hsbc-1.4.py
 import os
 import re
 from datetime import date, datetime
@@ -70,11 +70,11 @@ def _extract_amount_and_balance_from_line(line: str, paid_out_idx: int, paid_in_
     """
     line_n = _normalise_digit_splits_in_line(line)
 
-    slack_start = max(0, paid_out_idx - 5)
+    slack_start = max(0, paid_out_idx - 10)
+    numeric_region = line_n[slack_start:]
     matches = [
-        (m.start(), m.end(), _to_float(m.group(0)))
-        for m in MONEY_RE.finditer(line_n)
-        if m.start() >= slack_start
+        (slack_start + m.start(), slack_start + m.end(), _to_float(m.group(0)))
+        for m in MONEY_RE.finditer(numeric_region)
     ]
 
     if not matches:
