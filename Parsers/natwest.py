@@ -40,6 +40,22 @@ _CHARGES_LINE_RE = re.compile(
     r"^\s*(?P<day>\d{2})\s+(?P<mon>[A-Za-z]{3})\s+Charges\b(?P<rest>.*)$",
     re.IGNORECASE | re.MULTILINE,
 )
+_HEADER_PREAMBLE_CUE_RE = re.compile(
+    r"(Account\s+Name\s+Account\s+No\s+Sort\s+Code\s+Page\s+No|Current\s+Account\s+Summary|Welcome\s+to\s+your\s+NatWest\s+Statement|\bBIC\b|\bIBAN\b|Registered\s+Office:)",
+    re.IGNORECASE,
+)
+_TRANSACTION_KEYWORD_FINDER_RE = re.compile(
+    r"(Returned\s+Direct\s+Debit|Card\s+Transaction|Direct\s+Debit|OnLine\s+Transaction|Automated\s+Credit|Automated\s+Debit|Standing\s+Order|Cash\s+Withdrawal|Charges)",
+    re.IGNORECASE,
+)
+_CARD_TRANSACTION_PREFIX_RE = re.compile(
+    r"^Card\s+Transaction\s+\d{3,4}\s+\d{2}[A-Z]{3}\d{2}\s+(?:(?:CD|C|D)\s+)?",
+    re.IGNORECASE,
+)
+_GENERIC_KEYWORD_PREFIX_RE = re.compile(
+    r"^(Direct\s+Debit|OnLine\s+Transaction|Automated\s+Credit|Automated\s+Debit|Standing\s+Order|Cash\s+Withdrawal|Charges)\s+",
+    re.IGNORECASE,
+)
 
 # Currency amounts (NatWest export/table can include or omit £)
 _MONEY_RE = re.compile(r"(?:£\s*)?\(?-?[\d,]+\.\d{2}\)?(?!\s*%)")
@@ -143,6 +159,18 @@ def _clean_description(desc: str) -> str:
     if desc is None:
         return ""
     s = re.sub(r"\s+", " ", desc).strip()
+    if _HEADER_PREAMBLE_CUE_RE.search(s):
+        m = _TRANSACTION_KEYWORD_FINDER_RE.search(s)
+        if m:
+            s = s[m.start():]
+    if s.lower().startswith("returned direct debit"):
+        s = re.sub(r"\s+", " ", s).strip()
+        s = re.sub(r"\s+,", ",", s)
+        s = re.sub(r",\s*", ", ", s)
+        s = re.sub(r"\s{2,}", " ", s).strip()
+        return s
+    s = _CARD_TRANSACTION_PREFIX_RE.sub("", s, count=1)
+    s = _GENERIC_KEYWORD_PREFIX_RE.sub("", s, count=1)
     # Remove spaces before commas
     s = re.sub(r"\s+,", ",", s)
     # Remove duplicated commas spacing " , " -> ", "
