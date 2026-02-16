@@ -1,4 +1,4 @@
-# Version: 2.04
+# Version: 2.05
 import os
 import glob
 import re
@@ -889,9 +889,12 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
 
         if amt is None or bal is None:
             missing_or_bad_walk_rows += 1
+            running = None
             continue
 
         if running is None:
+            running = bal
+            last_checked_balance = bal
             continue
 
         expected = round(running + amt, 2)
@@ -919,15 +922,15 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
         "end_balance_check": None,
     }
 
-    if start_val is None or parseable_balance_rows == 0 or missing_or_bad_walk_rows > 0:
+    if checked_rows == 0:
         balance_walk_status = "NOT CHECKED"
         reasons = []
         if start_val is None:
             reasons.append("start balance missing/unparseable")
         if parseable_balance_rows == 0:
             reasons.append("no parseable row balances")
-        if missing_or_bad_walk_rows > 0:
-            reasons.append(f"{missing_or_bad_walk_rows} rows missing/unparseable amount or balance")
+        if parseable_balance_rows > 0 and start_val is not None:
+            reasons.append("no consecutive parseable amount/balance rows")
         balance_walk_summary = "; ".join(reasons)
     else:
         if mismatch_examples:
@@ -981,7 +984,8 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
             bad_amount += 1
             if len(bad_amount_rows) < 8:
                 bad_amount_rows.append(idx)
-        if _parse_money(t.get("Balance")) is None:
+        bal_raw = t.get("Balance")
+        if (not _is_blank(bal_raw)) and _parse_money(bal_raw) is None:
             bad_balance += 1
             if len(bad_balance_rows) < 8:
                 bad_balance_rows.append(idx)
@@ -1008,7 +1012,7 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
 
     if balance_walk_status == "MISMATCH":
         overall_status = "MISMATCH"
-    elif row_shape_status == "WARN" or balance_walk_status == "NOT CHECKED":
+    elif row_shape_status == "WARN":
         overall_status = "WARN"
     else:
         overall_status = "OK"
