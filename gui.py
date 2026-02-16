@@ -1,4 +1,4 @@
-# Version: 2.16
+# Version: 2.17
 import os
 import re
 import subprocess
@@ -556,8 +556,17 @@ class App(TkinterDnD.Tk):
         except Exception:
             pass
 
+        hp_start = (self.last_excel_data or {}).get("statement_period_start")
+        hp_end = (self.last_excel_data or {}).get("statement_period_end")
+
         self.set_status("Writing Excel...")
-        save_transactions_to_excel(transactions, output_path, client_name=client_name)
+        save_transactions_to_excel(
+            transactions,
+            output_path,
+            client_name=client_name,
+            header_period_start=hp_start,
+            header_period_end=hp_end,
+        )
 
         self.last_saved_output_path = output_path
         self.set_progress(len(self.selected_files), max(1, len(self.selected_files)))
@@ -756,6 +765,8 @@ class App(TkinterDnD.Tk):
 
         transactions = self.last_excel_data.get("transactions") or []
         client_name = self.last_excel_data.get("client_name") or ""
+        hp_start = (self.last_excel_data or {}).get("statement_period_start")
+        hp_end = (self.last_excel_data or {}).get("statement_period_end")
 
         temp_excel_path = ""
         created_temp_excel = False
@@ -799,7 +810,13 @@ class App(TkinterDnD.Tk):
                 temp_excel_path = make_unique_path(os.path.join(LOGS_DIR, temp_excel_name))
                 try:
                     if transactions:
-                        save_transactions_to_excel(transactions, temp_excel_path, client_name=client_name)
+                        save_transactions_to_excel(
+                            transactions,
+                            temp_excel_path,
+                            client_name=client_name,
+                            header_period_start=hp_start,
+                            header_period_end=hp_end,
+                        )
                     else:
                         _create_empty_support_excel(temp_excel_path, client_name_for_header=client_name)
                     excel_source = temp_excel_path
@@ -2359,6 +2376,8 @@ class App(TkinterDnD.Tk):
                 "client_name": client_name,
                 "filename": filename,
                 "initial_dir": initial_dir,
+                "statement_period_start": statement_period_start,
+                "statement_period_end": statement_period_end,
             }
 
             # Auto-create a support bundle zip whenever reconciliation or continuity has warnings/errors.
@@ -2422,7 +2441,13 @@ class App(TkinterDnD.Tk):
                 pass
 
             self.set_status("Writing Excel...")
-            save_transactions_to_excel(all_transactions, output_path, client_name=client_name)
+            save_transactions_to_excel(
+                all_transactions,
+                output_path,
+                client_name=client_name,
+                header_period_start=statement_period_start,
+                header_period_end=statement_period_end,
+            )
 
             self.last_saved_output_path = output_path
 

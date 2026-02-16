@@ -1,4 +1,4 @@
-# Version: 2.05
+# Version: 2.06
 import os
 import glob
 import re
@@ -728,7 +728,7 @@ def _apply_categorisation(transactions: list[dict], output_path: str, pd) -> Non
                 txn["Category"] = rule.get("Category", "")
                 break
 
-def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = ""):
+def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = "", header_period_start=None, header_period_end=None):
     if not transactions:
         raise ValueError("No transactions found!")
 
@@ -778,12 +778,30 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         ws = writer.sheets["Transaction Data"]
 
-        dmin = df["Date"].min()
-        dmax = df["Date"].max()
+        def _coerce_header_period_date(v):
+            try:
+                if v is None or v == "":
+                    return None
+                if hasattr(v, "to_pydatetime"):
+                    v = v.to_pydatetime()
+                if isinstance(v, datetime):
+                    return v.date()
+                if isinstance(v, date):
+                    return v
+            except Exception:
+                return None
+            return None
+
+        hp_start = _coerce_header_period_date(header_period_start)
+        hp_end = _coerce_header_period_date(header_period_end)
+
+        use_start = hp_start if hp_start else df["Date"].min()
+        use_end = hp_end if hp_end else df["Date"].max()
+
         period = ""
         try:
-            if pd.notna(dmin) and pd.notna(dmax):
-                period = f"{dmin.strftime('%d/%m/%y')} - {dmax.strftime('%d/%m/%y')}"
+            if pd.notna(use_start) and pd.notna(use_end):
+                period = f"{use_start.strftime('%d/%m/%y')} - {use_end.strftime('%d/%m/%y')}"
         except Exception:
             period = ""
 
