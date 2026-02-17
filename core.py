@@ -594,9 +594,23 @@ def _find_rules_file(folder: str, base_name: str) -> str | None:
     return None
 
 
+def _read_csv_with_encoding_fallback(path: str, pd):
+    encodings = ["utf-8-sig", "utf-8", "cp1252", "latin1"]
+    last_err = None
+    for enc in encodings:
+        try:
+            return pd.read_csv(path, encoding=enc)
+        except UnicodeDecodeError as e:
+            last_err = e
+            continue
+    if last_err is not None:
+        raise last_err
+    return pd.read_csv(path)
+
+
 def _load_rules(path: str, pd) -> list[dict]:
     if path.lower().endswith(".csv"):
-        df = pd.read_csv(path)
+        df = _read_csv_with_encoding_fallback(path, pd)
     else:
         excel = pd.ExcelFile(path)
         sheet_name = "Category Rules" if "Category Rules" in excel.sheet_names else excel.sheet_names[0]
@@ -663,7 +677,7 @@ def _load_rules(path: str, pd) -> list[dict]:
 def _load_rules_raw_df(path: str, pd):
     required_cols = ["Priority", "Category", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"]
     if path.lower().endswith(".csv"):
-        df = pd.read_csv(path)
+        df = _read_csv_with_encoding_fallback(path, pd)
     else:
         excel = pd.ExcelFile(path)
         sheet_name = "Category Rules" if "Category Rules" in excel.sheet_names else excel.sheet_names[0]
