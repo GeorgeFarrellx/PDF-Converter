@@ -997,12 +997,12 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
 
         if specific_cat_col:
-            specific_category_formula = "=LET(desc,LOWER([@Description]),pat,LOWER(CategorisationRules[Pattern]),ov,CategorisationRules[Client Override],idx,MATCH(1,(ov<>\"\")*ISNUMBER(SEARCH(pat,desc)),0),IFERROR(INDEX(ov,idx),\"\"))"
+            specific_category_formula = "=IFERROR(INDEX(CategorisationRules[Client Override],AGGREGATE(15,6,(ROW(CategorisationRules[Client Override])-ROW(INDEX(CategorisationRules[Client Override],1,1))+1)/((CategorisationRules[Client Override]<>\"\")*(IF(CategorisationRules[Txn Type Contains]=\"\",1,ISNUMBER(SEARCH(LOWER(CategorisationRules[Txn Type Contains]),LOWER([@[Transaction Type]])))))*(IF(LOWER(CategorisationRules[Match Type])=\"contains\",ISNUMBER(SEARCH(LOWER(CategorisationRules[Pattern]),LOWER([@Description]))),IF(LOWER(CategorisationRules[Match Type])=\"startswith\",LEFT(LOWER([@Description]),LEN(CategorisationRules[Pattern]))=LOWER(CategorisationRules[Pattern]),IF(LOWER(CategorisationRules[Match Type])=\"exact\",LOWER([@Description])=LOWER(CategorisationRules[Pattern]),0)))),1)),\"\")"
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
 
         if category_col and specific_cat_col and global_cat_col:
-            category_formula = "=IF([@[Specific Category]]<>\"\",[@[Specific Category]],[@[Global Category]])"
+            category_formula = "=IFERROR(IF([@[Specific Category]]<>\"\",[@[Specific Category]],[@[Global Category]]),[@[Global Category]])"
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=category_col).value = category_formula
 
@@ -1049,6 +1049,13 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 width = 60
 
             ws.column_dimensions[col_letter].width = width
+
+        if global_cat_col:
+            for r in range(2, max_r + 1):
+                global_cat_cell = ws.cell(row=r, column=global_cat_col)
+                if global_cat_cell.value is None or global_cat_cell.value == "":
+                    if hasattr(ws, "_cells") and (r, global_cat_col) in ws._cells:
+                        del ws._cells[(r, global_cat_col)]
 
 
 # ----------------------------
