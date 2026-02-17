@@ -689,7 +689,29 @@ def _load_rules(path: str, pd) -> list[dict]:
 def _load_rules_raw_df(path: str, pd):
     required_cols = ["Priority", "Category", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"]
     if path.lower().endswith(".csv"):
-        df = _read_csv_with_encoding_fallback(path, pd)
+        csv_read_attempts = [
+            {"encoding": "utf-8"},
+            {"encoding": "utf-8-sig"},
+            {"encoding": "cp1252"},
+            {"encoding": "latin1"},
+            {"encoding": "utf-8", "encoding_errors": "replace"},
+        ]
+        last_err = None
+        for kwargs in csv_read_attempts:
+            try:
+                df = pd.read_csv(path, **kwargs)
+                break
+            except TypeError:
+                if "encoding_errors" in kwargs:
+                    continue
+                raise
+            except UnicodeDecodeError as e:
+                last_err = e
+                continue
+        else:
+            if last_err is not None:
+                raise last_err
+            df = pd.read_csv(path)
     else:
         excel = pd.ExcelFile(path)
         sheet_name = "Category Rules" if "Category Rules" in excel.sheet_names else excel.sheet_names[0]
@@ -840,6 +862,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
     ensure_folder(os.path.dirname(output_path))
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        wb = writer.book
+        wb.calculation.calcMode = "auto"
+        wb.calculation.fullCalcOnLoad = True
+
         df.to_excel(writer, index=False, sheet_name="Transaction Data")
 
         global_folder = os.path.dirname(os.path.abspath(__file__))
@@ -965,7 +991,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         category_col = header_to_col.get("Category")
 
         max_r = ws.max_row
-        sep = _excel_list_separator()
         if date_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=date_col).number_format = "dd/mm/yyyy"
@@ -978,15 +1003,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         if specific_cat_col:
             specific_category_formula = '=IFERROR(INDEX(ClientCategorisationRules[Category],MATCH(AGGREGATE(15,6,IF(ClientCategorisationRules[Priority]="",9999,ClientCategorisationRules[Priority])/((IF(ClientCategorisationRules[Active]="",TRUE,ClientCategorisationRules[Active])=TRUE)*(ClientCategorisationRules[Pattern]<>"")*(ClientCategorisationRules[Category]<>"")*IF(UPPER(ClientCategorisationRules[Direction])="DEBIT",[@Amount]<0,IF(UPPER(ClientCategorisationRules[Direction])="CREDIT",[@Amount]>0,TRUE))*IF(ClientCategorisationRules[Txn Type Contains]="",TRUE,ISNUMBER(SEARCH(LOWER(ClientCategorisationRules[Txn Type Contains]),LOWER([@[Transaction Type]]))))*IF(LOWER(ClientCategorisationRules[Match Type])="exact",LOWER([@Description])=LOWER(ClientCategorisationRules[Pattern]),IF(LOWER(ClientCategorisationRules[Match Type])="startswith",LEFT(LOWER([@Description]),LEN(LOWER(ClientCategorisationRules[Pattern])))=LOWER(ClientCategorisationRules[Pattern]),IF(LOWER(ClientCategorisationRules[Match Type])="endswith",RIGHT(LOWER([@Description]),LEN(LOWER(ClientCategorisationRules[Pattern])))=LOWER(ClientCategorisationRules[Pattern]),ISNUMBER(SEARCH(LOWER(ClientCategorisationRules[Pattern]),LOWER([@Description]))))))),1),IF(ClientCategorisationRules[Priority]="",9999,ClientCategorisationRules[Priority]),0)),"")'
-            if sep != ",":
-                specific_category_formula = specific_category_formula.replace(",", sep)
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
 
         if category_col and specific_cat_col and global_cat_col:
             category_formula = '=IF([@[Specific Category]]<>"", [@[Specific Category]], [@[Global Category]])'
-            if sep != ",":
-                category_formula = category_formula.replace(",", sep)
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=category_col).value = category_formula
 
