@@ -421,22 +421,34 @@ def extract_account_holder_name(pdf_path) -> str:
 
     blob = _clean_text(text)
 
-    # Business: "Account name: ERFT LIMITED"
-    m = re.search(r"account name:\s*([A-Z0-9 &'.,\-]{3,80})", blob, re.IGNORECASE)
+    # Business/Personal: "Account name: ERFT LIMITED" or "Account name ERFT LIMITED"
+    m = re.search(r"\baccount name\b\s*:?\s*([A-Z0-9&'.,\-]{2,}(?:\s+[A-Z0-9&'.,\-]{2,}){0,20})", blob, re.IGNORECASE)
     if m:
         cand = _clean_text(m.group(1))
+        parts = cand.split()
+        while parts and len(parts[-1]) == 1:
+            parts.pop()
+        cand = " ".join(parts)
         if cand and "santander" not in cand.lower() and "statement" not in cand.lower():
             return cand
 
     # Fallback (Business): pick the first strong-looking addressee line near the top (often ALL CAPS)
     # e.g. "MR EMERSON RANDELL"
     lines = [ln.strip() for ln in (text.splitlines() if text else []) if ln and ln.strip()]
-    for ln in lines[:25]:
+    postcode_re = r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b"
+    for idx, ln in enumerate(lines[:25]):
         l = _clean_text(ln)
         low = l.lower()
         if any(k in low for k in ["santander", "business", "banking", "operations", "statement", "account number", "sort code", "page "]):
             continue
+        if re.search(postcode_re, l, re.IGNORECASE):
+            continue
+        if " " not in l and re.search(postcode_re, " ".join(lines[idx:idx + 4]), re.IGNORECASE):
+            if not any(marker in l for marker in ["LTD", "LIMITED", "LLP", "PLC", "&"]):
+                continue
         if re.match(r"^[A-Z][A-Z '\-]{6,60}$", l) and sum(c.isalpha() for c in l) >= 6:
+            if " " not in l and not any(marker in l for marker in ["LTD", "LIMITED", "LLP", "PLC", "&"]):
+                continue
             return l
 
     return ""
