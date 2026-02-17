@@ -1,4 +1,4 @@
-# Version: 2.09
+# Version: 2.10
 import os
 import glob
 import re
@@ -608,6 +608,18 @@ def _read_csv_with_encoding_fallback(path: str, pd):
     return pd.read_csv(path, encoding="latin-1")
 
 
+def _excel_list_separator() -> str:
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\\International") as k:
+            val, _ = winreg.QueryValueEx(k, "sList")
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    except Exception:
+        pass
+    return ","
+
+
 def _load_rules(path: str, pd) -> list[dict]:
     if path.lower().endswith(".csv"):
         df = _read_csv_with_encoding_fallback(path, pd)
@@ -953,6 +965,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         category_col = header_to_col.get("Category")
 
         max_r = ws.max_row
+        sep = _excel_list_separator()
         if date_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=date_col).number_format = "dd/mm/yyyy"
@@ -964,12 +977,18 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
 
         if specific_cat_col:
+            specific_category_formula = '=IFERROR(INDEX(ClientCategorisationRules[Category],MATCH(AGGREGATE(15,6,IF(ClientCategorisationRules[Priority]="",9999,ClientCategorisationRules[Priority])/((IF(ClientCategorisationRules[Active]="",TRUE,ClientCategorisationRules[Active])=TRUE)*(ClientCategorisationRules[Pattern]<>"")*(ClientCategorisationRules[Category]<>"")*IF(UPPER(ClientCategorisationRules[Direction])="DEBIT",[@Amount]<0,IF(UPPER(ClientCategorisationRules[Direction])="CREDIT",[@Amount]>0,TRUE))*IF(ClientCategorisationRules[Txn Type Contains]="",TRUE,ISNUMBER(SEARCH(LOWER(ClientCategorisationRules[Txn Type Contains]),LOWER([@[Transaction Type]]))))*IF(LOWER(ClientCategorisationRules[Match Type])="exact",LOWER([@Description])=LOWER(ClientCategorisationRules[Pattern]),IF(LOWER(ClientCategorisationRules[Match Type])="startswith",LEFT(LOWER([@Description]),LEN(LOWER(ClientCategorisationRules[Pattern])))=LOWER(ClientCategorisationRules[Pattern]),IF(LOWER(ClientCategorisationRules[Match Type])="endswith",RIGHT(LOWER([@Description]),LEN(LOWER(ClientCategorisationRules[Pattern])))=LOWER(ClientCategorisationRules[Pattern]),ISNUMBER(SEARCH(LOWER(ClientCategorisationRules[Pattern]),LOWER([@Description]))))))),1),IF(ClientCategorisationRules[Priority]="",9999,ClientCategorisationRules[Priority]),0)),"")'
+            if sep != ",":
+                specific_category_formula = specific_category_formula.replace(",", sep)
             for r in range(2, max_r + 1):
-                ws.cell(row=r, column=specific_cat_col).value = '=IFERROR(INDEX(ClientCategorisationRules[Category],MATCH(AGGREGATE(15,6,IF(ClientCategorisationRules[Priority]="",9999,ClientCategorisationRules[Priority])/((IF(ClientCategorisationRules[Active]="",TRUE,ClientCategorisationRules[Active])=TRUE)*(ClientCategorisationRules[Pattern]<>"")*(ClientCategorisationRules[Category]<>"")*IF(UPPER(ClientCategorisationRules[Direction])="DEBIT",[@Amount]<0,IF(UPPER(ClientCategorisationRules[Direction])="CREDIT",[@Amount]>0,TRUE))*IF(ClientCategorisationRules[Txn Type Contains]="",TRUE,ISNUMBER(SEARCH(LOWER(ClientCategorisationRules[Txn Type Contains]),LOWER([@[Transaction Type]]))))*IF(LOWER(ClientCategorisationRules[Match Type])="exact",LOWER([@Description])=LOWER(ClientCategorisationRules[Pattern]),IF(LOWER(ClientCategorisationRules[Match Type])="startswith",LEFT(LOWER([@Description]),LEN(LOWER(ClientCategorisationRules[Pattern])))=LOWER(ClientCategorisationRules[Pattern]),IF(LOWER(ClientCategorisationRules[Match Type])="endswith",RIGHT(LOWER([@Description]),LEN(LOWER(ClientCategorisationRules[Pattern])))=LOWER(ClientCategorisationRules[Pattern]),ISNUMBER(SEARCH(LOWER(ClientCategorisationRules[Pattern]),LOWER([@Description]))))))),1),IF(ClientCategorisationRules[Priority]="",9999,ClientCategorisationRules[Priority]),0)),"")'
+                ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
 
         if category_col and specific_cat_col and global_cat_col:
+            category_formula = '=IF([@[Specific Category]]<>"", [@[Specific Category]], [@[Global Category]])'
+            if sep != ",":
+                category_formula = category_formula.replace(",", sep)
             for r in range(2, max_r + 1):
-                ws.cell(row=r, column=category_col).value = '=IF([@[Specific Category]]<>"", [@[Specific Category]], [@[Global Category]])'
+                ws.cell(row=r, column=category_col).value = category_formula
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
