@@ -693,15 +693,17 @@ def _load_rules(path: str, pd) -> list[dict]:
 def _load_rules_raw_df(path: str, pd):
     required_cols = ["Priority", "Category", "Client Override", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"]
     if path.lower().endswith(".csv"):
-        try:
-            df = pd.read_csv(path, dtype=str, keep_default_na=False)
-        except UnicodeDecodeError:
+        encodings = ["utf-8-sig", "utf-8", "cp1252", "latin-1", "utf-16"]
+        last_err = None
+        df = None
+        for enc in encodings:
             try:
-                df = pd.read_csv(path, encoding="cp1252", dtype=str, keep_default_na=False)
+                df = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
+                break
             except Exception as e:
-                raise RuntimeError(f"[core] Failed to read rules CSV '{path}' after Unicode fallback: {e}") from e
-        except Exception as e:
-            print(f"[core] WARNING: Failed to read rules CSV '{path}': {e}")
+                last_err = e
+        if df is None:
+            print(f"[core] WARNING: Failed to read rules CSV '{path}': {last_err}")
             return None
     else:
         try:
@@ -873,14 +875,22 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         rules_cols = ["Priority", "Category", "Client Override", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"]
         if client_rules_path:
-            df_client = _load_rules_raw_df(client_rules_path, pd)
+            try:
+                df_client = _load_rules_raw_df(client_rules_path, pd)
+            except Exception as e:
+                print(f"[core] WARNING: Failed to load client rules '{client_rules_path}': {e}")
+                df_client = None
             if df_client is None:
                 df_client = pd.DataFrame([{"Priority": 9999, "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": True, "Notes": "Client rules file unreadable"}], columns=rules_cols)
         else:
             df_client = pd.DataFrame([{"Priority": 9999, "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": True, "Notes": ""}], columns=rules_cols)
 
         if global_rules_path:
-            df_global = _load_rules_raw_df(global_rules_path, pd)
+            try:
+                df_global = _load_rules_raw_df(global_rules_path, pd)
+            except Exception as e:
+                print(f"[core] WARNING: Failed to load global rules '{global_rules_path}': {e}")
+                df_global = None
             if df_global is None:
                 df_global = pd.DataFrame([{"Priority": "", "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": "", "Notes": "Global rules file unreadable"}], columns=rules_cols)
         else:
@@ -1005,6 +1015,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         if specific_cat_col:
             specific_category_formula = "=IFERROR(INDEX(CategorisationRules[Client Override],AGGREGATE(15,6,(ROW(CategorisationRules[Client Override])-ROW(INDEX(CategorisationRules[Client Override],1,1))+1)/((CategorisationRules[Client Override]<>\"\")*(IF(CategorisationRules[Txn Type Contains]=\"\",1,ISNUMBER(SEARCH(LOWER(CategorisationRules[Txn Type Contains]),LOWER([@[Transaction Type]])))))*(IF(LOWER(CategorisationRules[Match Type])=\"contains\",ISNUMBER(SEARCH(LOWER(CategorisationRules[Pattern]),LOWER([@Description]))),IF(LOWER(CategorisationRules[Match Type])=\"startswith\",LEFT(LOWER([@Description]),LEN(CategorisationRules[Pattern]))=LOWER(CategorisationRules[Pattern]),IF(LOWER(CategorisationRules[Match Type])=\"exact\",LOWER([@Description])=LOWER(CategorisationRules[Pattern]),0)))),1)),\"\"))"
+            if specific_category_formula.startswith("=IFERROR(") and specific_category_formula.count("(") == specific_category_formula.count(")") + 1:
+                specific_category_formula += ")"
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
 
