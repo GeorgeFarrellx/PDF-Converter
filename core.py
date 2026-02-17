@@ -1,4 +1,4 @@
-# Version: 2.10
+# Version: 2.11
 import os
 import glob
 import re
@@ -693,13 +693,15 @@ def _load_rules(path: str, pd) -> list[dict]:
 def _load_rules_raw_df(path: str, pd):
     required_cols = ["Priority", "Category", "Client Override", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"]
     if path.lower().endswith(".csv"):
-        encodings = ["utf-8-sig", "utf-8", "cp1252", "latin-1", "utf-16"]
+        encodings = ["utf-8-sig", "utf-8", "cp1252", "utf-16", "utf-16-le", "utf-16-be"]
         last_err = None
         df = None
         for enc in encodings:
             try:
                 df = pd.read_csv(path, encoding=enc, dtype=str, keep_default_na=False)
                 break
+            except UnicodeDecodeError as e:
+                last_err = e
             except Exception as e:
                 last_err = e
         if df is None:
@@ -810,7 +812,7 @@ def _apply_global_categorisation(transactions: list[dict], pd) -> None:
                 txn["Global Category"] = rule.get("Category", "")
                 break
 
-def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = "", header_period_start=None, header_period_end=None):
+def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = "", header_period_start=None, header_period_end=None, enable_categorisation: bool = True):
     if not transactions:
         raise ValueError("No transactions found!")
 
@@ -828,10 +830,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         )
         return None
 
-    try:
-        _apply_global_categorisation(transactions, pd)
-    except Exception:
-        pass
+    if enable_categorisation:
+        try:
+            _apply_global_categorisation(transactions, pd)
+        except Exception:
+            pass
 
     df = pd.DataFrame(transactions)
     if "T/N" not in df.columns:
@@ -856,9 +859,14 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce")
     df["Balance"] = pd.to_numeric(df["Balance"], errors="coerce")
 
-    df["Global Category"] = df["Global Category"].where(df["Global Category"].notna(), None)
-    df["Specific Category"] = df["Specific Category"].fillna("")
-    df["Category"] = df["Category"].fillna("")
+    if enable_categorisation:
+        df["Global Category"] = df["Global Category"].where(df["Global Category"].notna(), None)
+        df["Specific Category"] = df["Specific Category"].fillna("")
+        df["Category"] = df["Category"].fillna("")
+    else:
+        df["Global Category"] = ""
+        df["Specific Category"] = ""
+        df["Category"] = ""
 
     ensure_folder(os.path.dirname(output_path))
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
@@ -868,63 +876,64 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         df.to_excel(writer, index=False, sheet_name="Transaction Data")
 
-        global_folder = os.path.dirname(os.path.abspath(__file__))
-        client_folder = os.path.dirname(output_path) if output_path else ""
-        client_rules_path = _find_rules_file(client_folder, "Client Categorisation Rules")
-        global_rules_path = _find_rules_file(global_folder, "Global Categorisation Rules")
+        if enable_categorisation:
+            global_folder = os.path.dirname(os.path.abspath(__file__))
+            client_folder = os.path.dirname(output_path) if output_path else ""
+            client_rules_path = _find_rules_file(client_folder, "Client Categorisation Rules")
+            global_rules_path = _find_rules_file(global_folder, "Global Categorisation Rules")
 
-        rules_cols = ["Priority", "Category", "Client Override", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"]
-        if client_rules_path:
-            try:
-                df_client = _load_rules_raw_df(client_rules_path, pd)
-            except Exception as e:
-                print(f"[core] WARNING: Failed to load client rules '{client_rules_path}': {e}")
-                df_client = None
-            if df_client is None:
-                df_client = pd.DataFrame([{"Priority": 9999, "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": True, "Notes": "Client rules file unreadable"}], columns=rules_cols)
-        else:
-            df_client = pd.DataFrame([{"Priority": 9999, "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": True, "Notes": ""}], columns=rules_cols)
+            rules_cols = ["Priority", "Category", "Client Override", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"]
+            if client_rules_path:
+                try:
+                    df_client = _load_rules_raw_df(client_rules_path, pd)
+                except Exception as e:
+                    print(f"[core] WARNING: Failed to load client rules '{client_rules_path}': {e}")
+                    df_client = None
+                if df_client is None:
+                    df_client = pd.DataFrame([{"Priority": 9999, "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": True, "Notes": "Client rules file unreadable"}], columns=rules_cols)
+            else:
+                df_client = pd.DataFrame([{"Priority": 9999, "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": True, "Notes": ""}], columns=rules_cols)
 
-        if global_rules_path:
-            try:
-                df_global = _load_rules_raw_df(global_rules_path, pd)
-            except Exception as e:
-                print(f"[core] WARNING: Failed to load global rules '{global_rules_path}': {e}")
-                df_global = None
-            if df_global is None:
-                df_global = pd.DataFrame([{"Priority": "", "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": "", "Notes": "Global rules file unreadable"}], columns=rules_cols)
-        else:
-            df_global = pd.DataFrame([{"Priority": "", "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": "", "Notes": "Global rules file not found"}], columns=rules_cols)
+            if global_rules_path:
+                try:
+                    df_global = _load_rules_raw_df(global_rules_path, pd)
+                except Exception as e:
+                    print(f"[core] WARNING: Failed to load global rules '{global_rules_path}': {e}")
+                    df_global = None
+                if df_global is None:
+                    df_global = pd.DataFrame([{"Priority": "", "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": "", "Notes": "Global rules file unreadable"}], columns=rules_cols)
+            else:
+                df_global = pd.DataFrame([{"Priority": "", "Category": "", "Client Override": "", "Match Type": "", "Pattern": "", "Direction": "", "Txn Type Contains": "", "Active": "", "Notes": "Global rules file not found"}], columns=rules_cols)
 
-        rules_sheet = "Categorisation Rules"
-        df_client.to_excel(writer, index=False, sheet_name=rules_sheet, startrow=2)
-        global_start_row = 2 + len(df_client.index) + 1 + 2
-        df_global.to_excel(writer, index=False, sheet_name=rules_sheet, startrow=global_start_row)
+            rules_sheet = "Categorisation Rules"
+            df_client.to_excel(writer, index=False, sheet_name=rules_sheet, startrow=2)
+            global_start_row = 2 + len(df_client.index) + 1 + 2
+            df_global.to_excel(writer, index=False, sheet_name=rules_sheet, startrow=global_start_row)
 
-        ws_rules = writer.sheets[rules_sheet]
-        ws_rules["A1"] = "Edit ClientCategorisationRules to override categories instantly. Global Category is computed by Python using regex-capable global rules and requires rerun to change. Excel override table does not support regex."
+            ws_rules = writer.sheets[rules_sheet]
+            ws_rules["A1"] = "Edit ClientCategorisationRules to override categories instantly. Global Category is computed by Python using regex-capable global rules and requires rerun to change. Excel override table does not support regex."
 
-        client_header_row = 3
-        client_total_rows = max(len(df_client.index), 1) + 1
-        client_end_row = client_header_row + client_total_rows - 1
-        global_header_row = global_start_row + 1
-        global_total_rows = max(len(df_global.index), 1) + 1
-        global_end_row = global_header_row + global_total_rows - 1
+            client_header_row = 3
+            client_total_rows = max(len(df_client.index), 1) + 1
+            client_end_row = client_header_row + client_total_rows - 1
+            global_header_row = global_start_row + 1
+            global_total_rows = max(len(df_global.index), 1) + 1
+            global_end_row = global_header_row + global_total_rows - 1
 
-        client_ref = f"A{client_header_row}:I{client_end_row}"
-        global_ref = f"A{global_header_row}:I{global_end_row}"
+            client_ref = f"A{client_header_row}:I{client_end_row}"
+            global_ref = f"A{global_header_row}:I{global_end_row}"
 
-        client_table = Table(displayName="ClientCategorisationRules", ref=client_ref)
-        client_style = TableStyleInfo(name="TableStyleLight1", showFirstColumn=False, showLastColumn=False, showRowStripes=False, showColumnStripes=False)
-        client_table.totalsRowShown = False
-        client_table.tableStyleInfo = client_style
-        ws_rules.add_table(client_table)
+            client_table = Table(displayName="ClientCategorisationRules", ref=client_ref)
+            client_style = TableStyleInfo(name="TableStyleLight1", showFirstColumn=False, showLastColumn=False, showRowStripes=False, showColumnStripes=False)
+            client_table.totalsRowShown = False
+            client_table.tableStyleInfo = client_style
+            ws_rules.add_table(client_table)
 
-        global_table = Table(displayName="CategorisationRules", ref=global_ref)
-        global_style = TableStyleInfo(name="TableStyleLight1", showFirstColumn=False, showLastColumn=False, showRowStripes=False, showColumnStripes=False)
-        global_table.totalsRowShown = False
-        global_table.tableStyleInfo = global_style
-        ws_rules.add_table(global_table)
+            global_table = Table(displayName="CategorisationRules", ref=global_ref)
+            global_style = TableStyleInfo(name="TableStyleLight1", showFirstColumn=False, showLastColumn=False, showRowStripes=False, showColumnStripes=False)
+            global_table.totalsRowShown = False
+            global_table.tableStyleInfo = global_style
+            ws_rules.add_table(global_table)
 
         ws = writer.sheets["Transaction Data"]
 
@@ -1013,14 +1022,28 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
 
-        if specific_cat_col:
-            specific_category_formula = "=IFERROR(INDEX(CategorisationRules[Client Override],AGGREGATE(15,6,(ROW(CategorisationRules[Client Override])-ROW(INDEX(CategorisationRules[Client Override],1,1))+1)/((CategorisationRules[Client Override]<>\"\")*(IF(CategorisationRules[Txn Type Contains]=\"\",1,ISNUMBER(SEARCH(LOWER(CategorisationRules[Txn Type Contains]),LOWER([@[Transaction Type]])))))*(IF(LOWER(CategorisationRules[Match Type])=\"contains\",ISNUMBER(SEARCH(LOWER(CategorisationRules[Pattern]),LOWER([@Description]))),IF(LOWER(CategorisationRules[Match Type])=\"startswith\",LEFT(LOWER([@Description]),LEN(CategorisationRules[Pattern]))=LOWER(CategorisationRules[Pattern]),IF(LOWER(CategorisationRules[Match Type])=\"exact\",LOWER([@Description])=LOWER(CategorisationRules[Pattern]),0)))),1)),\"\"))"
-            if specific_category_formula.startswith("=IFERROR(") and specific_category_formula.count("(") == specific_category_formula.count(")") + 1:
-                specific_category_formula += ")"
-            for r in range(2, max_r + 1):
-                ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
+        if enable_categorisation and specific_cat_col:
+            specific_category_formula = (
+                "=IFERROR("
+                "INDEX(CategorisationRules[Client Override],"
+                "AGGREGATE(15,6,"
+                "(ROW(CategorisationRules[Client Override])-ROW(CategorisationRules[#Headers]))/"
+                "((LEN(CategorisationRules[Pattern])>0)*"
+                "(CategorisationRules[Client Override]<>\"\")*"
+                "ISNUMBER(SEARCH(CategorisationRules[Pattern],LOWER([@Description])))),"
+                "1"
+                ")"
+                "),"
+                "\"\""
+                ")"
+            )
+            if specific_category_formula.count("(") != specific_category_formula.count(")"):
+                print("[core] WARNING: Specific Category formula is unbalanced; formula write skipped.")
+            else:
+                for r in range(2, max_r + 1):
+                    ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
 
-        if category_col and specific_cat_col and global_cat_col:
+        if enable_categorisation and category_col and specific_cat_col and global_cat_col:
             category_formula = "=IFERROR(IF([@[Specific Category]]<>\"\",[@[Specific Category]],[@[Global Category]]),[@[Global Category]])"
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=category_col).value = category_formula
