@@ -834,7 +834,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         raise KeyError(f"Parser output missing columns: {missing}")
 
     if "Global Category" not in df.columns:
-        df["Global Category"] = ""
+        df["Global Category"] = None
     if "Specific Category" not in df.columns:
         df["Specific Category"] = ""
     if "Category" not in df.columns:
@@ -847,7 +847,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce")
     df["Balance"] = pd.to_numeric(df["Balance"], errors="coerce")
 
-    df["Global Category"] = df["Global Category"].fillna("")
+    df["Global Category"] = df["Global Category"].where(df["Global Category"].notna(), None)
     df["Specific Category"] = df["Specific Category"].fillna("")
     df["Category"] = df["Category"].fillna("")
 
@@ -1050,11 +1050,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
             ws.column_dimensions[col_letter].width = width
 
-        if global_cat_col:
+        if global_cat_col and hasattr(ws, "_cells"):
             for r in range(2, max_r + 1):
-                global_cat_cell = ws.cell(row=r, column=global_cat_col)
-                if global_cat_cell.value is None or global_cat_cell.value == "":
-                    if hasattr(ws, "_cells") and (r, global_cat_col) in ws._cells:
+                if (r, global_cat_col) in ws._cells:
+                    cell = ws._cells[(r, global_cat_col)]
+                    if cell.value is None or cell.value == "":
                         del ws._cells[(r, global_cat_col)]
 
 
