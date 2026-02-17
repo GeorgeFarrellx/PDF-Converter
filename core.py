@@ -693,8 +693,15 @@ def _load_rules(path: str, pd) -> list[dict]:
 def _load_rules_raw_df(path: str, pd):
     required_cols = ["Priority", "Category", "Client Override", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"]
     if path.lower().endswith(".csv"):
-        df = _read_rules_csv(path, pd)
-        if df is None:
+        try:
+            df = pd.read_csv(path, dtype=str, keep_default_na=False)
+        except UnicodeDecodeError:
+            try:
+                df = pd.read_csv(path, encoding="cp1252", dtype=str, keep_default_na=False)
+            except Exception as e:
+                raise RuntimeError(f"[core] Failed to read rules CSV '{path}' after Unicode fallback: {e}") from e
+        except Exception as e:
+            print(f"[core] WARNING: Failed to read rules CSV '{path}': {e}")
             return None
     else:
         try:
@@ -997,7 +1004,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
 
         if specific_cat_col:
-            specific_category_formula = "=IFERROR(INDEX(CategorisationRules[Client Override],AGGREGATE(15,6,(ROW(CategorisationRules[Client Override])-ROW(INDEX(CategorisationRules[Client Override],1,1))+1)/((CategorisationRules[Client Override]<>\"\")*(IF(CategorisationRules[Txn Type Contains]=\"\",1,ISNUMBER(SEARCH(LOWER(CategorisationRules[Txn Type Contains]),LOWER([@[Transaction Type]])))))*(IF(LOWER(CategorisationRules[Match Type])=\"contains\",ISNUMBER(SEARCH(LOWER(CategorisationRules[Pattern]),LOWER([@Description]))),IF(LOWER(CategorisationRules[Match Type])=\"startswith\",LEFT(LOWER([@Description]),LEN(CategorisationRules[Pattern]))=LOWER(CategorisationRules[Pattern]),IF(LOWER(CategorisationRules[Match Type])=\"exact\",LOWER([@Description])=LOWER(CategorisationRules[Pattern]),0)))),1)),\"\")"
+            specific_category_formula = "=IFERROR(INDEX(CategorisationRules[Client Override],AGGREGATE(15,6,(ROW(CategorisationRules[Client Override])-ROW(INDEX(CategorisationRules[Client Override],1,1))+1)/((CategorisationRules[Client Override]<>\"\")*(IF(CategorisationRules[Txn Type Contains]=\"\",1,ISNUMBER(SEARCH(LOWER(CategorisationRules[Txn Type Contains]),LOWER([@[Transaction Type]])))))*(IF(LOWER(CategorisationRules[Match Type])=\"contains\",ISNUMBER(SEARCH(LOWER(CategorisationRules[Pattern]),LOWER([@Description]))),IF(LOWER(CategorisationRules[Match Type])=\"startswith\",LEFT(LOWER([@Description]),LEN(CategorisationRules[Pattern]))=LOWER(CategorisationRules[Pattern]),IF(LOWER(CategorisationRules[Match Type])=\"exact\",LOWER([@Description])=LOWER(CategorisationRules[Pattern]),0)))),1)),\"\"))"
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
 
