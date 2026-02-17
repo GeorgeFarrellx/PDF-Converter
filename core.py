@@ -1,4 +1,4 @@
-# Version: 2.07
+# Version: 2.08
 import os
 import glob
 import re
@@ -865,13 +865,13 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         global_ref = f"A{global_header_row}:H{global_end_row}"
 
         client_table = Table(displayName="ClientCategorisationRules", ref=client_ref)
-        client_style = TableStyleInfo(name="None", showFirstColumn=False, showLastColumn=False, showRowStripes=False, showColumnStripes=False)
+        client_style = TableStyleInfo(name="TableStyleLight1", showFirstColumn=False, showLastColumn=False, showRowStripes=False, showColumnStripes=False)
         client_table.totalsRowShown = False
         client_table.tableStyleInfo = client_style
         ws_rules.add_table(client_table)
 
         global_table = Table(displayName="CategorisationRules", ref=global_ref)
-        global_style = TableStyleInfo(name="None", showFirstColumn=False, showLastColumn=False, showRowStripes=False, showColumnStripes=False)
+        global_style = TableStyleInfo(name="TableStyleLight1", showFirstColumn=False, showLastColumn=False, showRowStripes=False, showColumnStripes=False)
         global_table.totalsRowShown = False
         global_table.tableStyleInfo = global_style
         ws_rules.add_table(global_table)
@@ -921,7 +921,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             table = Table(displayName="TransactionData", ref=ref)
 
             style = TableStyleInfo(
-                name="None",
+                name="TableStyleLight1",
                 showFirstColumn=False,
                 showLastColumn=False,
                 showRowStripes=False,
@@ -965,11 +965,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         if specific_cat_col:
             for r in range(2, max_r + 1):
-                ws.cell(row=r, column=specific_cat_col).value = "=IFERROR(LET(desc,LOWER([@Description]),ttype,LOWER([@[Transaction Type]]),amt,[@Amount],prio0,ClientCategorisationRules[Priority],prio,IF(prio0=\"\",9999,prio0),cat,ClientCategorisationRules[Category],mt0,LOWER(ClientCategorisationRules[Match Type]),mt,IF((mt0=\"\")+(mt0=\"regex\"),\"contains\",mt0),pat,LOWER(ClientCategorisationRules[Pattern]),dir0,UPPER(ClientCategorisationRules[Direction]),dir,IF(dir0=\"\",\"ANY\",dir0),ttc,LOWER(ClientCategorisationRules[Txn Type Contains]),act0,ClientCategorisationRules[Active],act,IF(act0=\"\",TRUE,act0),ok_dir,(dir=\"ANY\")+((dir=\"DEBIT\")*(amt<0))+((dir=\"CREDIT\")*(amt>0)),ok_ttc,(ttc=\"\")+ISNUMBER(SEARCH(ttc,ttype)),ok_pat,IF(mt=\"exact\",desc=pat,IF(mt=\"startswith\",LEFT(desc,LEN(pat))=pat,IF(mt=\"endswith\",RIGHT(desc,LEN(pat))=pat,ISNUMBER(SEARCH(pat,desc))))),mask,(act=TRUE)*(pat<>\"\")*(cat<>\"\")*ok_dir*ok_ttc*ok_pat,f_prio,FILTER(prio,mask),f_cat,FILTER(cat,mask),minp,MIN(f_prio),INDEX(f_cat,XMATCH(minp,f_prio,0))),\"\")"
+                ws.cell(row=r, column=specific_cat_col).value = '=IFERROR(LET(desc,LOWER([@Description]),ttype,LOWER([@[Transaction Type]]),amt,[@Amount],prio0,ClientCategorisationRules[Priority],prio,IF(prio0="",9999,prio0),cat,ClientCategorisationRules[Category],mt0,LOWER(ClientCategorisationRules[Match Type]),mt,IF((mt0="")+(mt0="regex"),"contains",mt0),pat,LOWER(ClientCategorisationRules[Pattern]),dir0,UPPER(ClientCategorisationRules[Direction]),dir,IF(dir0="","ANY",dir0),ttc,LOWER(ClientCategorisationRules[Txn Type Contains]),act0,ClientCategorisationRules[Active],act,IF(act0="",TRUE,act0),ok_dir,(dir="ANY")+((dir="DEBIT")*(amt<0))+((dir="CREDIT")*(amt>0)),ok_ttc,(ttc="")+ISNUMBER(SEARCH(ttc,ttype)),ok_pat,IF(mt="exact",desc=pat,IF(mt="startswith",LEFT(desc,LEN(pat))=pat,IF(mt="endswith",RIGHT(desc,LEN(pat))=pat,ISNUMBER(SEARCH(pat,desc))))),mask,(act=TRUE)*(pat<>"")*(cat<>"")*ok_dir*ok_ttc*ok_pat,f_prio,FILTER(prio,mask),f_cat,FILTER(cat,mask),minp,MIN(f_prio),INDEX(f_cat,XMATCH(minp,f_prio,0))),"")'
 
         if category_col and specific_cat_col and global_cat_col:
             for r in range(2, max_r + 1):
-                ws.cell(row=r, column=category_col).value = "=IF([@[Specific Category]]<>\"\", [@[Specific Category]], [@[Global Category]])"
+                ws.cell(row=r, column=category_col).value = '=IF([@[Specific Category]]<>"", [@[Specific Category]], [@[Global Category]])'
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
