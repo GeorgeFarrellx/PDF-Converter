@@ -1,14 +1,15 @@
 """Santander PDF statement parser (text-based, no OCR)
 
-File: santander-1.7.py
-Version: 1.7
+File: santander-1.8.py
+Version: 1.8
 
 Notes:
-- Supports Santander Business Banking statements and Santander Online Banking transaction exports.
+- Supports four Santander layouts: Business Banking statements, Personal current account statements,
+  Online Banking current account exports, and Online Banking credit card exports.
 - Applies global transaction type rules as specified in the main project instructions.
 """
 
-__version__ = "1.7"
+__version__ = "1.8"
 
 import os
 import re
@@ -43,7 +44,7 @@ _MONEY_RE = re.compile(r'(?<!\w)(\(?-?\s*£?\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})?\)?
 _DATE_DMY_SLASH_FULL_RE = re.compile(r'^\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\s*(.*)$')
 
 # Business format date: 3rd Dec / 1st Jan etc
-_DATE_ORD_MON_RE = re.compile(r'^\s*(\d{1,2})(st|nd|rd|th)\s+([A-Za-z]{3,9})\s*(.*)$', re.IGNORECASE)
+_DATE_ORD_MON_RE = re.compile(r'^\s*(\d{1,2})(st|nd|rd|th)\s*([A-Za-z]{3,9})\s*(.*)$', re.IGNORECASE)
 
 
 def _clean_text(s: str) -> str:
@@ -139,6 +140,8 @@ def _is_online_noise_line(line: str) -> bool:
     if "transaction date:" in low:
         return True
     if "account number:" in low:
+        return True
+    if "card number:" in low:
         return True
     if low.startswith("page ") and " of " in low:
         return True
@@ -260,6 +263,15 @@ def _detect_statement_kind(first_page_text: str) -> str:
     t = (first_page_text or "").lower()
     if "santander online banking" in t and "money in" in t and "money out" in t and "balance" in t:
         return "ONLINE"
+    if "card number:" in t and "date card number description" in t and "money in" in t and "money out" in t:
+        return "ONLINE_CREDITCARD"
+    if (
+        "current account" in t
+        and "balance brought forward" in t
+        and "your balance at close of business" in t
+        and "santander business banking" not in t
+    ):
+        return "PERSONAL"
     if "santander business banking" in t or ("credits" in t and "debits" in t and "balance" in t and "statement number" in t):
         return "BUSINESS"
     # fallback heuristics
@@ -274,6 +286,7 @@ def _detect_statement_kind(first_page_text: str) -> str:
 
 def _parse_full_date_any(s: str) -> Optional[_dt.date]:
     s = _clean_text(s)
+    s = re.sub(r'(?i)(\d{1,2})(st|nd|rd|th)(?=\s*[A-Za-z]{3,9}\b)', r'\1', s)
     m = re.match(r'^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$', s)
     if m:
         d = int(m.group(1))
@@ -316,7 +329,7 @@ def _infer_period_online(blob: str) -> Tuple[Optional[_dt.date], Optional[_dt.da
 def _infer_period_business(blob: str) -> Tuple[Optional[_dt.date], Optional[_dt.date]]:
     # "Your account summary for 3 December 2024 to 2 January 2025"
     m = re.search(
-        r"your account summary for.*?(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\s+to\s+(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})",
+        r"your account summary for.*?(\d{1,2}(?:st|nd|rd|th)?\s*[A-Za-z]{3,9}\s+\d{4})\s+to\s+(\d{1,2}(?:st|nd|rd|th)?\s*[A-Za-z]{3,9}\s+\d{4})",
         blob, re.IGNORECASE | re.DOTALL
     )
     if m:
@@ -403,7 +416,7 @@ def extract_account_holder_name(pdf_path) -> str:
     # Returning a fabricated identifier (e.g., last digits) causes incorrect client headers/filenames.
     # So for ONLINE statements we return blank and let the user-supplied client name drive output.
     kind = _detect_statement_kind(text)
-    if kind == "ONLINE":
+    if kind in {"ONLINE", "ONLINE_CREDITCARD"}:
         return ""
 
     blob = _clean_text(text)
@@ -447,8 +460,7 @@ def extract_statement_balances(pdf_path) -> Dict[str, Optional[float]]:
     except Exception:
         return {"start_balance": None, "end_balance": None}
 
-    if kind == "BUSINESS":
-        # "Balance brought forward ... £19,152.64"
+    if kind in {"BUSINESS", "PERSONAL"}:
         m = re.search(
             r"balance brought forward.*?£\s*([\d,]+\.\d{2})",
             first_blob, re.IGNORECASE
@@ -456,7 +468,6 @@ def extract_statement_balances(pdf_path) -> Dict[str, Optional[float]]:
         if m:
             start_balance = _parse_money(m.group(1))
 
-        # "Your balance at close of business ... £23,283.62"
         m = re.search(
             r"your balance at close of business.*?£\s*([\d,]+\.\d{2})",
             first_blob, re.IGNORECASE
@@ -464,7 +475,11 @@ def extract_statement_balances(pdf_path) -> Dict[str, Optional[float]]:
         if m:
             end_balance = _parse_money(m.group(1))
 
-        # Fallback: "Previous statement balance" / "Current statement balance"
+        if end_balance is None:
+            m = re.search(r"balance\s*carried\s*forward(?:\s*to\s*next\s*statement)?[:\s]*£?\s*([\d,]+\.\d{2})", first_blob, re.IGNORECASE)
+            if m:
+                end_balance = _parse_money(m.group(1))
+
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 for page in pdf.pages[:4]:
@@ -477,14 +492,40 @@ def extract_statement_balances(pdf_path) -> Dict[str, Optional[float]]:
                         mm = re.search(r"current statement balance\s*([\d,]+\.\d{2})", t, re.IGNORECASE)
                         if mm:
                             end_balance = _parse_money(mm.group(1))
+                    if end_balance is None:
+                        mm = re.search(r"balance\s*carried\s*forward(?:\s*to\s*next\s*statement)?[:\s]*£?\s*([\d,]+\.\d{2})", t, re.IGNORECASE)
+                        if mm:
+                            end_balance = _parse_money(mm.group(1))
         except Exception:
             pass
 
         return {"start_balance": start_balance, "end_balance": end_balance}
 
-    # ONLINE: infer from transaction balances
-    # NOTE: We return transactions in chronological order (oldest -> newest), even if the PDF lists newest first.
     txs = extract_transactions(pdf_path)
+
+    if kind == "ONLINE_CREDITCARD":
+        init_m = re.search(r"initial\s+balance\s*£?\s*([\d,]+\.\d{2})", first_blob, re.IGNORECASE)
+        if init_m:
+            init_val = _parse_money(init_m.group(1))
+            if init_val is not None:
+                start_balance = -abs(float(init_val))
+
+        if txs and txs[-1].get("Balance") is not None:
+            try:
+                end_balance = float(txs[-1]["Balance"])
+            except Exception:
+                end_balance = None
+
+        if start_balance is not None and end_balance is None:
+            total = 0.0
+            for t in txs:
+                try:
+                    total += float(t.get("Amount", 0.0))
+                except Exception:
+                    pass
+            end_balance = round(float(start_balance) + total, 2)
+
+        return {"start_balance": start_balance, "end_balance": end_balance}
 
     first_tx = None
     last_tx = None
@@ -498,8 +539,6 @@ def extract_statement_balances(pdf_path) -> Dict[str, Optional[float]]:
             break
 
     if first_tx is not None:
-        # Opening balance is not printed on this export; derive it from the first transaction:
-        # opening = first_balance - first_amount
         try:
             start_balance = round(float(first_tx["Balance"]) - float(first_tx["Amount"]), 2)
         except Exception:
@@ -940,6 +979,252 @@ def _extract_transactions_online(pdf_path: str) -> List[Dict]:
     return txs
 
 
+def _extract_transactions_personal(pdf_path: str) -> List[Dict]:
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            first_blob = _clean_text("\n".join([(p.extract_text() or "") for p in pdf.pages[:2]]))
+            period_start, period_end = _infer_period_business(first_blob)
+
+            lines: List[str] = []
+            for p in pdf.pages:
+                t = p.extract_text() or ""
+                lines.extend(t.splitlines())
+    except Exception:
+        return []
+
+    txs: List[Dict] = []
+    prev_date: Optional[_dt.date] = None
+    prev_balance: Optional[float] = None
+
+    current_date: Optional[_dt.date] = None
+    current_desc_parts: List[str] = []
+    current_balance: Optional[float] = None
+    current_amount_raw: Optional[float] = None
+
+    def flush():
+        nonlocal current_date, current_desc_parts, current_balance, current_amount_raw, prev_balance, prev_date
+        if current_date is None:
+            current_desc_parts = []
+            current_balance = None
+            current_amount_raw = None
+            return
+
+        desc = _clean_text(" ".join(current_desc_parts))
+        low = desc.lower().replace(" ", "")
+        if "balancebroughtforward" in low or "balancecarriedforward" in low or "carriedforwardtonextstatement" in low:
+            if current_balance is not None and "balancebroughtforward" in low:
+                prev_balance = float(current_balance)
+            current_date = None
+            current_desc_parts = []
+            current_balance = None
+            current_amount_raw = None
+            return
+
+        tx_type_raw = _extract_type_prefix(desc)
+        amount = None
+        if current_balance is not None and prev_balance is not None:
+            amount = round(float(current_balance) - float(prev_balance), 2)
+        elif current_amount_raw is not None:
+            sign = _infer_sign_from_description(desc)
+            if sign is None:
+                sign = -1
+            amount = round(sign * abs(float(current_amount_raw)), 2)
+        else:
+            amount = 0.0
+
+        ttype, new_desc = _apply_global_type_rules(tx_type_raw, desc)
+        txs.append({
+            "Date": current_date,
+            "Transaction Type": ttype or _title_case_keep_acronyms(tx_type_raw),
+            "Description": new_desc,
+            "Amount": float(amount),
+            "Balance": float(current_balance) if current_balance is not None else None,
+        })
+
+        if current_balance is not None:
+            prev_balance = float(current_balance)
+        elif prev_balance is not None:
+            prev_balance = round(float(prev_balance) + float(amount), 2)
+        prev_date = current_date
+
+        current_date = None
+        current_desc_parts = []
+        current_balance = None
+        current_amount_raw = None
+
+    saw_transactions_section = False
+    in_table = False
+
+    for raw in lines:
+        line = _clean_text(raw)
+        if not line:
+            continue
+        low = line.lower()
+
+        if "your transactions" in low:
+            saw_transactions_section = True
+
+        if not saw_transactions_section:
+            continue
+
+        if "date" in low and "description" in low and ("moneyin" in low or "money in" in low) and ("moneyout" in low or "money out" in low) and "balance" in low:
+            in_table = True
+            continue
+
+        if not in_table:
+            continue
+
+        if _DATE_ORD_MON_RE.match(line):
+            flush()
+            d, rem = _parse_business_date(line, period_start, period_end, prev_date)
+            if d is None:
+                continue
+            current_date = d
+            current_desc_parts = [rem] if rem else []
+
+            vals = _extract_money_values(line)
+            if len(vals) >= 2:
+                current_amount_raw = abs(vals[-2])
+                current_balance = vals[-1]
+                if current_desc_parts:
+                    current_desc_parts[-1] = _remove_money_from_text(current_desc_parts[-1])
+            elif len(vals) == 1:
+                current_amount_raw = abs(vals[-1])
+                current_balance = vals[-1]
+                if current_desc_parts:
+                    current_desc_parts[-1] = _remove_money_from_text(current_desc_parts[-1])
+            else:
+                current_amount_raw = None
+                current_balance = None
+            continue
+
+        if current_date is None:
+            continue
+
+        vals = _extract_money_values(line)
+        low_ns = low.replace(" ", "")
+        if "balancebroughtforward" in low_ns and vals:
+            prev_balance = float(vals[-1])
+            current_date = None
+            current_desc_parts = []
+            current_balance = None
+            current_amount_raw = None
+            continue
+        if "balancecarriedforward" in low_ns or "carriedforwardtonextstatement" in low_ns:
+            current_date = None
+            current_desc_parts = []
+            current_balance = None
+            current_amount_raw = None
+            continue
+
+        if len(vals) >= 2 and current_balance is None:
+            current_amount_raw = abs(vals[-2])
+            current_balance = vals[-1]
+            desc_part = _remove_money_from_text(line)
+            if desc_part:
+                current_desc_parts.append(desc_part)
+            flush()
+        elif len(vals) == 1 and current_amount_raw is None:
+            current_amount_raw = abs(vals[-1])
+            desc_part = _remove_money_from_text(line)
+            if desc_part:
+                current_desc_parts.append(desc_part)
+        else:
+            current_desc_parts.append(line)
+
+    flush()
+    return txs
+
+
+def _extract_transactions_online_creditcard(pdf_path: str) -> List[Dict]:
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            lines: List[str] = []
+            for p in pdf.pages:
+                t = p.extract_text() or ""
+                lines.extend(t.splitlines())
+    except Exception:
+        return []
+
+    events: List[Dict] = []
+    in_table = False
+
+    for raw in lines:
+        line = _clean_text(raw)
+        if not line:
+            continue
+        low = line.lower()
+
+        if "date" in low and "card number" in low and "description" in low and "money in" in low and "money out" in low:
+            in_table = True
+            continue
+        if not in_table:
+            continue
+        if _is_online_noise_line(line):
+            continue
+        if not _DATE_DMY_SLASH_FULL_RE.match(line):
+            continue
+
+        d, rem = _parse_online_date(line)
+        if d is None:
+            continue
+
+        vals = _extract_money_values(line)
+        amount_raw = abs(vals[-1]) if vals else None
+        desc = _remove_money_from_text(rem)
+
+        events.append({
+            "Date": d,
+            "Description": desc,
+            "AmountRaw": amount_raw,
+            "IsInitial": "initial balance" in desc.lower() and len(vals) == 1,
+        })
+
+    if not events:
+        return []
+
+    dates = [e["Date"] for e in events]
+    if dates and dates[0] > dates[-1]:
+        events = list(reversed(events))
+
+    opening = None
+    filtered: List[Dict] = []
+    for e in events:
+        if e["IsInitial"] and opening is None and e["AmountRaw"] is not None:
+            opening = -abs(float(e["AmountRaw"]))
+            continue
+        filtered.append(e)
+
+    txs: List[Dict] = []
+    running = opening
+    for e in filtered:
+        desc = re.sub(r'^\*\*\s*\d{2,6}\s*', '', e["Description"] or '').strip()
+        amount_raw = float(e["AmountRaw"]) if e["AmountRaw"] is not None else 0.0
+        dlow = desc.lower()
+        if any(k in dlow for k in ["payment received", "refund", "cashback", "credit"]):
+            amount = abs(amount_raw)
+            tx_type_raw = "Credit"
+        else:
+            amount = -abs(amount_raw)
+            tx_type_raw = "Card Payment"
+
+        balance = None
+        if running is not None:
+            running = round(float(running) + float(amount), 2)
+            balance = running
+
+        ttype, new_desc = _apply_global_type_rules(tx_type_raw, desc)
+        txs.append({
+            "Date": e["Date"],
+            "Transaction Type": ttype or _title_case_keep_acronyms(tx_type_raw),
+            "Description": new_desc,
+            "Amount": float(amount),
+            "Balance": float(balance) if balance is not None else None,
+        })
+
+    return txs
+
+
 # -----------------------------
 # Public API: extract_transactions
 # -----------------------------
@@ -961,6 +1246,10 @@ def extract_transactions(pdf_path) -> List[Dict]:
         dates = [t.get("Date") for t in txs if isinstance(t.get("Date"), _dt.date)]
         if dates and dates[0] > dates[-1]:
             txs = list(reversed(txs))
+    elif kind == "ONLINE_CREDITCARD":
+        txs = _extract_transactions_online_creditcard(pdf_path)
+    elif kind == "PERSONAL":
+        txs = _extract_transactions_personal(pdf_path)
     else:
         txs = _extract_transactions_business(pdf_path)
 
