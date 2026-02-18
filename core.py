@@ -1022,6 +1022,26 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
 
+        def _is_valid_excel_formula_template(formula_template: str) -> bool:
+            if not isinstance(formula_template, str) or not formula_template.startswith("="):
+                return False
+            paren_balance = 0
+            in_string = False
+            for ch in formula_template:
+                if ch == '"':
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if ch == "(":
+                    paren_balance += 1
+                elif ch == ")":
+                    paren_balance -= 1
+                    if paren_balance < 0:
+                        return False
+            return (not in_string) and paren_balance == 0
+
+        specific_formula_valid = False
         if enable_categorisation and specific_cat_col:
             specific_category_formula = (
                 "=IFERROR("
@@ -1037,16 +1057,21 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 "\"\""
                 ")"
             )
-            if specific_category_formula.count("(") != specific_category_formula.count(")"):
-                print("[core] WARNING: Specific Category formula is unbalanced; formula write skipped.")
-            else:
+            specific_formula_valid = _is_valid_excel_formula_template(specific_category_formula)
+            if specific_formula_valid:
                 for r in range(2, max_r + 1):
                     ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
+            else:
+                print("[core] WARNING: Invalid Specific Category formula template detected; skipped formula write to prevent Excel corruption.")
 
-        if enable_categorisation and category_col and specific_cat_col and global_cat_col:
-            category_formula = "=IFERROR(IF([@[Specific Category]]<>\"\",[@[Specific Category]],[@[Global Category]]),[@[Global Category]])"
-            for r in range(2, max_r + 1):
-                ws.cell(row=r, column=category_col).value = category_formula
+        if enable_categorisation and category_col and global_cat_col:
+            if specific_cat_col and specific_formula_valid:
+                category_formula = "=IFERROR(IF([@[Specific Category]]<>\"\",[@[Specific Category]],[@[Global Category]]),[@[Global Category]])"
+                for r in range(2, max_r + 1):
+                    ws.cell(row=r, column=category_col).value = category_formula
+            else:
+                for r in range(2, max_r + 1):
+                    ws.cell(row=r, column=category_col).value = ws.cell(row=r, column=global_cat_col).value
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
