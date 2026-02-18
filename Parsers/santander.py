@@ -1,7 +1,7 @@
 """Santander PDF statement parser (text-based, no OCR)
 
 File: santander-1.8.py
-Version: 1.8
+Version: 1.8.1
 
 Notes:
 - Supports four Santander layouts: Business Banking statements, Personal current account statements,
@@ -9,7 +9,7 @@ Notes:
 - Applies global transaction type rules as specified in the main project instructions.
 """
 
-__version__ = "1.8"
+__version__ = "1.8.1"
 
 import os
 import re
@@ -422,13 +422,31 @@ def extract_account_holder_name(pdf_path) -> str:
     blob = _clean_text(text)
 
     # Business/Personal: "Account name: ERFT LIMITED" or "Account name ERFT LIMITED"
-    m = re.search(r"\baccount name\b\s*:?\s*([A-Z0-9&'.,\-]{2,}(?:\s+[A-Z0-9&'.,\-]{2,}){0,20})", blob, re.IGNORECASE)
+    m = re.search(
+        r"\baccount name\b[ \t]*:?[ \t]*([A-Z0-9&'.,\-]{2,}(?:[ \t]+[A-Z0-9&'.,\-]{2,}){0,20})",
+        blob,
+        re.IGNORECASE
+    )
     if m:
         cand = _clean_text(m.group(1))
+        stop_patterns = [
+            r"never\s*move\s*money\s*out\s*of\s*your",
+            r"account\s*number",
+            r"sort\s*code",
+            r"statement\s*number",
+            r"\bbic\b",
+            r"\biban\b",
+        ]
+        cut = len(cand)
+        for pat in stop_patterns:
+            mm = re.search(pat, cand, re.IGNORECASE)
+            if mm and mm.start() < cut:
+                cut = mm.start()
+        cand = _clean_text(cand[:cut])
         parts = cand.split()
         while parts and len(parts[-1]) == 1:
             parts.pop()
-        cand = " ".join(parts)
+        cand = " ".join(parts).strip()
         if cand and "santander" not in cand.lower() and "statement" not in cand.lower():
             return cand
 
