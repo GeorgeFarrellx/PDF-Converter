@@ -1,7 +1,7 @@
 """Santander PDF statement parser (text-based, no OCR)
 
 File: santander-1.8.py
-Version: 1.8.1
+Version: 1.8.2
 
 Notes:
 - Supports four Santander layouts: Business Banking statements, Personal current account statements,
@@ -9,7 +9,7 @@ Notes:
 - Applies global transaction type rules as specified in the main project instructions.
 """
 
-__version__ = "1.8.1"
+__version__ = "1.8.2"
 
 import os
 import re
@@ -51,6 +51,33 @@ def _clean_text(s: str) -> str:
     s = (s or "").replace("\u00a0", " ")
     s = re.sub(r"[ \t]+", " ", s)
     return s.strip()
+
+
+def _santander_decompact_text(s: str) -> str:
+    out = s or ""
+
+    substitutions = [
+        (r"DIRECT\s*DEBIT\s*PAYMENT|DIRECTDEBITPAYMENT", "DIRECT DEBIT PAYMENT"),
+        (r"BILL\s*PAYMENT\s*VIA\s*FASTER\s*PAYMENT|BILLPAYMENTVIAFASTERPAYMENT", "BILL PAYMENT VIA FASTER PAYMENT"),
+        (r"THIRD\s*PARTY\s*PAYMENT\s*MADE\s*VIA\s*FASTER\s*PAYMENT|THIRDPARTYPAYMENTMADEVIAFASTERPAYMENT", "THIRD PARTY PAYMENT MADE VIA FASTER PAYMENT"),
+        (r"FASTER\s*PAYMENTS\s*RECEIPT|FASTERPAYMENTSRECEIPT", "FASTER PAYMENTS RECEIPT"),
+        (r"BANK\s*GIRO\s*CREDIT|BANKGIROCREDIT", "BANK GIRO CREDIT"),
+        (r"CARD\s*PAYMENT|CARDPAYMENT", "CARD PAYMENT"),
+        (r"CASH\s*WITHDRAWAL|CASHWITHDRAWAL", "CASH WITHDRAWAL"),
+        (r"FOREIGN\s*CURRENCY\s*CONVERSION\s*FEE|FOREIGNCURRENCYCONVERSIONFEE", "FOREIGN CURRENCY CONVERSION FEE"),
+        (r"MANDATE\s*NO|MANDATENO", "MANDATE NO"),
+        (r"RECEIPT\s*REF|RECEIPTREF", "RECEIPT REF"),
+    ]
+    for pattern, replacement in substitutions:
+        out = re.sub(pattern, replacement, out, flags=re.IGNORECASE)
+
+    out = re.sub(r"PAYMENT\s*TO(?=\S)", "PAYMENT TO ", out, flags=re.IGNORECASE)
+    out = re.sub(r"TRANSFER\s*TO(?=\S)", "TRANSFER TO ", out, flags=re.IGNORECASE)
+
+    out = re.sub(r"\bREF\s+\.\s*", "REF.", out, flags=re.IGNORECASE)
+    out = re.sub(r"\bREF\.(?=\S)", "REF. ", out, flags=re.IGNORECASE)
+
+    return _clean_text(out)
 
 
 def _parse_money(token: str) -> Optional[float]:
@@ -630,18 +657,13 @@ def _extract_type_prefix(desc: str) -> str:
         "FOREIGN CURRENCY CONVERSION FEE",
     ]
     up = s.upper()
+    up_compact = re.sub(r"[^A-Z0-9]+", "", up)
     for k in known:
-        if up.startswith(k):
+        k_compact = re.sub(r"[^A-Z0-9]+", "", k.upper())
+        if up.startswith(k) or up_compact.startswith(k_compact):
             return k
 
-    words = s.split()
-    prefix_words = []
-    for w in words[:4]:
-        if re.match(r"^[A-Za-z][A-Za-z0-9/&'\-]*$", w) and (w.isupper() or w.lower() in {"to", "via", "payment"}):
-            prefix_words.append(w)
-        else:
-            break
-    return " ".join(prefix_words).strip()
+    return ""
 
 
 def _parse_business_date(line: str, period_start: Optional[_dt.date], period_end: Optional[_dt.date],
@@ -695,6 +717,7 @@ def _extract_transactions_business(pdf_path: str) -> List[Dict]:
             return
 
         desc = _clean_text(" ".join(current_desc_parts))
+        desc = _santander_decompact_text(desc)
         if not desc:
             current_desc_parts = []
             current_balance = None
@@ -1040,9 +1063,11 @@ def _extract_transactions_personal(pdf_path: str) -> List[Dict]:
             return
 
         desc = _clean_text(" ".join(current_desc_parts))
-        low = desc.lower().replace(" ", "")
-        if "balancebroughtforward" in low or "balancecarriedforward" in low or "carriedforwardtonextstatement" in low:
-            if current_balance is not None and "balancebroughtforward" in low:
+        desc = _santander_decompact_text(desc)
+        low = desc.lower()
+        low_ns = low.replace(" ", "")
+        if "balancebroughtforward" in low_ns or "balancecarriedforward" in low_ns or "carriedforwardtonextstatement" in low_ns:
+            if current_balance is not None and "balancebroughtforward" in low_ns:
                 prev_balance = float(current_balance)
             current_date = None
             current_desc_parts = []
