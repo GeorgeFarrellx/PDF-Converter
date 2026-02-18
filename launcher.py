@@ -1,12 +1,29 @@
 # Version: 2.02
 import os
 import sys
+import hashlib
+import platform
+import subprocess
 import traceback
 from datetime import datetime
 
 
 def ensure_folder(path: str) -> None:
     os.makedirs(path, exist_ok=True)
+
+
+def sha256_file(path: str) -> str | None:
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(65536)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return None
 
 
 def write_startup_log(logs_dir: str, prefix: str, content: str) -> str:
@@ -42,6 +59,47 @@ def main():
     header.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     header.append(f"App dir: {app_dir}")
     header.append(f"Target main: {target}")
+    header.append("")
+    header.append("Runtime Identity")
+    header.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    header.append(f"app_dir: {app_dir}")
+    header.append(f"cwd: {os.getcwd()}")
+    header.append(f"sys.executable: {sys.executable}")
+    header.append(f"sys.version: {sys.version}")
+    header.append(f"platform: {platform.system()}")
+    header.append(f"platform.release: {platform.release()}")
+    header.append(f"platform.machine: {platform.machine()}")
+
+    runtime_files = [
+        ("launcher.py", os.path.abspath(__file__)),
+        ("main.py", os.path.abspath(os.path.join(app_dir, "main.py"))),
+        ("core.py", os.path.abspath(os.path.join(app_dir, "core.py"))),
+        ("gui.py", os.path.abspath(os.path.join(app_dir, "gui.py"))),
+    ]
+    header.append("Runtime files:")
+    for label, file_path in runtime_files:
+        if os.path.exists(file_path):
+            header.append(f"- {label}: {file_path} | sha256={sha256_file(file_path)}")
+        else:
+            header.append(f"- {label}: {file_path} | MISSING")
+
+    git_dir = os.path.join(app_dir, ".git")
+    if os.path.isdir(git_dir):
+        try:
+            head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=app_dir, capture_output=True, text=True, check=False)
+            status = subprocess.run(["git", "status", "--porcelain"], cwd=app_dir, capture_output=True, text=True, check=False)
+            if head.returncode == 0:
+                header.append(f"git_commit: {head.stdout.strip()}")
+            else:
+                header.append(f"git_commit: unavailable (exit={head.returncode})")
+            if status.returncode == 0:
+                dirty = bool(status.stdout.strip())
+                header.append(f"git_dirty: {dirty}")
+            else:
+                header.append(f"git_dirty: unavailable (exit={status.returncode})")
+        except Exception as git_err:
+            header.append(f"git_info_error: {git_err}")
+
     header.append("")
     header_txt = "\n".join(header)
 

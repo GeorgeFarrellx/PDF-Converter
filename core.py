@@ -7,7 +7,10 @@ import traceback
 from datetime import datetime, timedelta, date
 import sys
 import hashlib
+import json
+import platform
 import zipfile
+import xml.etree.ElementTree as ET
 from collections import Counter
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -812,6 +815,192 @@ def _apply_global_categorisation(transactions: list[dict], pd) -> None:
                 txn["Global Category"] = rule.get("Category", "")
                 break
 
+
+def _sha256_file(path: str) -> str | None:
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(65536)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return None
+
+
+def _write_log_text(prefix: str, content: str) -> str | None:
+    try:
+        ensure_folder(LOGS_DIR)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = os.path.join(LOGS_DIR, f"{prefix}_{ts}.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+    except Exception:
+        return None
+
+
+def _write_log_json(prefix: str, obj) -> str | None:
+    try:
+        ensure_folder(LOGS_DIR)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = os.path.join(LOGS_DIR, f"{prefix}_{ts}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(obj, f, indent=2, ensure_ascii=False)
+        return path
+    except Exception:
+        return None
+
+
+def _audit_xlsx_categorisation(output_path: str) -> dict:
+    ns = {
+        "main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+        "rel": "http://schemas.openxmlformats.org/package/2006/relationships",
+    }
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    abs_output = os.path.abspath(output_path)
+    ensure_folder(LOGS_DIR)
+    audit = {
+        "output_path": abs_output,
+        "enable_categorisation": True,
+        "core_file": os.path.abspath(__file__),
+        "core_sha256": _sha256_file(os.path.abspath(__file__)),
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "pandas_version": None,
+        "openpyxl_version": None,
+        "transaction_data_sheet_xml": None,
+        "categorisation_rules_sheet_xml": None,
+        "transaction_data_formula_count": 0,
+        "transaction_data_formula_samples": [],
+        "categorisation_rules_formula_count": 0,
+        "tables": [],
+    }
+
+    try:
+        import pandas as _pd
+
+        audit["pandas_version"] = getattr(_pd, "__version__", None)
+    except Exception:
+        pass
+
+    try:
+        import openpyxl as _openpyxl
+
+        audit["openpyxl_version"] = getattr(_openpyxl, "__version__", None)
+    except Exception:
+        pass
+
+    workbook_xml = None
+    workbook_rels_xml = None
+    transaction_sheet_xml_raw = None
+    tables_summary_lines = []
+
+    with zipfile.ZipFile(abs_output, "r") as zf:
+        names = set(zf.namelist())
+        rel_target_map = {}
+        sheet_targets = {}
+
+        if "xl/workbook.xml" in names:
+            workbook_xml = zf.read("xl/workbook.xml").decode("utf-8", errors="replace")
+        if "xl/_rels/workbook.xml.rels" in names:
+            workbook_rels_xml = zf.read("xl/_rels/workbook.xml.rels").decode("utf-8", errors="replace")
+
+        if workbook_rels_xml:
+            rel_root = ET.fromstring(workbook_rels_xml)
+            for rel in rel_root.findall("rel:Relationship", ns):
+                rel_id = rel.attrib.get("Id")
+                target = rel.attrib.get("Target", "")
+                if rel_id and target:
+                    if target.startswith("/"):
+                        target = target.lstrip("/")
+                    if not target.startswith("xl/"):
+                        target = f"xl/{target}"
+                    rel_target_map[rel_id] = target
+
+        if workbook_xml:
+            wb_root = ET.fromstring(workbook_xml)
+            sheets = wb_root.find("main:sheets", ns)
+            if sheets is not None:
+                for sheet in sheets.findall("main:sheet", ns):
+                    name = sheet.attrib.get("name")
+                    rid = sheet.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+                    if name and rid and rid in rel_target_map:
+                        sheet_targets[name] = rel_target_map[rid]
+
+        transaction_sheet_xml = sheet_targets.get("Transaction Data")
+        categorisation_rules_sheet_xml = sheet_targets.get("Categorisation Rules")
+        audit["transaction_data_sheet_xml"] = transaction_sheet_xml
+        audit["categorisation_rules_sheet_xml"] = categorisation_rules_sheet_xml
+
+        def _read_formula_info(sheet_path: str):
+            if not sheet_path or sheet_path not in names:
+                return (0, [])
+            xml_text = zf.read(sheet_path).decode("utf-8", errors="replace")
+            root = ET.fromstring(xml_text)
+            count = 0
+            samples = []
+            for cell_node in root.findall(".//main:c", ns):
+                f_node = cell_node.find("main:f", ns)
+                if f_node is None:
+                    continue
+                count += 1
+                if len(samples) < 20:
+                    samples.append({
+                        "ref": cell_node.attrib.get("r"),
+                        "formula": f_node.text or "",
+                    })
+            return (count, samples)
+
+        tx_count, tx_samples = _read_formula_info(transaction_sheet_xml)
+        rules_count, _ = _read_formula_info(categorisation_rules_sheet_xml)
+        audit["transaction_data_formula_count"] = tx_count
+        audit["transaction_data_formula_samples"] = tx_samples
+        audit["categorisation_rules_formula_count"] = rules_count
+
+        table_paths = sorted(n for n in names if n.startswith("xl/tables/table") and n.endswith(".xml"))
+        for table_path in table_paths:
+            table_xml = zf.read(table_path).decode("utf-8", errors="replace")
+            t_root = ET.fromstring(table_xml)
+            display_name = t_root.attrib.get("displayName")
+            ref = t_root.attrib.get("ref")
+            columns = []
+            table_columns = t_root.find("main:tableColumns", ns)
+            if table_columns is not None:
+                for col in table_columns.findall("main:tableColumn", ns):
+                    columns.append(col.attrib.get("name"))
+            audit["tables"].append(
+                {
+                    "path": table_path,
+                    "displayName": display_name,
+                    "ref": ref,
+                    "tableColumns": columns,
+                }
+            )
+            tables_summary_lines.append(f"{table_path} | displayName={display_name} | ref={ref}")
+            tables_summary_lines.append(", ".join(str(c) for c in columns))
+            tables_summary_lines.append("")
+
+        if transaction_sheet_xml and transaction_sheet_xml in names:
+            transaction_sheet_xml_raw = zf.read(transaction_sheet_xml).decode("utf-8", errors="replace")
+
+    if transaction_sheet_xml_raw is not None:
+        with open(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_transaction_sheet.xml"), "w", encoding="utf-8") as f:
+            f.write(transaction_sheet_xml_raw)
+    if workbook_xml is not None:
+        with open(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_workbook.xml"), "w", encoding="utf-8") as f:
+            f.write(workbook_xml)
+    if workbook_rels_xml is not None:
+        with open(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_workbook.rels"), "w", encoding="utf-8") as f:
+            f.write(workbook_rels_xml)
+    if tables_summary_lines:
+        with open(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_tables_summary.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(tables_summary_lines))
+
+    return audit
+
 def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = "", header_period_start=None, header_period_end=None, enable_categorisation: bool = True):
     if not transactions:
         raise ValueError("No transactions found!")
@@ -1042,36 +1231,45 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             return (not in_string) and paren_balance == 0
 
         specific_formula_valid = False
-        if enable_categorisation and specific_cat_col:
-            specific_category_formula = (
-                "=IFERROR("
-                "INDEX(CategorisationRules[Client Override],"
-                "AGGREGATE(15,6,"
-                "(ROW(CategorisationRules[Client Override])-ROW(CategorisationRules[#Headers]))/"
-                "((LEN(CategorisationRules[Pattern])>0)*"
-                "(CategorisationRules[Client Override]<>\"\")*"
-                "ISNUMBER(SEARCH(CategorisationRules[Pattern],LOWER([@Description])))),"
-                "1"
-                ")"
-                "),"
-                "\"\""
-                ")"
-            )
-            specific_formula_valid = _is_valid_excel_formula_template(specific_category_formula)
-            if specific_formula_valid:
-                for r in range(2, max_r + 1):
-                    ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
-            else:
-                print("[core] WARNING: Invalid Specific Category formula template detected; skipped formula write to prevent Excel corruption.")
+        try:
+            if enable_categorisation and specific_cat_col:
+                specific_category_formula = (
+                    "=IFERROR("
+                    "INDEX(CategorisationRules[Client Override],"
+                    "AGGREGATE(15,6,"
+                    "(ROW(CategorisationRules[Client Override])-ROW(CategorisationRules[#Headers]))/"
+                    "((LEN(CategorisationRules[Pattern])>0)*"
+                    "(CategorisationRules[Client Override]<>\"\")*"
+                    "ISNUMBER(SEARCH(CategorisationRules[Pattern],LOWER([@Description])))),"
+                    "1"
+                    ")"
+                    "),"
+                    "\"\""
+                    ")"
+                )
+                specific_formula_valid = _is_valid_excel_formula_template(specific_category_formula)
+                if specific_formula_valid:
+                    for r in range(2, max_r + 1):
+                        ws.cell(row=r, column=specific_cat_col).value = specific_category_formula
+                else:
+                    print("[core] WARNING: Invalid Specific Category formula template detected; skipped formula write to prevent Excel corruption.")
 
-        if enable_categorisation and category_col and global_cat_col:
-            if specific_cat_col and specific_formula_valid:
-                category_formula = "=IFERROR(IF([@[Specific Category]]<>\"\",[@[Specific Category]],[@[Global Category]]),[@[Global Category]])"
-                for r in range(2, max_r + 1):
-                    ws.cell(row=r, column=category_col).value = category_formula
-            else:
-                for r in range(2, max_r + 1):
-                    ws.cell(row=r, column=category_col).value = ws.cell(row=r, column=global_cat_col).value
+            if enable_categorisation and category_col and global_cat_col:
+                if specific_cat_col and specific_formula_valid:
+                    category_formula = "=IFERROR(IF([@[Specific Category]]<>\"\",[@[Specific Category]],[@[Global Category]]),[@[Global Category]])"
+                    for r in range(2, max_r + 1):
+                        ws.cell(row=r, column=category_col).value = category_formula
+                else:
+                    for r in range(2, max_r + 1):
+                        ws.cell(row=r, column=category_col).value = ws.cell(row=r, column=global_cat_col).value
+        except Exception:
+            details = []
+            details.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            details.append(f"output_path: {output_path}")
+            details.append("Error while writing categorisation formulas:")
+            details.append(traceback.format_exc())
+            _write_log_text("categorisation_write_error", "\n".join(details))
+            raise
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
@@ -1123,6 +1321,20 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     cell = ws._cells[(r, global_cat_col)]
                     if cell.value is None or cell.value == "":
                         del ws._cells[(r, global_cat_col)]
+
+    if enable_categorisation:
+        try:
+            ensure_folder(LOGS_DIR)
+            audit = _audit_xlsx_categorisation(output_path)
+            _write_log_json("categorisation_audit", audit)
+        except Exception:
+            details = []
+            details.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            details.append(f"output_path: {output_path}")
+            details.append("Error during post-save categorisation audit:")
+            details.append(traceback.format_exc())
+            _write_log_text("categorisation_audit_error", "\n".join(details))
+
 
 
 # ----------------------------
