@@ -1,4 +1,4 @@
-Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
+﻿Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
 10,Groceries,contains,TESCO,DEBIT,,TRUE,Supermarkets & grocery delivery
 11,Groceries,contains,TESCO STORES,DEBIT,,TRUE,Supermarkets & grocery delivery
 12,Groceries,contains,SAINSBURY,DEBIT,,TRUE,Supermarkets & grocery delivery
@@ -38,7 +38,7 @@ Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
 70,Food & Drink,contains,STARBUCKS,DEBIT,,TRUE,Coffee shops & quick bites
 71,Food & Drink,contains,COSTA,DEBIT,,TRUE,Coffee shops & quick bites
 72,Food & Drink,contains,CAFFE NERO,DEBIT,,TRUE,Coffee shops & quick bites
-73,Food & Drink,contains,CAFF� NERO,DEBIT,,TRUE,Coffee shops & quick bites
+73,Food & Drink,contains,CAFFÈ NERO,DEBIT,,TRUE,Coffee shops & quick bites
 74,Food & Drink,contains,PRET,DEBIT,,TRUE,Coffee shops & quick bites
 75,Food & Drink,contains,PRET A MANGER,DEBIT,,TRUE,Coffee shops & quick bites
 76,Food & Drink,contains,GREGGS,DEBIT,,TRUE,Coffee shops & quick bites
@@ -212,9 +212,9 @@ Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
 568,Personal,contains,THE BODY SHOP,DEBIT,,TRUE,Retail and high street
 569,Repairs & Renewals,contains,IKEA,DEBIT,,TRUE,Retail and high street
 570,Repairs & Renewals,contains,B&Q,DEBIT,,TRUE,Retail and high street
-571,Shopping (High Street),contains,SCREWFIX,DEBIT,,TRUE,Retail and high street
-572,Shopping (High Street),contains,WICKES,DEBIT,,TRUE,Retail and high street
-573,Shopping (High Street),contains,HOMEBASE,DEBIT,,TRUE,Retail and high street
+571,Repairs & Renewals,contains,SCREWFIX,DEBIT,,TRUE,Retail and high street
+572,Repairs & Renewals,contains,WICKES,DEBIT,,TRUE,Retail and high street
+573,Repairs & Renewals,contains,HOMEBASE,DEBIT,,TRUE,Retail and high street
 574,Shopping (High Street),contains,DUNELM,DEBIT,,TRUE,Retail and high street
 600,Personal ,contains,NHS,DEBIT,,TRUE,Healthcare and pharmacy
 601,Personal ,contains,DENTAL,DEBIT,,TRUE,Healthcare and pharmacy
