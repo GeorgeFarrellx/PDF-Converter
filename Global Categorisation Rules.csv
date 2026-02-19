@@ -69,7 +69,7 @@
 99,Food & Drink,contains,ZIZZI,DEBIT,,TRUE,Restaurants / fast food
 100,Food & Drink,contains,ASK ITALIAN,DEBIT,,TRUE,Restaurants / fast food
 101,Food & Drink,contains,FRANKIE & BENNY,DEBIT,,TRUE,Restaurants / fast food
-102,Food & Drink,contains,WEATHERSPOON,DEBIT,,TRUE,Restaurants / fast food
+102,Food & Drink,contains,WETHERSPOON,DEBIT,,TRUE,Restaurants / fast food
 103,Food & Drink,contains,JD WETHERSPOON,DEBIT,,TRUE,Restaurants / fast food
 104,Food & Drink,contains,HARVESTER,DEBIT,,TRUE,Restaurants / fast food
 105,Food & Drink,contains,MILLER & CARTER,DEBIT,,TRUE,Restaurants / fast food
@@ -138,6 +138,7 @@
 267,Accomodation,contains,MARRIOTT,ANY,,TRUE,Hotels & accommodation
 268,Accomodation,contains,IHG,ANY,,TRUE,Hotels & accommodation
 269,Accomodation,contains,HOLIDAY INN,ANY,,TRUE,Hotels & accommodation
+270,Accomodation,contains,HOTEL,DEBIT,,TRUE,HOTEL
 300,Utilities,contains,OCTOPUS,DEBIT,,TRUE,Energy providers
 301,Utilities,contains,BRITISH GAS,DEBIT,,TRUE,Energy providers
 302,Utilities,contains,EDF,DEBIT,,TRUE,Energy providers
@@ -337,3 +338,7 @@
 1051,Personal ,contains,B&M,DEBIT,,TRUE,Retail and high street
 1052,Personal ,contains,HOMEBARGAINS,DEBIT,,TRUE,Retail and high street
 1053,Personal ,contains,POUNDLAND,DEBIT,,TRUE,Retail and high street
+1054,Motor Expenses,contains,RAC MOTORING SERVI,DEBIT,,TRUE,RAC
+1055,Personal,contains,PADDYPOWE,DEBIT,,TRUE,Gambling
+1056,Loan Repayment,contains,HSBC PLC LOANS,DEBIT,,TRUE,Loan Repayment
+1057,Credit Card,contains,B/CARD PLAT VISA,DEBIT,,TRUE,Credit Card Repayment
