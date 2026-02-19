@@ -1,4 +1,4 @@
-# Version: 2.13
+# Version: 2.14
 import os
 import glob
 import re
@@ -979,8 +979,12 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         df["Global Category"] = None
     if "Manual Category" not in df.columns:
         df["Manual Category"] = ""
+    if "Client Specific Category" not in df.columns:
+        df["Client Specific Category"] = ""
+    if "Final Category" not in df.columns:
+        df["Final Category"] = ""
 
-    df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global Category", "Manual Category"]]
+    df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global Category", "Client Specific Category", "Manual Category", "Final Category"]]
 
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
@@ -1060,6 +1064,22 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 for cell in row:
                     cell.border = no_border
 
+        ws_rules = wb.create_sheet("Client Categorisation Rules")
+        ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
+        ws_rules.append([1000, "", "", "ANY", "", False, "Add client rules here. Pattern is 'contains' (case-insensitive)."])
+        rules_table = Table(displayName="ClientRules", ref="A1:G2")
+        rules_style = TableStyleInfo(
+            name="TableStyleLight1",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=False,
+            showColumnStripes=False,
+        )
+        rules_table.totalsRowShown = False
+        rules_table.tableStyleInfo = rules_style
+        ws_rules.add_table(rules_table)
+        ws_rules.freeze_panes = "A2"
+
         gbp_accounting = "_-£* #,##0.00_-;[Red]-£* #,##0.00_-;_-£* \"-\"??_-;_-@_-"
 
         header_to_col = {}
@@ -1073,6 +1093,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         amt_col = header_to_col.get("Amount")
         bal_col = header_to_col.get("Balance")
         global_cat_col = header_to_col.get("Global Category")
+        client_specific_cat_col = header_to_col.get("Client Specific Category")
+        final_cat_col = header_to_col.get("Final Category")
 
         max_r = ws.max_row
         if date_col:
@@ -1084,6 +1106,32 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if bal_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
+
+        sep = _excel_list_separator()
+        client_specific_formula = (
+            f'=LET(desc{sep}[@Description]{sep}ttype{sep}[@[Transaction Type]]{sep}amt{sep}[@Amount]{sep}'
+            f'p{sep}ClientRules[Priority]{sep}c{sep}ClientRules[Category]{sep}pat{sep}ClientRules[Pattern]{sep}'
+            f'act{sep}ClientRules[Active]{sep}dir{sep}ClientRules[Direction]{sep}ttc{sep}ClientRules[Txn Type Contains]{sep}'
+            f'ttc_ok{sep}IF(ttc=""{sep}1{sep}ISNUMBER(SEARCH(ttc{sep}ttype))){sep}'
+            f'dir_ok{sep}IF((dir="")+(dir="ANY"){sep}1{sep}IF(dir="DEBIT"{sep}--(amt<0){sep}IF(dir="CREDIT"{sep}--(amt>0){sep}1))){sep}'
+            f'm{sep}(act=TRUE)*(pat<>"")*ISNUMBER(SEARCH(pat{sep}desc))*ttc_ok*dir_ok{sep}'
+            f'cats{sep}FILTER(c{sep}m){sep}pris{sep}FILTER(p{sep}m){sep}sorted{sep}SORTBY(cats{sep}pris{sep}1){sep}'
+            f'IFERROR(INDEX(sorted{sep}1){sep}"")'
+            f')'
+        )
+        final_category_formula = (
+            f'=IF([@[Manual Category]]<>""{sep}[@[Manual Category]]{sep}'
+            f'IF([@[Client Specific Category]]<>""{sep}[@[Client Specific Category]]{sep}'
+            f'IF([@[Global Category]]<>""{sep}[@[Global Category]]{sep}"")'
+            f'))'
+        )
+
+        if client_specific_cat_col:
+            for r in range(2, max_r + 1):
+                ws.cell(row=r, column=client_specific_cat_col).value = client_specific_formula
+        if final_cat_col:
+            for r in range(2, max_r + 1):
+                ws.cell(row=r, column=final_cat_col).value = final_category_formula
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
