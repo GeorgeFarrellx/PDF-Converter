@@ -1,6 +1,6 @@
 ﻿Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
-5,Fuel,contains, SERVICE STATIO,DEBIT,,TRUE,Petrol/diesel
-6,Fuel,contains,SERVICE ST,DEBIT,,TRUE,Petrol/diesel
+5,Fuel,contains,S/STN,DEBIT,,TRUE,Petrol/diesel
+6,Fuel,contains,SERVICE S,DEBIT,,TRUE,Petrol/diesel
 7,Fuel,contains,PAY AT PUMP,DEBIT,,TRUE,Petrol/diesel
 8,Fuel,contains,MFG,DEBIT,,TRUE,Petrol/diesel
 9,Fuel,contains,SVC STN ,DEBIT,,TRUE,Petrol/diesel
@@ -231,6 +231,7 @@
 574,Shopping (High Street),contains,DUNELM,DEBIT,,TRUE,Retail and high street
 575,Repairs & Renewals,contains,TOOLMAN,DEBIT,,TRUE,Retail and high street
 576,Repairs & Renewals,contains,TOOLSTATION,DEBIT,,TRUE,Retail and high street
+577,Personal,contains,MATALAN,DEBIT,,TRUE,Retail and high street
 600,Personal ,contains,NHS,DEBIT,,TRUE,Healthcare and pharmacy
 601,Personal ,contains,DENTAL,DEBIT,,TRUE,Healthcare and pharmacy
 602,Personal ,contains,DENTIST,DEBIT,,TRUE,Healthcare and pharmacy
