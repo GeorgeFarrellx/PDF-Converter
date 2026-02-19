@@ -1,4 +1,4 @@
-# Version: 2.14
+# Version: 2.15
 import os
 import glob
 import re
@@ -1106,25 +1106,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if bal_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
-
-        sep = _excel_list_separator()
-        client_specific_formula = (
-            f'=LET(desc{sep}[@Description]{sep}ttype{sep}[@[Transaction Type]]{sep}amt{sep}[@Amount]{sep}'
-            f'p{sep}ClientRules[Priority]{sep}c{sep}ClientRules[Category]{sep}pat{sep}ClientRules[Pattern]{sep}'
-            f'act{sep}ClientRules[Active]{sep}dir{sep}ClientRules[Direction]{sep}ttc{sep}ClientRules[Txn Type Contains]{sep}'
-            f'ttc_ok{sep}IF(ttc=""{sep}1{sep}ISNUMBER(SEARCH(ttc{sep}ttype))){sep}'
-            f'dir_ok{sep}IF((dir="")+(dir="ANY"){sep}1{sep}IF(dir="DEBIT"{sep}--(amt<0){sep}IF(dir="CREDIT"{sep}--(amt>0){sep}1))){sep}'
-            f'm{sep}(act=TRUE)*(pat<>"")*ISNUMBER(SEARCH(pat{sep}desc))*ttc_ok*dir_ok{sep}'
-            f'cats{sep}FILTER(c{sep}m){sep}pris{sep}FILTER(p{sep}m){sep}sorted{sep}SORTBY(cats{sep}pris{sep}1){sep}'
-            f'IFERROR(INDEX(sorted{sep}1){sep}"")'
-            f')'
-        )
-        final_category_formula = (
-            f'=IF([@[Manual Category]]<>""{sep}[@[Manual Category]]{sep}'
-            f'IF([@[Client Specific Category]]<>""{sep}[@[Client Specific Category]]{sep}'
-            f'IF([@[Global Category]]<>""{sep}[@[Global Category]]{sep}"")'
-            f'))'
-        )
+        client_specific_formula = "=\"TEST\""
+        final_category_formula = "=\"TEST\""
 
         if client_specific_cat_col:
             for r in range(2, max_r + 1):
