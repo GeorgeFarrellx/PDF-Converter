@@ -1,4 +1,4 @@
-# Version: 2.16
+# Version: 2.17
 import os
 import glob
 import re
@@ -955,7 +955,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     try:
         import pandas as pd
         from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
+        from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn, TableFormula
         from openpyxl.styles import Border
     except Exception as e:
         _show_dependency_error(
@@ -1066,9 +1066,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
             for table_col in table.tableColumns:
                 if table_col.name == "Client Specific Category":
-                    table_col.calculatedColumnFormula = client_specific_formula
+                    table_col.calculatedColumnFormula = TableFormula(attr_text=client_specific_formula)
                 if table_col.name == "Final Category":
-                    table_col.calculatedColumnFormula = final_category_formula
+                    table_col.calculatedColumnFormula = TableFormula(attr_text=final_category_formula)
 
             style = TableStyleInfo(
                 name="TableStyleLight1",
