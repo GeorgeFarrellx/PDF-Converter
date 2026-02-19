@@ -6,7 +6,7 @@
 7,Fuel,contains,PAY AT PUMP,DEBIT,,TRUE,Petrol/diesel
 8,Fuel,contains,MFG,DEBIT,,TRUE,Petrol/diesel
 9,Fuel,contains,SVC STN ,DEBIT,,TRUE,Petrol/diesel
-10,Groceries,contains,TESCO,DEBIT,,TRUE,Supermarkets & grocery delivery
+10,Groceries,contains,TESCO,DEBIT,Card,TRUE,Supermarkets & grocery delivery
 11,Groceries,contains,TESCO STORES,DEBIT,,TRUE,Supermarkets & grocery delivery
 12,Groceries,contains,SAINSBURY,DEBIT,,TRUE,Supermarkets & grocery delivery
 13,Groceries,contains,SAINSBURYS,DEBIT,,TRUE,Supermarkets & grocery delivery
@@ -38,10 +38,10 @@
 45,Groceries,contains,OFF LICENCE,DEBIT,,TRUE,Corner shops/newsagents
 46,Groceries,contains,CONVENIE,DEBIT,,TRUE,Corner shops/newsagents
 50,Fuel,contains,SHELL,DEBIT,,TRUE,Petrol/diesel
-51,Fuel,contains,BP,DEBIT,,TRUE,Petrol/diesel
+51,Fuel,regex,(?<![A-Za-z0-9])BP(?![A-Za-z0-9]),DEBIT,Card,TRUE,Petrol/diesel
 52,Fuel,contains,ESSO,DEBIT,,TRUE,Petrol/diesel
 53,Fuel,contains,TEXACO,DEBIT,,TRUE,Petrol/diesel
-54,Fuel,contains,JET,DEBIT,,TRUE,Petrol/diesel
+54,Fuel,regex,(?<![A-Za-z0-9])JET(?![A-Za-z0-9]),DEBIT,Card,TRUE,Petrol/diesel
 55,Fuel,contains,ASDA PETROL,DEBIT,,TRUE,Petrol/diesel
 56,Fuel,contains,TESCO FUEL,DEBIT,,TRUE,Petrol/diesel
 57,Fuel,contains,SAINSBURY'S FUEL,DEBIT,,TRUE,Petrol/diesel
@@ -75,8 +75,8 @@
 105,Food & Drink,contains,MILLER & CARTER,DEBIT,,TRUE,Restaurants / fast food
 106,Food & Drink,contains,BIG JOHN,DEBIT,,TRUE,Restaurants / fast food
 120,Food & Drink,contains,DELIVEROO,DEBIT,,TRUE,Delivery platforms
-121,Food & Drink,contains,JUST EAT,DEBIT,,TRUE,Delivery platforms
-122,Food & Drink,contains,UBER EATS,DEBIT,,TRUE,Delivery platforms
+121,Food & Drink,regex,JUST\s*EAT,DEBIT,,TRUE,Delivery platforms
+122,Food & Drink,regex,UBER\s*EATS,DEBIT,,TRUE,Delivery platforms
 123,Food & Drink,contains,FOODHUB,DEBIT,,TRUE,Delivery platforms
 140,Travel,contains,TFL,DEBIT,,TRUE,Public transport
 141,Travel,contains,TRANSPORT FOR LONDON,DEBIT,,TRUE,Public transport
@@ -99,7 +99,7 @@
 158,Travel,contains,STAGECOACH,DEBIT,,TRUE,Public transport
 159,Travel,contains,ARRIVA,DEBIT,,TRUE,Public transport
 160,Travel,contains,FIRST BUS,DEBIT,,TRUE,Public transport
-180,Travel,contains,UBER,DEBIT,,TRUE,Taxis and ride-hailing
+180,Travel,regex,(?<![A-Za-z0-9])UBER(?![A-Za-z0-9]),DEBIT,Card,TRUE,Taxis and ride-hailing
 181,Travel,contains,BOLT,DEBIT,,TRUE,Taxis and ride-hailing
 182,Travel,contains,FREE NOW,DEBIT,,TRUE,Taxis and ride-hailing
 183,Travel,contains,OLA,DEBIT,,TRUE,Taxis and ride-hailing
@@ -164,8 +164,8 @@
 364,Telecoms / Internet,contains,SKY DIGITAL,DEBIT,,TRUE,Phone/internet
 365,Telecoms / Internet,contains,TALKTALK,DEBIT,,TRUE,Phone/internet
 366,Telephone,contains,VODAFONE,DEBIT,,TRUE,Phone/internet
-367,Telephone,contains,O2,DEBIT,,TRUE,Phone/internet
-368,Telephone,contains,EE,DEBIT,,TRUE,Phone/internet
+367,Telephone,regex,(?<![A-Za-z0-9])O2(?![A-Za-z0-9]),DEBIT,Direct Debit,TRUE,Phone/internet
+368,Telephone,regex,(?<![A-Za-z0-9])EE(?![A-Za-z0-9]),DEBIT,Direct Debit,TRUE,Phone/internet
 369,Telecoms / Internet,contains,THREE,DEBIT,,TRUE,Phone/internet
 370,Telecoms / Internet,contains,PLUSNET,DEBIT,,TRUE,Phone/internet
 371,Telecoms / Internet,contains,GIGACLEAR,DEBIT,,TRUE,Phone/internet
@@ -308,7 +308,7 @@
 964,Charitable Donations,contains,RED CROSS,DEBIT,,TRUE,Charitable donations
 965,Charitable Donations,contains,UNICEF,DEBIT,,TRUE,Charitable donations
 980,Postage,contains,ROYAL MAIL,DEBIT,,TRUE,Shipping/couriers
-981,Postage,contains,POST OFFICE,DEBIT,,TRUE,Shipping/couriers
+981,Postage,contains,POST OFFICE,DEBIT,Card,TRUE,Shipping/couriers
 982,Postage,contains,DPD,DEBIT,,TRUE,Shipping/couriers
 983,Postage,contains,EVRI,DEBIT,,TRUE,Shipping/couriers
 984,Postage,contains,HERMES,DEBIT,,TRUE,Shipping/couriers
