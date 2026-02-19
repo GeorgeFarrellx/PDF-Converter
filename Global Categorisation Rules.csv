@@ -145,7 +145,7 @@
 304,Utilities,contains,EON,DEBIT,,TRUE,Energy providers
 305,Utilities,contains,SCOTTISHPOWER,DEBIT,,TRUE,Energy providers
 306,Utilities,contains,OVO,DEBIT,,TRUE,Energy providers
-307,Utilities,contains,SSE,DEBIT,,TRUE,Energy providers
+307,Utilities,regex,(?i)(?<![A-Za-z])SSE(?![A-Za-z]),DEBIT,,TRUE,Energy providers
 308,Utilities,contains,UTILITY WAREHOUSE,DEBIT,,TRUE,Energy providers
 309,Utilities,contains,BULB,DEBIT,,TRUE,Energy providers
 330,Utilities,contains,THAMES WATER,DEBIT,,TRUE,Water providers
