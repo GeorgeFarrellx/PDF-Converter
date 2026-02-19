@@ -1,4 +1,4 @@
-# Version: 2.15
+# Version: 2.16
 import os
 import glob
 import re
@@ -872,7 +872,7 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
                         sheet_targets[name] = rel_target_map[rid]
 
         transaction_sheet_xml = sheet_targets.get("Transaction Data")
-        categorisation_rules_sheet_xml = sheet_targets.get("Categorisation Rules")
+        categorisation_rules_sheet_xml = sheet_targets.get("Client Categorisation Rules")
         audit["transaction_data_sheet_xml"] = transaction_sheet_xml
         audit["categorisation_rules_sheet_xml"] = categorisation_rules_sheet_xml
 
@@ -908,16 +908,22 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
             display_name = t_root.attrib.get("displayName")
             ref = t_root.attrib.get("ref")
             columns = []
+            calculated_column_formulas = {}
             table_columns = t_root.find("main:tableColumns", ns)
             if table_columns is not None:
                 for col in table_columns.findall("main:tableColumn", ns):
-                    columns.append(col.attrib.get("name"))
+                    column_name = col.attrib.get("name")
+                    columns.append(column_name)
+                    calculated_formula_node = col.find("main:calculatedColumnFormula", ns)
+                    if calculated_formula_node is not None and calculated_formula_node.text is not None:
+                        calculated_column_formulas[column_name] = calculated_formula_node.text
             audit["tables"].append(
                 {
                     "path": table_path,
                     "displayName": display_name,
                     "ref": ref,
                     "tableColumns": columns,
+                    "calculatedColumnFormulas": calculated_column_formulas,
                 }
             )
             tables_summary_lines.append(f"{table_path} | displayName={display_name} | ref={ref}")
@@ -949,7 +955,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     try:
         import pandas as pd
         from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.table import Table, TableStyleInfo
+        from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
         from openpyxl.styles import Border
     except Exception as e:
         _show_dependency_error(
@@ -980,9 +986,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     if "Manual Category" not in df.columns:
         df["Manual Category"] = ""
     if "Client Specific Category" not in df.columns:
-        df["Client Specific Category"] = ""
+        df["Client Specific Category"] = None
     if "Final Category" not in df.columns:
-        df["Final Category"] = ""
+        df["Final Category"] = None
 
     df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global Category", "Client Specific Category", "Manual Category", "Final Category"]]
 
@@ -995,6 +1001,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         df["Global Category"] = df["Global Category"].where(df["Global Category"].notna(), None)
     else:
         df["Global Category"] = ""
+
+    df["Client Specific Category"] = None
+    df["Final Category"] = None
 
     ensure_folder(os.path.dirname(output_path))
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
@@ -1047,6 +1056,19 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if last_row >= 2 and last_col >= 1:
             ref = f"A1:{get_column_letter(last_col)}{last_row}"
             table = Table(displayName="TransactionData", ref=ref)
+            table.tableColumns = [
+                TableColumn(id=idx, name=header)
+                for idx, header in enumerate(df.columns, start=1)
+            ]
+
+            client_specific_formula = "LET(desc,[@Description],ttype,[@[Transaction Type]],amt,[@Amount],p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),dir_ok,IF((dir=\"\")+(dir=\"ANY\"),1,IF(dir=\"DEBIT\",--(amt<0),IF(dir=\"CREDIT\",--(amt>0),1))),m,(act=TRUE)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*dir_ok,pri,IF(m,p,1E+99),minp,MIN(pri),idx,XMATCH(minp,pri,0),res,IF(minp>1E+98,\"\",INDEX(c,idx)),IFERROR(res,\"\"))"
+            final_category_formula = "IF([@[Manual Category]]<>\"\",[@[Manual Category]],IF([@[Client Specific Category]]<>\"\",[@[Client Specific Category]],IF([@[Global Category]]<>\"\",[@[Global Category]],\"\")))"
+
+            for table_col in table.tableColumns:
+                if table_col.name == "Client Specific Category":
+                    table_col.calculatedColumnFormula = client_specific_formula
+                if table_col.name == "Final Category":
+                    table_col.calculatedColumnFormula = final_category_formula
 
             style = TableStyleInfo(
                 name="TableStyleLight1",
@@ -1093,8 +1115,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         amt_col = header_to_col.get("Amount")
         bal_col = header_to_col.get("Balance")
         global_cat_col = header_to_col.get("Global Category")
-        client_specific_cat_col = header_to_col.get("Client Specific Category")
-        final_cat_col = header_to_col.get("Final Category")
 
         max_r = ws.max_row
         if date_col:
@@ -1106,15 +1126,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if bal_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
-        client_specific_formula = "=\"TEST\""
-        final_category_formula = "=\"TEST\""
-
-        if client_specific_cat_col:
-            for r in range(2, max_r + 1):
-                ws.cell(row=r, column=client_specific_cat_col).value = client_specific_formula
-        if final_cat_col:
-            for r in range(2, max_r + 1):
-                ws.cell(row=r, column=final_cat_col).value = final_category_formula
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
