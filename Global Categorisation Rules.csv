@@ -1,4 +1,9 @@
 ﻿Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
+5,Fuel,contains, SERVICE STATIO,DEBIT,,TRUE,Petrol/diesel
+6,Fuel,contains,SERVICE ST,DEBIT,,TRUE,Petrol/diesel
+7,Fuel,contains,PAY AT PUMP,DEBIT,,TRUE,Petrol/diesel
+8,Fuel,contains,MFG,DEBIT,,TRUE,Petrol/diesel
+9,Fuel,contains,SVC STN ,DEBIT,,TRUE,Petrol/diesel
 10,Groceries,contains,TESCO,DEBIT,,TRUE,Supermarkets & grocery delivery
 11,Groceries,contains,TESCO STORES,DEBIT,,TRUE,Supermarkets & grocery delivery
 12,Groceries,contains,SAINSBURY,DEBIT,,TRUE,Supermarkets & grocery delivery
@@ -20,11 +25,15 @@
 28,Groceries,contains,OCADO,DEBIT,,TRUE,Supermarkets & grocery delivery
 29,Groceries,contains,DELIVEROO HOP,DEBIT,,TRUE,Supermarkets & grocery delivery
 30,Groceries,contains,AMAZON FRESH,DEBIT,,TRUE,Supermarkets & grocery delivery
+31,Groceries,contains,SUPERMARKET,DEBIT,,TRUE,Supermarkets & grocery delivery
+32,Groceries,contains,FARMFOODS,DEBIT,,TRUE,Supermarkets & grocery delivery
 40,Stationary,contains,WHSMITH,DEBIT,,TRUE,Corner shops/newsagents
 41,Groceries,contains,MCCOLLS,DEBIT,,TRUE,Corner shops/newsagents
 42,Groceries,contains,PREMIER,DEBIT,,TRUE,Corner shops/newsagents
 43,Groceries,contains,NISA,DEBIT,,TRUE,Corner shops/newsagents
 44,Groceries,contains,NEWSAGENT,DEBIT,,TRUE,Corner shops/newsagents
+45,Groceries,contains,OFF LICENCE,DEBIT,,TRUE,Corner shops/newsagents
+46,Groceries,contains,CONVENIE,DEBIT,,TRUE,Corner shops/newsagents
 50,Fuel,contains,SHELL,DEBIT,,TRUE,Petrol/diesel
 51,Fuel,contains,BP,DEBIT,,TRUE,Petrol/diesel
 52,Fuel,contains,ESSO,DEBIT,,TRUE,Petrol/diesel
@@ -35,6 +44,7 @@
 57,Fuel,contains,SAINSBURY'S FUEL,DEBIT,,TRUE,Petrol/diesel
 58,Fuel,contains,MORRISONS FUEL,DEBIT,,TRUE,Petrol/diesel
 59,Fuel,contains,COSTCO FUEL,DEBIT,,TRUE,Petrol/diesel
+60,Fuel,contains,FUEL,DEBIT,,TRUE,Petrol/diesel
 70,Food & Drink,contains,STARBUCKS,DEBIT,,TRUE,Coffee shops & quick bites
 71,Food & Drink,contains,COSTA,DEBIT,,TRUE,Coffee shops & quick bites
 72,Food & Drink,contains,CAFFE NERO,DEBIT,,TRUE,Coffee shops & quick bites
@@ -60,6 +70,7 @@
 103,Food & Drink,contains,JD WETHERSPOON,DEBIT,,TRUE,Restaurants / fast food
 104,Food & Drink,contains,HARVESTER,DEBIT,,TRUE,Restaurants / fast food
 105,Food & Drink,contains,MILLER & CARTER,DEBIT,,TRUE,Restaurants / fast food
+106,Food & Drink,contains,BIG JOHN,DEBIT,,TRUE,Restaurants / fast food
 120,Food & Drink,contains,DELIVEROO,DEBIT,,TRUE,Delivery platforms
 121,Food & Drink,contains,JUST EAT,DEBIT,,TRUE,Delivery platforms
 122,Food & Drink,contains,UBER EATS,DEBIT,,TRUE,Delivery platforms
@@ -100,6 +111,7 @@
 207,Travel,contains,DART CHARGE,DEBIT,,TRUE,Parking and road charges
 208,Travel,contains,MERSEYFLOW,DEBIT,,TRUE,Parking and road charges
 209,Travel,contains,M6TOLL,DEBIT,,TRUE,Parking and road charges
+210,Travel,contains, CLEAN AIR ZONE,DEBIT,,TRUE,Parking and road charges
 220,Travel (Airlines),contains,EASYJET,DEBIT,,TRUE,Airlines
 221,Travel (Airlines),contains,RYANAIR,DEBIT,,TRUE,Airlines
 222,Travel (Airlines),contains,BRITISH AIRWAYS,DEBIT,,TRUE,Airlines
@@ -216,6 +228,8 @@
 572,Repairs & Renewals,contains,WICKES,DEBIT,,TRUE,Retail and high street
 573,Repairs & Renewals,contains,HOMEBASE,DEBIT,,TRUE,Retail and high street
 574,Shopping (High Street),contains,DUNELM,DEBIT,,TRUE,Retail and high street
+575,Repairs & Renewals,contains,TOOLMAN,DEBIT,,TRUE,Retail and high street
+576,Repairs & Renewals,contains,TOOLSTATION,DEBIT,,TRUE,Retail and high street
 600,Personal ,contains,NHS,DEBIT,,TRUE,Healthcare and pharmacy
 601,Personal ,contains,DENTAL,DEBIT,,TRUE,Healthcare and pharmacy
 602,Personal ,contains,DENTIST,DEBIT,,TRUE,Healthcare and pharmacy
@@ -241,6 +255,8 @@
 680,Personal,contains,CASH WITHDRAWAL,DEBIT,,TRUE,ATM cash withdrawals
 681,Personal,contains,ATM,DEBIT,,TRUE,ATM cash withdrawals
 682,Personal,contains,CASH MACHINE,DEBIT,,TRUE,ATM cash withdrawals
+682,Personal,contains,NOTEMACHINE,DEBIT,,TRUE,ATM cash withdrawals
+1,Personal,contains,LNK,DEBIT,,TRUE,ATM cash withdrawals
 700,Payment Processor,contains,PAYPAL,ANY,,TRUE,Payment processors / platforms
 701,Payment Processor,contains,STRIPE,ANY,,TRUE,Payment processors / platforms
 702,Payment Processor,contains,SQUARE,ANY,,TRUE,Payment processors / platforms
@@ -311,3 +327,4 @@
 1045,Accountancy,contains,BOOKKEEP,DEBIT,,TRUE,Professional fees (often needs tailoring)
 1046,Professional Services,contains,CONSULT,DEBIT,,TRUE,Professional fees (often needs tailoring)
 1047,Professional Services,contains,ADVISORY,DEBIT,,TRUE,Professional fees (often needs tailoring)
+1048,Motor Expenses,contains,DVLA,DEBIT,,TRUE,
