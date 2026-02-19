@@ -1,4 +1,4 @@
-# Version: 2.12
+# Version: 2.13
 import os
 import glob
 import re
@@ -977,8 +977,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
     if "Global Category" not in df.columns:
         df["Global Category"] = None
+    if "Manual Category" not in df.columns:
+        df["Manual Category"] = ""
 
-    df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global Category"]]
+    df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global Category", "Manual Category"]]
 
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
