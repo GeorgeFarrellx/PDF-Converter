@@ -327,4 +327,6 @@
 1045,Accountancy,contains,BOOKKEEP,DEBIT,,TRUE,Professional fees (often needs tailoring)
 1046,Professional Services,contains,CONSULT,DEBIT,,TRUE,Professional fees (often needs tailoring)
 1047,Professional Services,contains,ADVISORY,DEBIT,,TRUE,Professional fees (often needs tailoring)
-1048,Motor Expenses,contains,DVLA,DEBIT,,TRUE,
+1048,Motor Expenses,contains,DVLA,DEBIT,,TRUE,DVLA Vehicle Tax
+1049,Personal ,contains,PETS AT HOME,DEBIT,,TRUE,Pets
+1050,Personal ,contains,VETS,DEBIT,,TRUE,Pets
