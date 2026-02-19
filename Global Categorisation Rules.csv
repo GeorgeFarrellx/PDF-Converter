@@ -1,4 +1,6 @@
 ﻿Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
+1,Personal,contains,LNK,DEBIT,,TRUE,ATM cash withdrawals
+4,Fuel,contains,APPLEGREEN,DEBIT,,TRUE,Petrol/diesel
 5,Fuel,contains,S/STN,DEBIT,,TRUE,Petrol/diesel
 6,Fuel,contains,SERVICE S,DEBIT,,TRUE,Petrol/diesel
 7,Fuel,contains,PAY AT PUMP,DEBIT,,TRUE,Petrol/diesel
@@ -258,7 +260,6 @@
 681,Personal,contains,ATM,DEBIT,,TRUE,ATM cash withdrawals
 682,Personal,contains,CASH MACHINE,DEBIT,,TRUE,ATM cash withdrawals
 682,Personal,contains,NOTEMACHINE,DEBIT,,TRUE,ATM cash withdrawals
-1,Personal,contains,LNK,DEBIT,,TRUE,ATM cash withdrawals
 700,Payment Processor,contains,PAYPAL,ANY,,TRUE,Payment processors / platforms
 701,Payment Processor,contains,STRIPE,ANY,,TRUE,Payment processors / platforms
 702,Payment Processor,contains,SQUARE,ANY,,TRUE,Payment processors / platforms
