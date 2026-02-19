@@ -1,4 +1,4 @@
-# Version: 2.17
+# Version: 2.18
 import os
 import glob
 import re
@@ -795,6 +795,61 @@ def _write_log_json(prefix: str, obj) -> str | None:
         return None
 
 
+def _write_categorisation_evidence_instructions(audit: dict, audit_json_path: str | None) -> str | None:
+    try:
+        ensure_folder(LOGS_DIR)
+        ts = audit.get("audit_ts") or datetime.now().strftime("%Y%m%d_%H%M%S")
+        instructions_path = os.path.join(LOGS_DIR, f"categorisation_evidence_pack_instructions_{ts}.txt")
+
+        version_text = None
+        version_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION.txt")
+        try:
+            with open(version_path, "r", encoding="utf-8") as vf:
+                version_text = vf.read().strip()
+        except Exception:
+            version_text = None
+
+        lines = []
+        lines.append("Categorisation Evidence Pack Instructions")
+        lines.append("========================================")
+        lines.append("")
+        lines.append(f"Output workbook path: {audit.get('output_path')}")
+        if version_text:
+            lines.append(f"App version: {version_text}")
+        else:
+            lines.append(f"core.py path: {audit.get('core_file')}")
+            lines.append(f"core.py sha256: {audit.get('core_sha256')}")
+        lines.append(f"Python version: {audit.get('python_version')}")
+        lines.append(f"pandas version: {audit.get('pandas_version')}")
+        lines.append(f"openpyxl version: {audit.get('openpyxl_version')}")
+        lines.append(f"Platform: {audit.get('platform')}")
+        lines.append(f"excel_list_separator_detected: {audit.get('excel_list_separator_detected')}")
+        lines.append("")
+        lines.append("If Excel shows 'needs repairs'")
+        lines.append("------------------------------")
+        lines.append("1) Open the workbook in Excel.")
+        lines.append("2) Click Repair.")
+        lines.append("3) Click Show Repairs.")
+        lines.append("4) Copy/paste the full 'Repaired Records' text into your report.")
+        lines.append("")
+        lines.append("Send these files")
+        lines.append("---------------")
+        lines.append(f"- Output workbook: {audit.get('output_path')}")
+        lines.append(f"- Categorisation audit JSON: {audit_json_path}")
+        artifact_paths = audit.get("artifact_paths") or {}
+        for _, artifact_path in artifact_paths.items():
+            lines.append(f"- Audit artifact: {artifact_path}")
+        lines.append("- Include the latest recon log from Logs/ (recon_*.txt) if present.")
+        lines.append("- Include any crash logs from Logs/ (crash_*.txt) if present.")
+        lines.append("- Include the Global Categorisation Rules.csv file used for the run.")
+
+        with open(instructions_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        return instructions_path
+    except Exception:
+        return None
+
+
 def _audit_xlsx_categorisation(output_path: str) -> dict:
     ns = {
         "main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
@@ -804,14 +859,17 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
     abs_output = os.path.abspath(output_path)
     ensure_folder(LOGS_DIR)
     audit = {
+        "audit_ts": ts,
         "output_path": abs_output,
         "enable_categorisation": True,
         "core_file": os.path.abspath(__file__),
         "core_sha256": _sha256_file(os.path.abspath(__file__)),
+        "excel_list_separator_detected": _excel_list_separator(),
         "python_version": sys.version,
         "platform": platform.platform(),
         "pandas_version": None,
         "openpyxl_version": None,
+        "artifact_paths": {},
         "transaction_data_sheet_xml": None,
         "categorisation_rules_sheet_xml": None,
         "transaction_data_formula_count": 0,
@@ -909,6 +967,7 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
             ref = t_root.attrib.get("ref")
             columns = []
             calculated_column_formulas = {}
+            calculated_column_formula_attrs = {}
             table_columns = t_root.find("main:tableColumns", ns)
             if table_columns is not None:
                 for col in table_columns.findall("main:tableColumn", ns):
@@ -917,6 +976,7 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
                     calculated_formula_node = col.find("main:calculatedColumnFormula", ns)
                     if calculated_formula_node is not None and calculated_formula_node.text is not None:
                         calculated_column_formulas[column_name] = calculated_formula_node.text
+                        calculated_column_formula_attrs[column_name] = dict(calculated_formula_node.attrib)
             audit["tables"].append(
                 {
                     "path": table_path,
@@ -924,6 +984,7 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
                     "ref": ref,
                     "tableColumns": columns,
                     "calculatedColumnFormulas": calculated_column_formulas,
+                    "calculatedColumnFormulaAttrs": calculated_column_formula_attrs,
                 }
             )
             tables_summary_lines.append(f"{table_path} | displayName={display_name} | ref={ref}")
@@ -934,17 +995,25 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
             transaction_sheet_xml_raw = zf.read(transaction_sheet_xml).decode("utf-8", errors="replace")
 
     if transaction_sheet_xml_raw is not None:
-        with open(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_transaction_sheet.xml"), "w", encoding="utf-8") as f:
+        artifact_path = os.path.abspath(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_transaction_sheet.xml"))
+        with open(artifact_path, "w", encoding="utf-8") as f:
             f.write(transaction_sheet_xml_raw)
+        audit["artifact_paths"]["transaction_sheet_xml"] = artifact_path
     if workbook_xml is not None:
-        with open(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_workbook.xml"), "w", encoding="utf-8") as f:
+        artifact_path = os.path.abspath(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_workbook.xml"))
+        with open(artifact_path, "w", encoding="utf-8") as f:
             f.write(workbook_xml)
+        audit["artifact_paths"]["workbook_xml"] = artifact_path
     if workbook_rels_xml is not None:
-        with open(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_workbook.rels"), "w", encoding="utf-8") as f:
+        artifact_path = os.path.abspath(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_workbook.rels"))
+        with open(artifact_path, "w", encoding="utf-8") as f:
             f.write(workbook_rels_xml)
+        audit["artifact_paths"]["workbook_rels"] = artifact_path
     if tables_summary_lines:
-        with open(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_tables_summary.txt"), "w", encoding="utf-8") as f:
+        artifact_path = os.path.abspath(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_tables_summary.txt"))
+        with open(artifact_path, "w", encoding="utf-8") as f:
             f.write("\n".join(tables_summary_lines))
+        audit["artifact_paths"]["tables_summary"] = artifact_path
 
     return audit
 
@@ -1066,7 +1135,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
             for table_col in table.tableColumns:
                 if table_col.name == "Client Specific Category":
-                    table_col.calculatedColumnFormula = TableFormula(attr_text=client_specific_formula)
+                    table_col.calculatedColumnFormula = TableFormula(attr_text=client_specific_formula, array=True)
                 if table_col.name == "Final Category":
                     table_col.calculatedColumnFormula = TableFormula(attr_text=final_category_formula)
 
@@ -1182,7 +1251,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         try:
             ensure_folder(LOGS_DIR)
             audit = _audit_xlsx_categorisation(output_path)
-            _write_log_json("categorisation_audit", audit)
+            audit_json_path = _write_log_json("categorisation_audit", audit)
+            try:
+                _write_categorisation_evidence_instructions(audit, audit_json_path)
+            except Exception:
+                pass
         except Exception:
             details = []
             details.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
