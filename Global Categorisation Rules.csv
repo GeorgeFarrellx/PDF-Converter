@@ -26,7 +26,7 @@
 27,Groceries,contains,WHOLE FOODS,DEBIT,,TRUE,Supermarkets & grocery delivery
 28,Groceries,contains,OCADO,DEBIT,,TRUE,Supermarkets & grocery delivery
 29,Groceries,contains,DELIVEROO HOP,DEBIT,,TRUE,Supermarkets & grocery delivery
-30,Groceries,contains,AMAZON FRESH,DEBIT,,TRUE,Supermarkets & grocery delivery
+30,Online Shopping,contains,AMAZON FRESH,DEBIT,,TRUE,Supermarkets & grocery delivery
 31,Groceries,contains,SUPERMARKET,DEBIT,,TRUE,Supermarkets & grocery delivery
 32,Groceries,contains,FARMFOODS,DEBIT,,TRUE,Supermarkets & grocery delivery
 33,Groceries,contains,HERON FOODS,DEBIT,,TRUE,Supermarkets & grocery delivery
@@ -173,7 +173,7 @@
 401,Personal,contains,SPOTIFY,DEBIT,,TRUE,Streaming/media subscriptions
 402,Personal,contains,DISNEY,DEBIT,,TRUE,Streaming/media subscriptions
 403,Personal,contains,DISNEY PLUS,DEBIT,,TRUE,Streaming/media subscriptions
-404,Amazon,contains,AMAZON PRIME,DEBIT,,TRUE,Streaming/media subscriptions
+404,Online Shopping,contains,AMAZON PRIME,DEBIT,,TRUE,Streaming/media subscriptions
 405,Personal,contains,PRIME VIDEO,DEBIT,,TRUE,Streaming/media subscriptions
 406,Software,contains,APPLE.COM/BILL,DEBIT,,TRUE,Streaming/media subscriptions
 407,Personal,contains,YOUTUBE PREMIUM,DEBIT,,TRUE,Streaming/media subscriptions
@@ -200,11 +200,12 @@
 466,Software,contains,OPENAI,DEBIT,,TRUE,Software/SaaS subscriptions
 467,Software,contains,CHATGPT,DEBIT,,TRUE,Software/SaaS subscriptions
 468,Software,contains,FIGMA,DEBIT,,TRUE,Software/SaaS subscriptions
-520,Shopping (Online),contains,AMAZON,DEBIT,,TRUE,E-commerce and retailers
-521,Shopping (Online),contains,AMZN,DEBIT,,TRUE,E-commerce and retailers
+519,Personal,Contains,Audible,DEBIT,,TRUE,Audio Books
+520,Online Shopping,contains,AMAZON,DEBIT,,TRUE,E-commerce and retailers
+521,Online Shopping,contains,AMZN,DEBIT,,TRUE,E-commerce and retailers
 522,Shopping (Online),contains,EBAY,DEBIT,,TRUE,E-commerce and retailers
 523,Shopping (Online),contains,ETSY,DEBIT,,TRUE,E-commerce and retailers
-524,Shopping (Online),contains,ALIEXPRESS,DEBIT,,TRUE,E-commerce and retailers
+524,Online Shopping,contains,ALIEXPRESS,DEBIT,,TRUE,E-commerce and retailers
 525,Shopping (Online),contains,TEMU,DEBIT,,TRUE,E-commerce and retailers
 526,Shopping (Online),contains,SHEIN,DEBIT,,TRUE,E-commerce and retailers
 527,Shopping (Online),contains,ARGOS,DEBIT,,TRUE,E-commerce and retailers
