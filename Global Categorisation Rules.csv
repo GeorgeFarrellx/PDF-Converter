@@ -27,6 +27,7 @@
 30,Groceries,contains,AMAZON FRESH,DEBIT,,TRUE,Supermarkets & grocery delivery
 31,Groceries,contains,SUPERMARKET,DEBIT,,TRUE,Supermarkets & grocery delivery
 32,Groceries,contains,FARMFOODS,DEBIT,,TRUE,Supermarkets & grocery delivery
+33,Groceries,contains,HERON FOODS,DEBIT,,TRUE,Supermarkets & grocery delivery
 40,Stationary,contains,WHSMITH,DEBIT,,TRUE,Corner shops/newsagents
 41,Groceries,contains,MCCOLLS,DEBIT,,TRUE,Corner shops/newsagents
 42,Groceries,contains,PREMIER,DEBIT,,TRUE,Corner shops/newsagents
@@ -330,3 +331,6 @@
 1048,Motor Expenses,contains,DVLA,DEBIT,,TRUE,DVLA Vehicle Tax
 1049,Personal ,contains,PETS AT HOME,DEBIT,,TRUE,Pets
 1050,Personal ,contains,VETS,DEBIT,,TRUE,Pets
+1051,Personal ,contains,B&M,DEBIT,,TRUE,Retail and high street
+1052,Personal ,contains,HOMEBARGAINS,DEBIT,,TRUE,Retail and high street
+1053,Personal ,contains,POUNDLAND,DEBIT,,TRUE,Retail and high street
