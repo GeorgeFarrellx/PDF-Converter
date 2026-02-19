@@ -1,5 +1,5 @@
-# Version: lloyds-1.2.py
-"""lloyds-1.2.py
+# Version: lloyds-1.3.py
+"""lloyds-1.3.py
 
 Lloyds Bank (UK) Business Account statement parser (text-based PDFs, NO OCR).
 
@@ -478,6 +478,8 @@ def extract_transactions(pdf_path: str) -> List[Dict]:
                 return
 
             desc = _clean_ws(" ".join([p for p in cur_desc_parts if p and p.strip()]))
+            desc = re.sub(r"\(?\s*continued\s+on\s+next\s+page\s*\)?", "", desc, flags=re.I)
+            desc = _clean_ws(desc)
 
             # Remove standalone purchase-date tokens like 29NOV25 / 04APR25 (common on Lloyds DEB/CPT rows)
             desc = re.sub(r"\b\d{2}[A-Z]{3}\d{2}\b", "", desc).strip()
@@ -598,6 +600,8 @@ def extract_transactions(pdf_path: str) -> List[Dict]:
             for ln in lines:
                 s = ln.strip()
                 if not s or s == ".":
+                    continue
+                if re.fullmatch(r"\(?\s*continued\s+on\s+next\s+page\s*\)?", s, flags=re.I):
                     continue
 
                 # If the PDF extracts values on the next line (e.g. "Money Out (£)" then "29.31"),
