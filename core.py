@@ -1,4 +1,4 @@
-# Version: 2.19
+# Version: 2.20
 import os
 import glob
 import re
@@ -1026,6 +1026,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
         from openpyxl.styles import Border
+        from openpyxl.worksheet.filters import AutoFilter
     except Exception as e:
         _show_dependency_error(
             "pandas and openpyxl are required for Excel output.\n\n"
@@ -1139,6 +1140,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             )
             table.totalsRowShown = False
             table.tableStyleInfo = style
+            table.autoFilter = AutoFilter(ref=table.ref)
             ws.add_table(table)
 
             no_border = Border()
