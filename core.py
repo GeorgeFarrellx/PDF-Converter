@@ -1,4 +1,4 @@
-# Version: 2.22
+# Version: 2.23
 import os
 import glob
 import re
@@ -1178,6 +1178,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         bal_col = header_to_col.get("Balance")
         global_cat_col = header_to_col.get("Global Category")
         client_specific_col = header_to_col.get("Client Specific Category")
+        manual_col = header_to_col.get("Manual Category")
         final_col = header_to_col.get("Final Category")
 
         disable_client_specific_formula_for_diagnostics = True
@@ -1185,11 +1186,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         client_specific_formula = None
         if not disable_client_specific_formula_for_diagnostics:
             client_specific_formula = "=LET(desc,[@Description],ttype,[@[Transaction Type]],amt,[@Amount],p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),dir_ok,IF((dir=\"\")+(dir=\"ANY\"),1,IF(dir=\"DEBIT\",--(amt<0),IF(dir=\"CREDIT\",--(amt>0),1))),m,(act=TRUE)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*dir_ok,pri,IF(m,p,1E+99),minp,MIN(pri),idx,XMATCH(minp,pri,0),res,IF(minp>1E+98,\"\",INDEX(c,idx)),IFERROR(res,\"\"))"
-        final_category_formula = "=1"
         if sep != ",":
             if client_specific_formula is not None:
                 client_specific_formula = client_specific_formula.replace(",", sep)
-            final_category_formula = final_category_formula.replace(",", sep)
 
         max_r = ws.max_row
         if date_col:
@@ -1204,8 +1203,17 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if client_specific_col and client_specific_formula is not None:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
-        if final_col:
+        if final_col and manual_col and client_specific_col and global_cat_col:
+            manual_letter = get_column_letter(manual_col)
+            client_letter = get_column_letter(client_specific_col)
+            global_letter = get_column_letter(global_cat_col)
             for r in range(2, max_r + 1):
+                manual_ref = f"{manual_letter}{r}"
+                client_ref = f"{client_letter}{r}"
+                global_ref = f"{global_letter}{r}"
+                final_category_formula = f'=IF({manual_ref}<>"",{manual_ref},IF({client_ref}<>"",{client_ref},IF({global_ref}<>"",{global_ref},"")))'
+                if sep != ",":
+                    final_category_formula = final_category_formula.replace(",", sep)
                 ws.cell(row=r, column=final_col).value = final_category_formula
 
         if tn_col:
