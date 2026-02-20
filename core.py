@@ -1,4 +1,4 @@
-# Version: 2.24
+# Version: 2.25
 import os
 import glob
 import re
@@ -1199,30 +1199,13 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if (
             client_specific_col
             and desc_col
-            and txn_type_col
-            and amt_col
             and not disable_client_specific_formula_for_diagnostics
         ):
             desc_letter = get_column_letter(desc_col)
-            ttype_letter = get_column_letter(txn_type_col)
-            amt_letter = get_column_letter(amt_col)
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
-                ttype_ref = f"{ttype_letter}{r}"
-                amt_ref = f"{amt_letter}{r}"
                 client_specific_formula = (
-                    f"=LET(desc,{desc_ref},ttype,{ttype_ref},amt,{amt_ref},"
-                    "p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],"
-                    "act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],"
-                    "ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),"
-                    "dir_tag,IF(amt<0,\"DEBIT\",IF(amt>0,\"CREDIT\",\"\")),"
-                    "dir_ok,(dir=\"\")+(dir=\"ANY\")+(dir=dir_tag),"
-                    "act_ok,(act=TRUE)+(act=\"\"),"
-                    "p0,IF(p=\"\",1E+99,IFERROR(VALUE(p),1E+99)),"
-                    "m,(act_ok>0)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*(dir_ok>0),"
-                    "pri,IF(m,p0,1E+99),minp,MIN(pri),"
-                    "res,IF(minp>1E+98,\"\",INDEX(c,XMATCH(minp,pri,0))),"
-                    "IFERROR(res,\"\"))"
+                    f"=IFERROR(INDEX(ClientRules[Category],MATCH(AGGREGATE(15,6,ClientRules[Priority]/((ClientRules[Active]<>FALSE)*(ClientRules[Pattern]<>\"\")*ISNUMBER(SEARCH(ClientRules[Pattern],{desc_ref}))),1),ClientRules[Priority],0)),\"\")"
                 )
                 if sep != ",":
                     client_specific_formula = client_specific_formula.replace(",", sep)
