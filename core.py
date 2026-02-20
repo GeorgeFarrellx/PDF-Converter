@@ -1,4 +1,4 @@
-# Version: 2.21
+# Version: 2.22
 import os
 import glob
 import re
@@ -1185,7 +1185,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         client_specific_formula = None
         if not disable_client_specific_formula_for_diagnostics:
             client_specific_formula = "=LET(desc,[@Description],ttype,[@[Transaction Type]],amt,[@Amount],p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),dir_ok,IF((dir=\"\")+(dir=\"ANY\"),1,IF(dir=\"DEBIT\",--(amt<0),IF(dir=\"CREDIT\",--(amt>0),1))),m,(act=TRUE)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*dir_ok,pri,IF(m,p,1E+99),minp,MIN(pri),idx,XMATCH(minp,pri,0),res,IF(minp>1E+98,\"\",INDEX(c,idx)),IFERROR(res,\"\"))"
-        final_category_formula = "=IF([@[Manual Category]]<>\"\",[@[Manual Category]],IF([@[Client Specific Category]]<>\"\",[@[Client Specific Category]],IF([@[Global Category]]<>\"\",[@[Global Category]],\"\")))"
+        final_category_formula = "=1"
         if sep != ",":
             if client_specific_formula is not None:
                 client_specific_formula = client_specific_formula.replace(",", sep)
