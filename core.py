@@ -1,4 +1,4 @@
-# Version: 2.28
+# Version: 2.29
 import os
 import glob
 import re
@@ -1204,8 +1204,17 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             desc_letter = get_column_letter(desc_col)
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
+                cond_expr = (
+                    f"((ClientRules[[#Data],[Active]]=TRUE)+(ClientRules[[#Data],[Active]]=\"\"))"
+                    f"*(ClientRules[[#Data],[Pattern]]<>\"\")"
+                    f"*ISNUMBER(SEARCH(ClientRules[[#Data],[Pattern]]{sep}{desc_ref}))"
+                )
+                pri_expr = (
+                    f"IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}1*ClientRules[[#Data],[Priority]])"
+                )
                 client_specific_formula = (
-                    f"=IFERROR(INDEX(ClientRules[[#Data],[Category]]{sep}MATCH(1{sep}INDEX(((ClientRules[[#Data],[Active]]=TRUE)+(ClientRules[[#Data],[Active]]=\"\"))*(ClientRules[[#Data],[Pattern]]<>\"\")*ISNUMBER(SEARCH(ClientRules[[#Data],[Pattern]]{sep}{desc_ref})){sep}0){sep}0)){sep}\"\")"
+                    f"=IFERROR(INDEX(ClientRules[[#Data],[Category]]{sep}MATCH(1{sep}INDEX(({cond_expr})"
+                    f"*({pri_expr}=AGGREGATE(15{sep}6{sep}({pri_expr})/({cond_expr}){sep}1)){sep}0){sep}0)){sep}\"\")"
                 )
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
         if final_col and manual_col and client_specific_col and global_cat_col:
