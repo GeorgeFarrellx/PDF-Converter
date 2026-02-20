@@ -1,4 +1,4 @@
-# Version: 2.18
+# Version: 2.19
 import os
 import glob
 import re
@@ -1024,7 +1024,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     try:
         import pandas as pd
         from openpyxl.utils import get_column_letter
-        from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn, TableFormula
+        from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
         from openpyxl.styles import Border
     except Exception as e:
         _show_dependency_error(
@@ -1130,15 +1130,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 for idx, header in enumerate(df.columns, start=1)
             ]
 
-            client_specific_formula = "LET(desc,[@Description],ttype,[@[Transaction Type]],amt,[@Amount],p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),dir_ok,IF((dir=\"\")+(dir=\"ANY\"),1,IF(dir=\"DEBIT\",--(amt<0),IF(dir=\"CREDIT\",--(amt>0),1))),m,(act=TRUE)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*dir_ok,pri,IF(m,p,1E+99),minp,MIN(pri),idx,XMATCH(minp,pri,0),res,IF(minp>1E+98,\"\",INDEX(c,idx)),IFERROR(res,\"\"))"
-            final_category_formula = "IF([@[Manual Category]]<>\"\",[@[Manual Category]],IF([@[Client Specific Category]]<>\"\",[@[Client Specific Category]],IF([@[Global Category]]<>\"\",[@[Global Category]],\"\")))"
-
-            for table_col in table.tableColumns:
-                if table_col.name == "Client Specific Category":
-                    table_col.calculatedColumnFormula = TableFormula(attr_text=client_specific_formula, array=True)
-                if table_col.name == "Final Category":
-                    table_col.calculatedColumnFormula = TableFormula(attr_text=final_category_formula)
-
             style = TableStyleInfo(
                 name="TableStyleLight1",
                 showFirstColumn=False,
@@ -1184,6 +1175,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         amt_col = header_to_col.get("Amount")
         bal_col = header_to_col.get("Balance")
         global_cat_col = header_to_col.get("Global Category")
+        client_specific_col = header_to_col.get("Client Specific Category")
+        final_col = header_to_col.get("Final Category")
+
+        sep = _excel_list_separator()
+        client_specific_formula = "=LET(desc,[@Description],ttype,[@[Transaction Type]],amt,[@Amount],p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),dir_ok,IF((dir=\"\")+(dir=\"ANY\"),1,IF(dir=\"DEBIT\",--(amt<0),IF(dir=\"CREDIT\",--(amt>0),1))),m,(act=TRUE)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*dir_ok,pri,IF(m,p,1E+99),minp,MIN(pri),idx,XMATCH(minp,pri,0),res,IF(minp>1E+98,\"\",INDEX(c,idx)),IFERROR(res,\"\"))"
+        final_category_formula = "=IF([@[Manual Category]]<>\"\",[@[Manual Category]],IF([@[Client Specific Category]]<>\"\",[@[Client Specific Category]],IF([@[Global Category]]<>\"\",[@[Global Category]],\"\")))"
+        if sep != ",":
+            client_specific_formula = client_specific_formula.replace(",", sep)
+            final_category_formula = final_category_formula.replace(",", sep)
 
         max_r = ws.max_row
         if date_col:
@@ -1195,6 +1195,12 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if bal_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
+        if client_specific_col:
+            for r in range(2, max_r + 1):
+                ws.cell(row=r, column=client_specific_col).value = client_specific_formula
+        if final_col:
+            for r in range(2, max_r + 1):
+                ws.cell(row=r, column=final_col).value = final_category_formula
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
