@@ -1,4 +1,4 @@
-# Version: 2.25
+# Version: 2.26
 import os
 import glob
 import re
@@ -1205,7 +1205,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
                 client_specific_formula = (
-                    f"=IFERROR(INDEX(ClientRules[Category],MATCH(AGGREGATE(15,6,ClientRules[Priority]/((ClientRules[Active]<>FALSE)*(ClientRules[Pattern]<>\"\")*ISNUMBER(SEARCH(ClientRules[Pattern],{desc_ref}))),1),ClientRules[Priority],0)),\"\")"
+                    f"=IFERROR(INDEX(ClientRules[Category],MATCH(1,((ClientRules[Active]=TRUE)+(ClientRules[Active]=\"\"))*(ClientRules[Pattern]<>\"\")*ISNUMBER(SEARCH(ClientRules[Pattern],{desc_ref})),0)),\"\")"
                 )
                 if sep != ",":
                     client_specific_formula = client_specific_formula.replace(",", sep)
