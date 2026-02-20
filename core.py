@@ -1,4 +1,4 @@
-# Version: 2.20
+# Version: 2.21
 import os
 import glob
 import re
@@ -1180,11 +1180,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         client_specific_col = header_to_col.get("Client Specific Category")
         final_col = header_to_col.get("Final Category")
 
+        disable_client_specific_formula_for_diagnostics = True
         sep = _excel_list_separator()
-        client_specific_formula = "=LET(desc,[@Description],ttype,[@[Transaction Type]],amt,[@Amount],p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),dir_ok,IF((dir=\"\")+(dir=\"ANY\"),1,IF(dir=\"DEBIT\",--(amt<0),IF(dir=\"CREDIT\",--(amt>0),1))),m,(act=TRUE)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*dir_ok,pri,IF(m,p,1E+99),minp,MIN(pri),idx,XMATCH(minp,pri,0),res,IF(minp>1E+98,\"\",INDEX(c,idx)),IFERROR(res,\"\"))"
+        client_specific_formula = None
+        if not disable_client_specific_formula_for_diagnostics:
+            client_specific_formula = "=LET(desc,[@Description],ttype,[@[Transaction Type]],amt,[@Amount],p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),dir_ok,IF((dir=\"\")+(dir=\"ANY\"),1,IF(dir=\"DEBIT\",--(amt<0),IF(dir=\"CREDIT\",--(amt>0),1))),m,(act=TRUE)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*dir_ok,pri,IF(m,p,1E+99),minp,MIN(pri),idx,XMATCH(minp,pri,0),res,IF(minp>1E+98,\"\",INDEX(c,idx)),IFERROR(res,\"\"))"
         final_category_formula = "=IF([@[Manual Category]]<>\"\",[@[Manual Category]],IF([@[Client Specific Category]]<>\"\",[@[Client Specific Category]],IF([@[Global Category]]<>\"\",[@[Global Category]],\"\")))"
         if sep != ",":
-            client_specific_formula = client_specific_formula.replace(",", sep)
+            if client_specific_formula is not None:
+                client_specific_formula = client_specific_formula.replace(",", sep)
             final_category_formula = final_category_formula.replace(",", sep)
 
         max_r = ws.max_row
@@ -1197,7 +1201,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if bal_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
-        if client_specific_col:
+        if client_specific_col and client_specific_formula is not None:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
         if final_col:
