@@ -1,4 +1,4 @@
-# Version: 2.23
+# Version: 2.24
 import os
 import glob
 import re
@@ -1176,19 +1176,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         date_col = header_to_col.get("Date")
         amt_col = header_to_col.get("Amount")
         bal_col = header_to_col.get("Balance")
+        desc_col = header_to_col.get("Description")
+        txn_type_col = header_to_col.get("Transaction Type")
         global_cat_col = header_to_col.get("Global Category")
         client_specific_col = header_to_col.get("Client Specific Category")
         manual_col = header_to_col.get("Manual Category")
         final_col = header_to_col.get("Final Category")
 
-        disable_client_specific_formula_for_diagnostics = True
+        disable_client_specific_formula_for_diagnostics = False
         sep = _excel_list_separator()
-        client_specific_formula = None
-        if not disable_client_specific_formula_for_diagnostics:
-            client_specific_formula = "=LET(desc,[@Description],ttype,[@[Transaction Type]],amt,[@Amount],p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),dir_ok,IF((dir=\"\")+(dir=\"ANY\"),1,IF(dir=\"DEBIT\",--(amt<0),IF(dir=\"CREDIT\",--(amt>0),1))),m,(act=TRUE)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*dir_ok,pri,IF(m,p,1E+99),minp,MIN(pri),idx,XMATCH(minp,pri,0),res,IF(minp>1E+98,\"\",INDEX(c,idx)),IFERROR(res,\"\"))"
-        if sep != ",":
-            if client_specific_formula is not None:
-                client_specific_formula = client_specific_formula.replace(",", sep)
 
         max_r = ws.max_row
         if date_col:
@@ -1200,8 +1196,36 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if bal_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
-        if client_specific_col and client_specific_formula is not None:
+        if (
+            client_specific_col
+            and desc_col
+            and txn_type_col
+            and amt_col
+            and not disable_client_specific_formula_for_diagnostics
+        ):
+            desc_letter = get_column_letter(desc_col)
+            ttype_letter = get_column_letter(txn_type_col)
+            amt_letter = get_column_letter(amt_col)
             for r in range(2, max_r + 1):
+                desc_ref = f"{desc_letter}{r}"
+                ttype_ref = f"{ttype_letter}{r}"
+                amt_ref = f"{amt_letter}{r}"
+                client_specific_formula = (
+                    f"=LET(desc,{desc_ref},ttype,{ttype_ref},amt,{amt_ref},"
+                    "p,ClientRules[Priority],c,ClientRules[Category],pat,ClientRules[Pattern],"
+                    "act,ClientRules[Active],dir,ClientRules[Direction],ttc,ClientRules[Txn Type Contains],"
+                    "ttc_ok,IF(ttc=\"\",1,ISNUMBER(SEARCH(ttc,ttype))),"
+                    "dir_tag,IF(amt<0,\"DEBIT\",IF(amt>0,\"CREDIT\",\"\")),"
+                    "dir_ok,(dir=\"\")+(dir=\"ANY\")+(dir=dir_tag),"
+                    "act_ok,(act=TRUE)+(act=\"\"),"
+                    "p0,IF(p=\"\",1E+99,IFERROR(VALUE(p),1E+99)),"
+                    "m,(act_ok>0)*(pat<>\"\")*ISNUMBER(SEARCH(pat,desc))*ttc_ok*(dir_ok>0),"
+                    "pri,IF(m,p0,1E+99),minp,MIN(pri),"
+                    "res,IF(minp>1E+98,\"\",INDEX(c,XMATCH(minp,pri,0))),"
+                    "IFERROR(res,\"\"))"
+                )
+                if sep != ",":
+                    client_specific_formula = client_specific_formula.replace(",", sep)
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
         if final_col and manual_col and client_specific_col and global_cat_col:
             manual_letter = get_column_letter(manual_col)
