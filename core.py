@@ -1132,7 +1132,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ]
 
             style = TableStyleInfo(
-                name="TableStyleLight1",
+                name="TableStyleLight21",
                 showFirstColumn=False,
                 showLastColumn=False,
                 showRowStripes=False,
@@ -1153,7 +1153,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.append([1000, "", "", "ANY", "", False, "Add client rules here. Pattern is 'contains' (case-insensitive)."])
         rules_table = Table(displayName="ClientRules", ref="A1:G2")
         rules_style = TableStyleInfo(
-            name="TableStyleLight1",
+            name="TableStyleLight21",
             showFirstColumn=False,
             showLastColumn=False,
             showRowStripes=False,
