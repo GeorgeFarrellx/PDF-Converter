@@ -1025,7 +1025,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         import pandas as pd
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
-        from openpyxl.styles import Border
+        from openpyxl.styles import Border, Side
+        from openpyxl.styles.differential import DifferentialStyle
         from openpyxl.worksheet.filters import AutoFilter
     except Exception as e:
         _show_dependency_error(
@@ -1081,6 +1082,19 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         wb.calculation.calcMode = "auto"
         wb.calculation.fullCalcOnLoad = True
 
+        borderless_border = Border(
+            left=Side(style=None),
+            right=Side(style=None),
+            top=Side(style=None),
+            bottom=Side(style=None),
+            diagonal=Side(style=None),
+            vertical=Side(style=None),
+            horizontal=Side(style=None),
+        )
+        borderless_dxf = DifferentialStyle(border=borderless_border)
+        wb._differential_styles.dxf.append(borderless_dxf)
+        borderless_dxf_id = wb._differential_styles.idx_base + len(wb._differential_styles.dxf) - 1
+
         df.to_excel(writer, index=False, sheet_name="Transaction Data")
 
         ws = writer.sheets["Transaction Data"]
@@ -1132,7 +1146,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ]
 
             style = TableStyleInfo(
-                name="TableStyleLight21",
+                name="TableStyleLight1",
                 showFirstColumn=False,
                 showLastColumn=False,
                 showRowStripes=False,
@@ -1141,6 +1155,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             table.totalsRowShown = False
             table.tableStyleInfo = style
             table.autoFilter = AutoFilter(ref=table.ref)
+            table.headerRowBorderDxfId = borderless_dxf_id
+            table.tableBorderDxfId = borderless_dxf_id
+            table.totalsRowBorderDxfId = borderless_dxf_id
             ws.add_table(table)
 
             no_border = Border()
@@ -1153,7 +1170,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.append([1000, "", "", "ANY", "", False, "Add client rules here. Pattern is 'contains' (case-insensitive)."])
         rules_table = Table(displayName="ClientRules", ref="A1:G2")
         rules_style = TableStyleInfo(
-            name="TableStyleLight21",
+            name="TableStyleLight1",
             showFirstColumn=False,
             showLastColumn=False,
             showRowStripes=False,
@@ -1161,6 +1178,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         )
         rules_table.totalsRowShown = False
         rules_table.tableStyleInfo = rules_style
+        rules_table.headerRowBorderDxfId = borderless_dxf_id
+        rules_table.tableBorderDxfId = borderless_dxf_id
+        rules_table.totalsRowBorderDxfId = borderless_dxf_id
         ws_rules.add_table(rules_table)
         ws_rules.freeze_panes = "A2"
 
