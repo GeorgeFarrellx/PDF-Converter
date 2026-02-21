@@ -1164,8 +1164,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         ws_rules = wb.create_sheet("Client Categorisation Rules")
         ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
+        ws_rules.append([10, "Tools & Materials", "ELECTRICAL", "ANY", "", True, "TEMP seed rule for testing"])
+        ws_rules.append([11, "Tools & Materials", "SCREWFIX", "ANY", "", True, "TEMP seed rule for testing"])
         ws_rules.append([1000, "", "", "ANY", "", False, "Add client rules here. Pattern is 'contains' (case-insensitive)."])
-        rules_table = Table(displayName="ClientRules", ref="A1:G2")
+        rules_table = Table(displayName="ClientRules", ref="A1:G4")
         rules_style = TableStyleInfo(
             name="TableStyleLight1",
             showFirstColumn=False,
