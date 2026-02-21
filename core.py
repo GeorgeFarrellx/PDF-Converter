@@ -1082,18 +1082,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         wb.calculation.calcMode = "auto"
         wb.calculation.fullCalcOnLoad = True
 
+        borderless_side = Side(style=None)
         borderless_border = Border(
-            left=Side(style=None),
-            right=Side(style=None),
-            top=Side(style=None),
-            bottom=Side(style=None),
-            diagonal=Side(style=None),
-            vertical=Side(style=None),
-            horizontal=Side(style=None),
+            left=borderless_side,
+            right=borderless_side,
+            top=borderless_side,
+            bottom=borderless_side,
         )
         borderless_dxf = DifferentialStyle(border=borderless_border)
-        wb._differential_styles.dxf.append(borderless_dxf)
-        borderless_dxf_id = wb._differential_styles.idx_base + len(wb._differential_styles.dxf) - 1
+        borderless_dxf_id = wb._differential_styles.add(borderless_dxf)
 
         df.to_excel(writer, index=False, sheet_name="Transaction Data")
 
