@@ -1229,12 +1229,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     f"*ISNUMBER(SEARCH(ClientRules[[#Data],[Pattern]]{sep}{desc_ref}))"
                 )
                 pri_expr = (
-                    f"IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}1*ClientRules[[#Data],[Priority]])"
+                    f"IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}IFERROR(1*ClientRules[[#Data],[Priority]]{sep}1E+99))"
                 )
                 client_specific_formula = (
-                    f"=IFERROR(INDEX(ClientRules[[#Data],[Category]]{sep}MATCH(1{sep}INDEX(({cond_expr})"
-                    f"*(IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}IFERROR(1*ClientRules[[#Data],[Priority]]{sep}1E+99))"
-                    f"=MIN(IF({cond_expr}{sep}IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}IFERROR(1*ClientRules[[#Data],[Priority]]{sep}1E+99)){sep}1E+99))){sep}0){sep}0)){sep}\"\")"
+                    f"=IFERROR(TAKE(SORTBY(FILTER(ClientRules[[#Data],[Category]]{sep}{cond_expr})"
+                    f"{sep}FILTER({pri_expr}{sep}{cond_expr}){sep}1){sep}1){sep}\"\")"
                 )
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
         if final_col and manual_col and client_specific_col and global_cat_col:
