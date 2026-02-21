@@ -1,4 +1,4 @@
-# Version: 2.29
+# Version: 2.30
 import os
 import glob
 import re
@@ -1231,9 +1231,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 pri_expr = (
                     f"IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}IFERROR(1*ClientRules[[#Data],[Priority]]{sep}1E+99))"
                 )
+                min_pri_expr = f"MIN(IF({cond_expr}{sep}{pri_expr}{sep}1E+99))"
                 client_specific_formula = (
-                    f"=IFERROR(TAKE(SORTBY(FILTER(ClientRules[[#Data],[Category]]{sep}{cond_expr})"
-                    f"{sep}FILTER({pri_expr}{sep}{cond_expr}){sep}1){sep}1){sep}\"\")"
+                    f"=IFERROR(INDEX(ClientRules[[#Data],[Category]]{sep}"
+                    f"MATCH(1{sep}INDEX(({cond_expr})*({pri_expr}={min_pri_expr}){sep}0){sep}0))"
+                    f"{sep}\"\")"
                 )
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
         if final_col and manual_col and client_specific_col and global_cat_col:
