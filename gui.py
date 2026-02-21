@@ -110,6 +110,24 @@ def show_reconciliation_popup(
             return ""
         return ""
 
+    def _safe_amount(value):
+        try:
+            if value is None:
+                return None
+            if isinstance(value, str):
+                s = value.strip()
+                if not s:
+                    return None
+                s = s.replace("£", "").replace(",", "")
+                return float(s)
+            return float(value)
+        except Exception:
+            return None
+
+    def _fmt_money_or_na(value) -> str:
+        text = _fmt_money(value)
+        return text if text else "N/A"
+
     recon_results = sorted(list(recon_results or []), key=_recon_sort_key)
     period_by_pdf = {
         str(r.get("pdf") or ""): _fmt_period(r.get("period_start"), r.get("period_end"))
@@ -185,17 +203,48 @@ def show_reconciliation_popup(
                 except Exception:
                     continue
 
+        credit_count = 0
+        credit_total = 0.0
+        debit_count = 0
+        debit_total_abs = 0.0
+        net_total = None
+
+        if isinstance(transactions, list):
+            for txn in transactions:
+                if not isinstance(txn, dict):
+                    continue
+                amount = _safe_amount(txn.get("Amount"))
+                if amount is None:
+                    continue
+                net_total = (net_total or 0.0) + amount
+                if amount > 0:
+                    credit_count += 1
+                    credit_total += amount
+                elif amount < 0:
+                    debit_count += 1
+                    debit_total_abs += abs(amount)
+        else:
+            net_from_result = _safe_amount(r.get("sum_amounts"))
+            if net_from_result is not None:
+                net_total = net_from_result
+
+        start_balance = _safe_amount(r.get("start_balance"))
+        end_balance = _safe_amount(r.get("end_balance"))
+        difference = _safe_amount(r.get("difference"))
+        expected_end = _safe_amount(r.get("expected_end"))
+
+        if expected_end is not None:
+            calculated_end = expected_end
+        elif start_balance is not None and net_total is not None:
+            calculated_end = start_balance + net_total
+        else:
+            calculated_end = None
+
         if status == "OK":
-            msg = (
-                f"OK: {pdf} "
-                f"(Start {_fmt_money(r.get('start_balance'))}, Net {_fmt_money(r.get('sum_amounts'))}, End {_fmt_money(r.get('end_balance'))})"
-            )
+            msg = f"OK: {pdf}"
             tag = "ok"
         elif status == "Mismatch":
-            msg = (
-                f"MISMATCH: {pdf} "
-                f"(Start {_fmt_money(r.get('start_balance'))}, Net {_fmt_money(r.get('sum_amounts'))}, End {_fmt_money(r.get('end_balance'))}, Diff {_fmt_money(r.get('difference'))})"
-            )
+            msg = f"MISMATCH: {pdf}"
             tag = "bad"
         elif status == "Statement balances not found":
             msg = f"NOT CHECKED: {pdf} (statement balances not found)"
@@ -207,7 +256,21 @@ def show_reconciliation_popup(
             msg = f"NOT CHECKED: {pdf} ({status or 'not checked'})"
             tag = "warn"
 
-        txt.insert("end", msg + f" | {txn_count} Transactions\n", tag)
+        lines = [
+            msg,
+            f"  Credits: {credit_count} | Total: {_fmt_money_or_na(credit_total)}",
+            f"  Debits:  {debit_count} | Total: {_fmt_money_or_na(debit_total_abs)}",
+            f"  Total transactions: {txn_count}",
+            f"  Starting balance: {_fmt_money_or_na(start_balance)}",
+            f"  Net movement: {_fmt_money_or_na(net_total)}",
+            f"  Calculated ending balance: {_fmt_money_or_na(calculated_end)}",
+            f"  Statement ending balance: {_fmt_money_or_na(end_balance)}",
+        ]
+
+        if difference is not None:
+            lines.append(f"  Difference: {_fmt_money_or_na(difference)}")
+
+        txt.insert("end", "\n".join(lines) + "\n\n", tag)
 
     txt.insert("end", "\n")
 
