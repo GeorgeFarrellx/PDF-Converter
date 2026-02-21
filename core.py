@@ -1,4 +1,4 @@
-# Version: 2.30
+# Version: 2.29
 import os
 import glob
 import re
@@ -1226,15 +1226,13 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 cond_expr = (
                     f"((ClientRules[[#Data],[Active]]=TRUE)+(ClientRules[[#Data],[Active]]=\"\"))"
                     f"*(ClientRules[[#Data],[Pattern]]<>\"\")"
+                    f"*(ClientRules[[#Data],[Priority]]<>\"\")"
                     f"*ISNUMBER(SEARCH(ClientRules[[#Data],[Pattern]]{sep}{desc_ref}))"
                 )
-                pri_expr = (
-                    f"IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}IFERROR(1*ClientRules[[#Data],[Priority]]{sep}1E+99))"
-                )
-                min_pri_expr = f"MIN(IF({cond_expr}{sep}{pri_expr}{sep}1E+99))"
                 client_specific_formula = (
                     f"=IFERROR(INDEX(ClientRules[[#Data],[Category]]{sep}"
-                    f"MATCH(1{sep}INDEX(({cond_expr})*({pri_expr}={min_pri_expr}){sep}0){sep}0))"
+                    f"MATCH(AGGREGATE(15{sep}6{sep}ClientRules[[#Data],[Priority]]/({cond_expr}){sep}1){sep}"
+                    f"ClientRules[[#Data],[Priority]]{sep}0))"
                     f"{sep}\"\")"
                 )
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
