@@ -1234,7 +1234,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 )
                 client_specific_formula = (
                     f"=IFERROR(INDEX(ClientRules[[#Data],[Category]]{sep}MATCH(1{sep}INDEX(({cond_expr})"
-                    f"*({pri_expr}=AGGREGATE(15{sep}6{sep}({pri_expr})/({cond_expr}){sep}1)){sep}0){sep}0)){sep}\"\")"
+                    f"*(IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}IFERROR(1*ClientRules[[#Data],[Priority]]{sep}1E+99))"
+                    f"=MIN(IF({cond_expr}{sep}IF(ClientRules[[#Data],[Priority]]=\"\"{sep}1E+99{sep}IFERROR(1*ClientRules[[#Data],[Priority]]{sep}1E+99)){sep}1E+99))){sep}0){sep}0)){sep}\"\")"
                 )
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
         if final_col and manual_col and client_specific_col and global_cat_col:
