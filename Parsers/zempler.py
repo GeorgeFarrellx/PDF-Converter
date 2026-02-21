@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import os
 import re
 from typing import Optional
 
@@ -157,20 +158,47 @@ def extract_account_holder_name(pdf_path: str) -> str:
     return ""
 
 
+def _parse_period_from_filename(pdf_path: str) -> tuple[Optional[_dt.date], Optional[_dt.date]]:
+    try:
+        name = os.path.basename(pdf_path or "")
+        m = re.search(
+            r"(?P<d1>\d{1,2})[./-](?P<m1>\d{1,2})[./-](?P<y1>\d{2,4})\s*[-–—]\s*(?P<d2>\d{1,2})[./-](?P<m2>\d{1,2})[./-](?P<y2>\d{2,4})",
+            name,
+        )
+        if not m:
+            return None, None
+
+        d1 = int(m.group("d1"))
+        m1 = int(m.group("m1"))
+        y1 = int(m.group("y1"))
+        d2 = int(m.group("d2"))
+        m2 = int(m.group("m2"))
+        y2 = int(m.group("y2"))
+
+        if y1 < 100:
+            y1 += 2000
+        if y2 < 100:
+            y2 += 2000
+
+        return _dt.date(y1, m1, d1), _dt.date(y2, m2, d2)
+    except Exception:
+        return None, None
+
+
 def extract_statement_period(pdf_path: str) -> tuple[Optional[_dt.date], Optional[_dt.date]]:
     try:
         lines = _iter_lines(pdf_path)
         text = "\n".join(lines)
+        m = _PERIOD_RE.search(text)
+        if m:
+            try:
+                start = _dt.datetime.strptime(m.group(1), "%d/%m/%Y").date()
+                end = _dt.datetime.strptime(m.group(2), "%d/%m/%Y").date()
+                return start, end
+            except Exception:
+                pass
+
     except Exception:
         return None, None
 
-    m = _PERIOD_RE.search(text)
-    if not m:
-        return None, None
-
-    try:
-        start = _dt.datetime.strptime(m.group(1), "%d/%m/%Y").date()
-        end = _dt.datetime.strptime(m.group(2), "%d/%m/%Y").date()
-        return start, end
-    except Exception:
-        return None, None
+    return _parse_period_from_filename(pdf_path)
