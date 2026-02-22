@@ -1462,6 +1462,9 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
     parseable_balance_rows = 0
     checked_rows = 0
     missing_or_bad_walk_rows = 0
+    pending_sum = 0.0
+    pending_rows = 0
+    bridged_rows_validated = 0
     mismatch_examples = []
     running = start_val
     last_checked_balance = None
@@ -1473,17 +1476,39 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
         if bal is not None:
             parseable_balance_rows += 1
 
-        if amt is None or bal is None:
+        if amt is None and bal is None:
             missing_or_bad_walk_rows += 1
             running = None
+            pending_sum = 0.0
+            pending_rows = 0
+            continue
+
+        if amt is None and bal is not None:
+            missing_or_bad_walk_rows += 1
+            running = bal
+            last_checked_balance = bal
+            pending_sum = 0.0
+            pending_rows = 0
+            continue
+
+        if amt is not None and bal is None:
+            missing_or_bad_walk_rows += 1
+            if running is not None:
+                pending_sum = round(pending_sum + amt, 2)
+                pending_rows += 1
+            else:
+                pending_sum = 0.0
+                pending_rows = 0
             continue
 
         if running is None:
             running = bal
             last_checked_balance = bal
+            pending_sum = 0.0
+            pending_rows = 0
             continue
 
-        expected = round(running + amt, 2)
+        expected = round(running + pending_sum + amt, 2)
         if abs(expected - bal) > 0.01:
             if len(mismatch_examples) < 5:
                 mismatch_examples.append(
@@ -1493,9 +1518,13 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
                         "actual": bal,
                     }
                 )
+        if pending_rows > 0:
+            bridged_rows_validated += pending_rows
+        checked_rows += 1
         running = bal
         last_checked_balance = bal
-        checked_rows += 1
+        pending_sum = 0.0
+        pending_rows = 0
 
     balance_walk_status = "OK"
     balance_walk_summary = ""
@@ -1504,6 +1533,10 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
         "checked_rows": checked_rows,
         "parseable_balance_rows": parseable_balance_rows,
         "missing_or_bad_rows": missing_or_bad_walk_rows,
+        "coverage_total_steps": max(1, row_count - 1),
+        "coverage_checked_steps": checked_rows,
+        "coverage_pct": round((checked_rows / max(1, row_count - 1)) * 100.0, 1),
+        "bridged_rows_validated": bridged_rows_validated,
         "mismatch_examples": mismatch_examples,
         "end_balance_check": None,
     }
@@ -1516,14 +1549,19 @@ def run_audit_checks_basic(pdf_name: str, transactions: list[dict], start_balanc
         if parseable_balance_rows == 0:
             reasons.append("no parseable row balances")
         if parseable_balance_rows > 0 and start_val is not None:
-            reasons.append("no consecutive parseable amount/balance rows")
+            reasons.append("no checkable balance steps")
         balance_walk_summary = "; ".join(reasons)
     else:
+        coverage_total_steps = balance_walk_details["coverage_total_steps"]
+        coverage_pct = balance_walk_details["coverage_pct"]
+        coverage_summary = f"{checked_rows}/{coverage_total_steps} steps checked ({coverage_pct:.1f}%)"
+        if bridged_rows_validated > 0:
+            coverage_summary = coverage_summary + f"; bridged {bridged_rows_validated} rows"
         if mismatch_examples:
             balance_walk_status = "MISMATCH"
-            balance_walk_summary = f"{len(mismatch_examples)} row mismatches"
+            balance_walk_summary = f"{len(mismatch_examples)} row mismatches; {coverage_summary}"
         else:
-            balance_walk_summary = f"{checked_rows} rows checked"
+            balance_walk_summary = coverage_summary
 
         if end_val is not None and last_checked_balance is not None:
             end_diff = round(last_checked_balance - end_val, 2)
