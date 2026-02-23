@@ -176,6 +176,25 @@ def _parse_period_from_text(page1_text: str):
     if not page1_text:
         return None, None
     t = " ".join(page1_text.split())
+    m_explicit_years = re.search(
+        r"\b(?P<d1>\d{1,2})\s+(?P<m1>[A-Za-z]+)\s+(?P<y1>\d{4})\s+to\s+(?P<d2>\d{1,2})\s+(?P<m2>[A-Za-z]+)\s+(?P<y2>\d{4})\b",
+        t,
+        re.IGNORECASE,
+    )
+    if m_explicit_years:
+        y1 = int(m_explicit_years.group("y1"))
+        y2 = int(m_explicit_years.group("y2"))
+        m1 = MONTHS_FULL.get(m_explicit_years.group("m1").title())
+        m2 = MONTHS_FULL.get(m_explicit_years.group("m2").title())
+        if not m1 or not m2:
+            return None, None
+        try:
+            start = date(y1, m1, int(m_explicit_years.group("d1")))
+            end = date(y2, m2, int(m_explicit_years.group("d2")))
+            return start, end
+        except Exception:
+            return None, None
+
     m = re.search(
         r"\b(?P<d1>\d{1,2})\s+(?P<m1>[A-Za-z]+)\s+to\s+(?P<d2>\d{1,2})\s+(?P<m2>[A-Za-z]+)\s+(?P<y>\d{4})\b",
         t,
