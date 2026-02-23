@@ -1,4 +1,4 @@
-# Version: 2.33
+# Version: 2.35
 import os
 import glob
 import re
@@ -1127,74 +1127,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         gbp_accounting = "_-£* #,##0.00_-;[Red]-£* #,##0.00_-;_-£* \"-\"??_-;_-@_-"
         sep = _excel_list_separator()
 
-        ws_summary = wb.create_sheet("Summary", 0)
-        ws_summary.cell(row=1, column=1).value = "Category"
-        ws_summary.cell(row=1, column=2).value = "Total"
-        ws_summary.cell(row=1, column=4).value = "Category"
-        ws_summary.cell(row=1, column=5).value = "Total"
-
-        income_categories = sorted(
-            {
-                str(cat).strip()
-                for cat in df.loc[df["Amount"] > 0, "Global"]
-                if pd.notna(cat) and str(cat).strip()
-            }
-        )
-        expense_categories = sorted(
-            {
-                str(cat).strip()
-                for cat in df.loc[df["Amount"] < 0, "Global"]
-                if pd.notna(cat) and str(cat).strip()
-            }
-        )
-
-        for idx, category in enumerate(income_categories, start=2):
-            ws_summary.cell(row=idx, column=1).value = category
-            income_formula = f'=IF(A{idx}="","",SUMIFS(TransactionData[Amount],TransactionData[Final],A{idx},TransactionData[Amount],">0"))'
-            if sep != ",":
-                income_formula = income_formula.replace(",", sep)
-            ws_summary.cell(row=idx, column=2).value = income_formula
-            ws_summary.cell(row=idx, column=2).number_format = gbp_accounting
-
-        for idx, category in enumerate(expense_categories, start=2):
-            ws_summary.cell(row=idx, column=4).value = category
-            expense_formula = f'=IF(D{idx}="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],D{idx},TransactionData[Amount],"<0"))'
-            if sep != ",":
-                expense_formula = expense_formula.replace(",", sep)
-            ws_summary.cell(row=idx, column=5).value = expense_formula
-            ws_summary.cell(row=idx, column=5).number_format = gbp_accounting
-
-        if income_categories:
-            income_ref = f"A1:B{1 + len(income_categories)}"
-            income_table = Table(displayName="IncomeSummary", ref=income_ref)
-            income_style = TableStyleInfo(
-                name="None",
-                showRowStripes=False,
-                showColumnStripes=False,
-            )
-            income_table.totalsRowShown = False
-            income_table.tableStyleInfo = income_style
-            ws_summary.add_table(income_table)
-
-        if expense_categories:
-            expense_ref = f"D1:E{1 + len(expense_categories)}"
-            expense_table = Table(displayName="ExpenseSummary", ref=expense_ref)
-            expense_style = TableStyleInfo(
-                name="None",
-                showRowStripes=False,
-                showColumnStripes=False,
-            )
-            expense_table.totalsRowShown = False
-            expense_table.tableStyleInfo = expense_style
-            ws_summary.add_table(expense_table)
-
         left_text = (client_name or "").strip()
         right_text = period
-
-        for hdr in (ws_summary.oddHeader, ws_summary.evenHeader, ws_summary.firstHeader):
-            hdr.left.text = left_text
-            hdr.center.text = "Summary"
-            hdr.right.text = right_text
 
         center_text = "Transaction Data"
 
@@ -1251,6 +1185,34 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         for hdr in (ws_rules.oddHeader, ws_rules.evenHeader, ws_rules.firstHeader):
             hdr.left.text = left_text
             hdr.center.text = "Custom Rules"
+            hdr.right.text = right_text
+
+        ws_summary = wb.create_sheet("Summary")
+        ws_summary.cell(row=1, column=1).value = "Category"
+        ws_summary.cell(row=1, column=2).value = "Total"
+        ws_summary.cell(row=1, column=4).value = "Category"
+        ws_summary.cell(row=1, column=5).value = "Total"
+
+        income_categories_formula = '=LET(f,TransactionData[Final],a,TransactionData[Amount],IFERROR(SORT(UNIQUE(FILTER(f,(a>0)*(f<>"")))),""))'
+        income_totals_formula = '=LET(c,$A$2#,IF(c="","",SUMIFS(TransactionData[Amount],TransactionData[Final],c,TransactionData[Amount],">0")))'
+        expense_categories_formula = '=LET(f,TransactionData[Final],a,TransactionData[Amount],IFERROR(SORT(UNIQUE(FILTER(f,(a<0)*(f<>"")))),""))'
+        expense_totals_formula = '=LET(c,$D$2#,IF(c="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],c,TransactionData[Amount],"<0")))'
+        if sep != ",":
+            income_categories_formula = income_categories_formula.replace(",", sep)
+            income_totals_formula = income_totals_formula.replace(",", sep)
+            expense_categories_formula = expense_categories_formula.replace(",", sep)
+            expense_totals_formula = expense_totals_formula.replace(",", sep)
+
+        ws_summary["A2"] = income_categories_formula
+        ws_summary["B2"] = income_totals_formula
+        ws_summary["D2"] = expense_categories_formula
+        ws_summary["E2"] = expense_totals_formula
+        ws_summary["B2"].number_format = gbp_accounting
+        ws_summary["E2"].number_format = gbp_accounting
+
+        for hdr in (ws_summary.oddHeader, ws_summary.evenHeader, ws_summary.firstHeader):
+            hdr.left.text = left_text
+            hdr.center.text = "Summary"
             hdr.right.text = right_text
 
         no_border_rules = Border()
