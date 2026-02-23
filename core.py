@@ -1,4 +1,4 @@
-# Version: 2.35
+# Version: 2.36
 import os
 import glob
 import re
@@ -1193,9 +1193,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_summary.cell(row=1, column=4).value = "Category"
         ws_summary.cell(row=1, column=5).value = "Total"
 
-        income_categories_formula = '=IFERROR(_xlfn._xlws.SORT(_xlfn._xlws.UNIQUE(_xlfn._xlws.FILTER(TransactionData[Final],(TransactionData[Amount]>0)*(TransactionData[Final]<>"")))),""))'
+        income_categories_formula = '=IFERROR(_xlfn._xlws.SORT(_xlfn._xlws.UNIQUE(_xlfn._xlws.FILTER(TransactionData[Final],(TransactionData[Amount]>0)*(TransactionData[Final]<>"")))),"" )'
         income_totals_formula = '=IF($A$2#="","",SUMIFS(TransactionData[Amount],TransactionData[Final],$A$2#,TransactionData[Amount],">0"))'
-        expense_categories_formula = '=IFERROR(_xlfn._xlws.SORT(_xlfn._xlws.UNIQUE(_xlfn._xlws.FILTER(TransactionData[Final],(TransactionData[Amount]<0)*(TransactionData[Final]<>"")))),""))'
+        expense_categories_formula = '=IFERROR(_xlfn._xlws.SORT(_xlfn._xlws.UNIQUE(_xlfn._xlws.FILTER(TransactionData[Final],(TransactionData[Amount]<0)*(TransactionData[Final]<>"")))),"" )'
         expense_totals_formula = '=IF($D$2#="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],$D$2#,TransactionData[Amount],"<0"))'
         if sep != ",":
             income_categories_formula = income_categories_formula.replace(",", sep)
