@@ -1,4 +1,4 @@
-# Version: 2.29
+# Version: 2.30
 import os
 import glob
 import re
@@ -1221,21 +1221,27 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             and not disable_client_specific_formula_for_diagnostics
         ):
             desc_letter = get_column_letter(desc_col)
+            priority_rng = "'Client Categorisation Rules'!$A$2:$A$5000"
+            category_rng = "'Client Categorisation Rules'!$B$2:$B$5000"
+            pattern_rng = "'Client Categorisation Rules'!$C$2:$C$5000"
+            active_rng = "'Client Categorisation Rules'!$F$2:$F$5000"
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
                 cond_expr = (
-                    f"((ClientRules[[#Data],[Active]]=TRUE)+(ClientRules[[#Data],[Active]]=\"\"))"
-                    f"*(ClientRules[[#Data],[Pattern]]<>\"\")"
-                    f"*(ClientRules[[#Data],[Priority]]<>\"\")"
-                    f"*ISNUMBER(SEARCH(ClientRules[[#Data],[Pattern]]{sep}{desc_ref}))"
+                    f"(({active_rng}=TRUE)+({active_rng}=\"\"))"
+                    f"*({pattern_rng}<>\"\")"
+                    f"*({priority_rng}<>\"\")"
+                    f"*ISNUMBER(SEARCH({pattern_rng},{desc_ref}))"
                 )
                 client_specific_formula = (
-                    f"=IFERROR(INDEX(ClientRules[[#Data],[Category]]{sep}"
-                    f"MATCH(AGGREGATE(15{sep}6{sep}(1*ClientRules[[#Data],[Priority]])/"
-                    f"INDEX({cond_expr}{sep}0){sep}1){sep}"
-                    f"(1*ClientRules[[#Data],[Priority]]){sep}0))"
-                    f"{sep}\"\")"
+                    f"=IFERROR(INDEX({category_rng},"
+                    f"MATCH(AGGREGATE(15,6,(1*{priority_rng})/"
+                    f"INDEX({cond_expr},0),1),"
+                    f"(1*{priority_rng}),0)),"
+                    f"\"\")"
                 )
+                if sep != ",":
+                    client_specific_formula = client_specific_formula.replace(",", sep)
                 ws.cell(row=r, column=client_specific_col).value = client_specific_formula
         if final_col and manual_col and client_specific_col and global_cat_col:
             manual_letter = get_column_letter(manual_col)
