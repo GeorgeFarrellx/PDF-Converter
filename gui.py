@@ -438,13 +438,13 @@ class App(TkinterDnD.Tk):
 
         ttk.Checkbutton(
             bank_row,
-            text="Auto-detect bank",
+            text="Auto-Detect Bank",
             variable=self.auto_detect_var,
         ).pack(side="left")
 
         ttk.Checkbutton(
             bank_row,
-            text="Enable categorisation",
+            text="Enable Categorisation",
             variable=self.enable_categorisation_var,
         ).pack(side="left", padx=(12, 0))
 
@@ -469,7 +469,7 @@ class App(TkinterDnD.Tk):
         self.run_btn = ttk.Button(run_row, text="Convert", command=self.run_parser)
         self.run_btn.pack(side="left")
 
-        self.cleanup_btn = ttk.Button(run_row, text="Clean Up", command=self.clean_up)
+        self.cleanup_btn = ttk.Button(run_row, text="Clean", command=self.clean_up)
         self.cleanup_btn.pack(side="left", padx=10)
 
         ttk.Separator(root).pack(fill="x", pady=(18, 8))
