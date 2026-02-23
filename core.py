@@ -1,4 +1,4 @@
-# Version: 2.37
+# Version: 2.38
 import os
 import glob
 import re
@@ -1138,6 +1138,13 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             hdr.right.text = right_text
 
         last_row = ws.max_row
+        tx_sheet_name = ws.title
+        tx_last_row = ws.max_row
+        amt_letter = get_column_letter(df.columns.get_loc("Amount") + 1)
+        final_letter = get_column_letter(df.columns.get_loc("Final") + 1)
+        amt_rng = f"'{tx_sheet_name}'!${amt_letter}$2:${amt_letter}${tx_last_row}"
+        final_rng = f"'{tx_sheet_name}'!${final_letter}$2:${final_letter}${tx_last_row}"
+        final_first = f"'{tx_sheet_name}'!${final_letter}$2"
         last_col = ws.max_column
         if last_row >= 2 and last_col >= 1:
             ref = f"A1:{get_column_letter(last_col)}{last_row}"
@@ -1196,36 +1203,20 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         SUMMARY_MAX_ROWS = 500
         summary_last_data_row = 1 + SUMMARY_MAX_ROWS
 
-        income_categories = sorted(
-            {
-                str(cat).strip()
-                for cat in df.loc[(df["Amount"] > 0) & (df["Global"].notna()), "Global"].tolist()
-                if str(cat).strip()
-            }
-        )
-        expense_categories = sorted(
-            {
-                str(cat).strip()
-                for cat in df.loc[(df["Amount"] < 0) & (df["Global"].notna()), "Global"].tolist()
-                if str(cat).strip()
-            }
-        )
-
-        for idx, category in enumerate(income_categories[:SUMMARY_MAX_ROWS], start=2):
-            ws_summary[f"A{idx}"] = category
-        for idx, category in enumerate(expense_categories[:SUMMARY_MAX_ROWS], start=2):
-            ws_summary[f"D{idx}"] = category
-
         for r in range(2, summary_last_data_row + 1):
-            income_total_formula = f'=IF(A{r}="","",SUMIFS(TransactionData[Amount],TransactionData[Final],A{r},TransactionData[Amount],">0"))'
-            expense_total_formula = f'=IF(D{r}="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],D{r},TransactionData[Amount],"<0"))'
+            income_category_formula = f'=IFERROR(INDEX({final_rng},AGGREGATE(15,6,(ROW({final_rng})-ROW({final_first})+1)/((COUNTIF($A$1:A{r-1},{final_rng})=0)*({amt_rng}>0)*({final_rng}<>"")),1)),"")'
+            expense_category_formula = f'=IFERROR(INDEX({final_rng},AGGREGATE(15,6,(ROW({final_rng})-ROW({final_first})+1)/((COUNTIF($D$1:D{r-1},{final_rng})=0)*({amt_rng}<0)*({final_rng}<>"")),1)),"")'
+            income_total_formula = f'=IF(A{r}="","",SUMIFS({amt_rng},{final_rng},A{r},{amt_rng},">0"))'
+            expense_total_formula = f'=IF(D{r}="","",-SUMIFS({amt_rng},{final_rng},D{r},{amt_rng},"<0"))'
             if sep != ",":
+                income_category_formula = income_category_formula.replace(",", sep)
+                expense_category_formula = expense_category_formula.replace(",", sep)
                 income_total_formula = income_total_formula.replace(",", sep)
                 expense_total_formula = expense_total_formula.replace(",", sep)
+            ws_summary[f"A{r}"] = income_category_formula
+            ws_summary[f"D{r}"] = expense_category_formula
             ws_summary[f"B{r}"] = income_total_formula
             ws_summary[f"E{r}"] = expense_total_formula
-            ws_summary[f"B{r}"].number_format = gbp_accounting
-            ws_summary[f"E{r}"].number_format = gbp_accounting
 
         subtotal_row = summary_last_data_row + 1
         ws_summary[f"A{subtotal_row}"] = "Subtotal"
@@ -1237,8 +1228,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             expense_subtotal_formula = expense_subtotal_formula.replace(",", sep)
         ws_summary[f"B{subtotal_row}"] = income_subtotal_formula
         ws_summary[f"E{subtotal_row}"] = expense_subtotal_formula
-        ws_summary[f"B{subtotal_row}"].number_format = gbp_accounting
-        ws_summary[f"E{subtotal_row}"].number_format = gbp_accounting
+
+        for r in range(2, subtotal_row + 1):
+            ws_summary[f"B{r}"].number_format = gbp_accounting
+            ws_summary[f"E{r}"].number_format = gbp_accounting
 
         for hdr in (ws_summary.oddHeader, ws_summary.evenHeader, ws_summary.firstHeader):
             hdr.left.text = left_text
