@@ -1,4 +1,4 @@
-# Version: 2.40
+# Version: 2.41
 import os
 import glob
 import re
@@ -1216,34 +1216,13 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         subtotal_row = summary_last_data_row + 1
 
         for r in range(start_row, summary_last_data_row + 1):
-            prev_income = "$G$3:G3" if r == start_row else f"$G${start_row}:G{r-1}"
-            prev_expense = "$J$3:J3" if r == start_row else f"$J${start_row}:J{r-1}"
-
-            income_category_formula = f'=IFERROR(TRIM(INDEX({final_rng},MATCH(0,IF(({amt_rng}>0)*(TRIM({final_rng})<>""),COUNTIF({prev_income},TRIM({final_rng})),1),0))),"")'
-            expense_category_formula = f'=IFERROR(TRIM(INDEX({final_rng},MATCH(0,IF(({amt_rng}<0)*(TRIM({final_rng})<>""),COUNTIF({prev_expense},TRIM({final_rng})),1),0))),"")'
+            income_category_formula = f'=LET(_cats,SORT(UNIQUE(FILTER({final_rng},({amt_rng}>0)*(TRIM({final_rng})<>"")))),IFERROR(INDEX(_cats,ROWS($A${start_row}:A{r})),""))'
+            expense_category_formula = f'=LET(_cats,SORT(UNIQUE(FILTER({final_rng},({amt_rng}<0)*(TRIM({final_rng})<>"")))),IFERROR(INDEX(_cats,ROWS($D${start_row}:D{r})),""))'
             if sep != ",":
                 income_category_formula = income_category_formula.replace(",", sep)
                 expense_category_formula = expense_category_formula.replace(",", sep)
-
-            ws_summary[f"G{r}"].value = ArrayFormula(f"G{r}", income_category_formula)
-            ws_summary[f"J{r}"].value = ArrayFormula(f"J{r}", expense_category_formula)
-
-        for r in range(start_row, summary_last_data_row + 1):
-            income_rank_formula = f'=IF(G{r}="","",COUNTIFS($G${start_row}:$G${summary_last_data_row},"<"&G{r},$G${start_row}:$G${summary_last_data_row},"<>")+1)'
-            expense_rank_formula = f'=IF(J{r}="","",COUNTIFS($J${start_row}:$J${summary_last_data_row},"<"&J{r},$J${start_row}:$J${summary_last_data_row},"<>")+1)'
-            if sep != ",":
-                income_rank_formula = income_rank_formula.replace(",", sep)
-                expense_rank_formula = expense_rank_formula.replace(",", sep)
-            ws_summary[f"H{r}"] = income_rank_formula
-            ws_summary[f"K{r}"] = expense_rank_formula
-
-            sorted_income_formula = f'=IFERROR(INDEX($G${start_row}:$G${summary_last_data_row},MATCH(ROWS($A${start_row}:A{r}),$H${start_row}:$H${summary_last_data_row},0)),"")'
-            sorted_expense_formula = f'=IFERROR(INDEX($J${start_row}:$J${summary_last_data_row},MATCH(ROWS($D${start_row}:D{r}),$K${start_row}:$K${summary_last_data_row},0)),"")'
-            if sep != ",":
-                sorted_income_formula = sorted_income_formula.replace(",", sep)
-                sorted_expense_formula = sorted_expense_formula.replace(",", sep)
-            ws_summary[f"A{r}"] = sorted_income_formula
-            ws_summary[f"D{r}"] = sorted_expense_formula
+            ws_summary[f"A{r}"] = income_category_formula
+            ws_summary[f"D{r}"] = expense_category_formula
 
         for r in range(start_row, summary_last_data_row + 1):
             income_total_formula = f'=IF(A{r}="","",SUMIFS({amt_rng},{final_rng},A{r},{amt_rng},">0"))'
