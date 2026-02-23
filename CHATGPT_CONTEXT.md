@@ -50,7 +50,7 @@ Root-level structure and key files/folders visible in this repo:
 - **UI ownership:** `gui.py` owns user interaction, layout, and continuity/reconciliation behavior in the interface.
 - **Parser ownership:** `Parsers/*.py` own bank-specific PDF extraction and row normalization only; parser files must not define app-wide GUI or startup policy.
 - **Version ownership:** `VERSION.txt` is the authoritative user-facing version marker and must align with parser-version changes.
-- **Current app version:** `2.31`.
+- **Current app version:** `2.30`.
 
 ## Parser Interface Contract
 
