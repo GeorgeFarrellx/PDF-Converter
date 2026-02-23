@@ -1027,6 +1027,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
         from openpyxl.styles import Border
         from openpyxl.worksheet.filters import AutoFilter
+        from openpyxl.worksheet.formula import ArrayFormula
     except Exception as e:
         _show_dependency_error(
             "pandas and openpyxl are required for Excel output.\n\n"
@@ -1144,7 +1145,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         final_letter = get_column_letter(df.columns.get_loc("Final") + 1)
         amt_rng = f"'{tx_sheet_name}'!${amt_letter}$2:${amt_letter}${tx_last_row}"
         final_rng = f"'{tx_sheet_name}'!${final_letter}$2:${final_letter}${tx_last_row}"
-        final_first = f"'{tx_sheet_name}'!${final_letter}$2"
         last_col = ws.max_column
         if last_row >= 2 and last_col >= 1:
             ref = f"A1:{get_column_letter(last_col)}{last_row}"
@@ -1204,17 +1204,24 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         summary_last_data_row = 1 + SUMMARY_MAX_ROWS
 
         for r in range(2, summary_last_data_row + 1):
-            income_category_formula = f'=IFERROR(INDEX({final_rng},AGGREGATE(15,6,(ROW({final_rng})-ROW({final_first})+1)/((COUNTIF($A$1:A{r-1},{final_rng})=0)*({amt_rng}>0)*({final_rng}<>"")),1)),"")'
-            expense_category_formula = f'=IFERROR(INDEX({final_rng},AGGREGATE(15,6,(ROW({final_rng})-ROW({final_first})+1)/((COUNTIF($D$1:D{r-1},{final_rng})=0)*({amt_rng}<0)*({final_rng}<>"")),1)),"")'
-            income_total_formula = f'=IF(A{r}="","",SUMIFS({amt_rng},{final_rng},A{r},{amt_rng},">0"))'
-            expense_total_formula = f'=IF(D{r}="","",-SUMIFS({amt_rng},{final_rng},D{r},{amt_rng},"<0"))'
+            ws_summary[f"A{r}"].value = None
+            ws_summary[f"D{r}"].value = None
+
+        income_array_formula = f'=IFERROR(INDEX({final_rng},MATCH(0,IF(({amt_rng}>0)*({final_rng}<>""),COUNTIF($A$1:A1,{final_rng}),1),0)),"")'
+        expense_array_formula = f'=IFERROR(INDEX({final_rng},MATCH(0,IF(({amt_rng}<0)*({final_rng}<>""),COUNTIF($D$1:D1,{final_rng}),1),0)),"")'
+        if sep != ",":
+            income_array_formula = income_array_formula.replace(",", sep)
+            expense_array_formula = expense_array_formula.replace(",", sep)
+
+        ws_summary["A2"].value = ArrayFormula(f"A2:A{summary_last_data_row}", income_array_formula)
+        ws_summary["D2"].value = ArrayFormula(f"D2:D{summary_last_data_row}", expense_array_formula)
+
+        for r in range(2, summary_last_data_row + 1):
+            income_total_formula = f'=IF(A{r}="","",SUMIFS(TransactionData[Amount],TransactionData[Final],A{r},TransactionData[Amount],">0"))'
+            expense_total_formula = f'=IF(D{r}="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],D{r},TransactionData[Amount],"<0"))'
             if sep != ",":
-                income_category_formula = income_category_formula.replace(",", sep)
-                expense_category_formula = expense_category_formula.replace(",", sep)
                 income_total_formula = income_total_formula.replace(",", sep)
                 expense_total_formula = expense_total_formula.replace(",", sep)
-            ws_summary[f"A{r}"] = income_category_formula
-            ws_summary[f"D{r}"] = expense_category_formula
             ws_summary[f"B{r}"] = income_total_formula
             ws_summary[f"E{r}"] = expense_total_formula
 
