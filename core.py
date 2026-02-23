@@ -1,4 +1,4 @@
-# Version: 2.30
+# Version: 2.31
 import os
 import glob
 import re
@@ -747,13 +747,13 @@ def _apply_global_categorisation(transactions: list[dict], pd) -> None:
     for txn in transactions:
         if not isinstance(txn, dict):
             continue
-        if "Global Category" not in txn:
-            txn["Global Category"] = ""
-        if str(txn.get("Global Category", "") or "").strip():
+        if "Global" not in txn:
+            txn["Global"] = ""
+        if str(txn.get("Global", "") or "").strip():
             continue
         for rule in rules:
             if _rule_matches(txn, rule):
-                txn["Global Category"] = rule.get("Category", "")
+                txn["Global"] = rule.get("Category", "")
                 break
 
 
@@ -930,7 +930,7 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
                         sheet_targets[name] = rel_target_map[rid]
 
         transaction_sheet_xml = sheet_targets.get("Transaction Data")
-        categorisation_rules_sheet_xml = sheet_targets.get("Client Categorisation Rules")
+        categorisation_rules_sheet_xml = sheet_targets.get("Custom Rules")
         audit["transaction_data_sheet_xml"] = transaction_sheet_xml
         audit["categorisation_rules_sheet_xml"] = categorisation_rules_sheet_xml
 
@@ -1051,16 +1051,28 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     if missing:
         raise KeyError(f"Parser output missing columns: {missing}")
 
-    if "Global Category" not in df.columns:
-        df["Global Category"] = None
-    if "Manual Category" not in df.columns:
-        df["Manual Category"] = ""
-    if "Client Specific Category" not in df.columns:
-        df["Client Specific Category"] = None
-    if "Final Category" not in df.columns:
-        df["Final Category"] = None
+    legacy_to_new = {
+        "Global Category": "Global",
+        "Client Specific Category": "Custom",
+        "Manual Category": "Manual",
+        "Final Category": "Final",
+    }
+    for old_col, new_col in legacy_to_new.items():
+        if old_col in df.columns:
+            if new_col not in df.columns:
+                df[new_col] = df[old_col]
+            df = df.drop(columns=[old_col])
 
-    df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global Category", "Client Specific Category", "Manual Category", "Final Category"]]
+    if "Global" not in df.columns:
+        df["Global"] = None
+    if "Manual" not in df.columns:
+        df["Manual"] = ""
+    if "Custom" not in df.columns:
+        df["Custom"] = None
+    if "Final" not in df.columns:
+        df["Final"] = None
+
+    df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global", "Custom", "Manual", "Final"]]
 
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
@@ -1068,12 +1080,12 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     df["Balance"] = pd.to_numeric(df["Balance"], errors="coerce")
 
     if enable_categorisation:
-        df["Global Category"] = df["Global Category"].where(df["Global Category"].notna(), None)
+        df["Global"] = df["Global"].where(df["Global"].notna(), None)
     else:
-        df["Global Category"] = ""
+        df["Global"] = ""
 
-    df["Client Specific Category"] = None
-    df["Final Category"] = None
+    df["Custom"] = None
+    df["Final"] = None
 
     ensure_folder(os.path.dirname(output_path))
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
@@ -1148,7 +1160,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 for cell in row:
                     cell.border = no_border
 
-        ws_rules = wb.create_sheet("Client Categorisation Rules")
+        ws_rules = wb.create_sheet("Custom Rules")
         ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
         ws_rules.append([10, "Tools & Materials", "ELECTRICAL", "ANY", "", True, "TEMP seed rule for testing"])
         ws_rules.append([11, "Tools & Materials", "SCREWFIX", "ANY", "", True, "TEMP seed rule for testing"])
@@ -1187,10 +1199,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         bal_col = header_to_col.get("Balance")
         desc_col = header_to_col.get("Description")
         txn_type_col = header_to_col.get("Transaction Type")
-        global_cat_col = header_to_col.get("Global Category")
-        client_specific_col = header_to_col.get("Client Specific Category")
-        manual_col = header_to_col.get("Manual Category")
-        final_col = header_to_col.get("Final Category")
+        global_cat_col = header_to_col.get("Global")
+        custom_col = header_to_col.get("Custom")
+        manual_col = header_to_col.get("Manual")
+        final_col = header_to_col.get("Final")
 
         disable_client_specific_formula_for_diagnostics = False
         sep = _excel_list_separator()
@@ -1206,15 +1218,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
         if (
-            client_specific_col
+            custom_col
             and desc_col
             and not disable_client_specific_formula_for_diagnostics
         ):
             desc_letter = get_column_letter(desc_col)
-            priority_rng = "'Client Categorisation Rules'!$A$2:$A$5000"
-            category_rng = "'Client Categorisation Rules'!$B$2:$B$5000"
-            pattern_rng = "'Client Categorisation Rules'!$C$2:$C$5000"
-            active_rng = "'Client Categorisation Rules'!$F$2:$F$5000"
+            priority_rng = "'Custom Rules'!$A$2:$A$5000"
+            category_rng = "'Custom Rules'!$B$2:$B$5000"
+            pattern_rng = "'Custom Rules'!$C$2:$C$5000"
+            active_rng = "'Custom Rules'!$F$2:$F$5000"
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
                 cond_expr = (
@@ -1222,23 +1234,23 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     f"*({pattern_rng}<>\"\")"
                     f"*ISNUMBER(SEARCH({pattern_rng},{desc_ref}))"
                 )
-                client_specific_formula = (
+                custom_formula = (
                     f"=IFERROR(INDEX({category_rng},"
                     f"MATCH(1,INDEX({cond_expr},0),0)),"
                     f"\"\")"
                 )
                 if sep != ",":
-                    client_specific_formula = client_specific_formula.replace(",", sep)
-                ws.cell(row=r, column=client_specific_col).value = client_specific_formula
-        if final_col and manual_col and client_specific_col and global_cat_col:
+                    custom_formula = custom_formula.replace(",", sep)
+                ws.cell(row=r, column=custom_col).value = custom_formula
+        if final_col and manual_col and custom_col and global_cat_col:
             manual_letter = get_column_letter(manual_col)
-            client_letter = get_column_letter(client_specific_col)
+            custom_letter = get_column_letter(custom_col)
             global_letter = get_column_letter(global_cat_col)
             for r in range(2, max_r + 1):
                 manual_ref = f"{manual_letter}{r}"
-                client_ref = f"{client_letter}{r}"
+                custom_ref = f"{custom_letter}{r}"
                 global_ref = f"{global_letter}{r}"
-                final_category_formula = f'=IF({manual_ref}<>"",{manual_ref},IF({client_ref}<>"",{client_ref},IF({global_ref}<>"",{global_ref},"")))'
+                final_category_formula = f'=IF({manual_ref}<>"",{manual_ref},IF({custom_ref}<>"",{custom_ref},IF({global_ref}<>"",{global_ref},"")))'
                 if sep != ",":
                     final_category_formula = final_category_formula.replace(",", sep)
                 ws.cell(row=r, column=final_col).value = final_category_formula
