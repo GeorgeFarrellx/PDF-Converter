@@ -1193,10 +1193,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_summary.cell(row=1, column=4).value = "Category"
         ws_summary.cell(row=1, column=5).value = "Total"
 
-        income_categories_formula = '=LET(f,TransactionData[Final],a,TransactionData[Amount],IFERROR(SORT(UNIQUE(FILTER(f,(a>0)*(f<>"")))),""))'
-        income_totals_formula = '=LET(c,$A$2#,IF(c="","",SUMIFS(TransactionData[Amount],TransactionData[Final],c,TransactionData[Amount],">0")))'
-        expense_categories_formula = '=LET(f,TransactionData[Final],a,TransactionData[Amount],IFERROR(SORT(UNIQUE(FILTER(f,(a<0)*(f<>"")))),""))'
-        expense_totals_formula = '=LET(c,$D$2#,IF(c="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],c,TransactionData[Amount],"<0")))'
+        income_categories_formula = '=IFERROR(_xlfn._xlws.SORT(_xlfn._xlws.UNIQUE(_xlfn._xlws.FILTER(TransactionData[Final],(TransactionData[Amount]>0)*(TransactionData[Final]<>"")))),""))'
+        income_totals_formula = '=IF($A$2#="","",SUMIFS(TransactionData[Amount],TransactionData[Final],$A$2#,TransactionData[Amount],">0"))'
+        expense_categories_formula = '=IFERROR(_xlfn._xlws.SORT(_xlfn._xlws.UNIQUE(_xlfn._xlws.FILTER(TransactionData[Final],(TransactionData[Amount]<0)*(TransactionData[Final]<>"")))),""))'
+        expense_totals_formula = '=IF($D$2#="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],$D$2#,TransactionData[Amount],"<0"))'
         if sep != ",":
             income_categories_formula = income_categories_formula.replace(",", sep)
             income_totals_formula = income_totals_formula.replace(",", sep)
