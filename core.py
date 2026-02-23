@@ -1193,22 +1193,25 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_summary.cell(row=1, column=4).value = "Category"
         ws_summary.cell(row=1, column=5).value = "Total"
 
-        income_categories_formula = '=IFERROR(_xlfn._xlws.SORT(_xlfn._xlws.UNIQUE(_xlfn._xlws.FILTER(TransactionData[Final],(TransactionData[Amount]>0)*(TransactionData[Final]<>"")))),"" )'
-        income_totals_formula = '=IF($A$2#="","",SUMIFS(TransactionData[Amount],TransactionData[Final],$A$2#,TransactionData[Amount],">0"))'
-        expense_categories_formula = '=IFERROR(_xlfn._xlws.SORT(_xlfn._xlws.UNIQUE(_xlfn._xlws.FILTER(TransactionData[Final],(TransactionData[Amount]<0)*(TransactionData[Final]<>"")))),"" )'
-        expense_totals_formula = '=IF($D$2#="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],$D$2#,TransactionData[Amount],"<0"))'
+        SUMMARY_MAX_ROWS = 5000
+        income_categories_formula = '=IFERROR(SORT(UNIQUE(FILTER(TransactionData[Final],(TransactionData[Amount]>0)*(TransactionData[Final]<>"")))),"")'
+        expense_categories_formula = '=IFERROR(SORT(UNIQUE(FILTER(TransactionData[Final],(TransactionData[Amount]<0)*(TransactionData[Final]<>"")))),"")'
         if sep != ",":
             income_categories_formula = income_categories_formula.replace(",", sep)
-            income_totals_formula = income_totals_formula.replace(",", sep)
             expense_categories_formula = expense_categories_formula.replace(",", sep)
-            expense_totals_formula = expense_totals_formula.replace(",", sep)
 
         ws_summary["A2"] = income_categories_formula
-        ws_summary["B2"] = income_totals_formula
         ws_summary["D2"] = expense_categories_formula
-        ws_summary["E2"] = expense_totals_formula
-        ws_summary["B2"].number_format = gbp_accounting
-        ws_summary["E2"].number_format = gbp_accounting
+        for r in range(2, SUMMARY_MAX_ROWS + 1):
+            income_total_formula = f'=IF(A{r}="","",SUMIFS(TransactionData[Amount],TransactionData[Final],A{r},TransactionData[Amount],">0"))'
+            expense_total_formula = f'=IF(D{r}="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],D{r},TransactionData[Amount],"<0"))'
+            if sep != ",":
+                income_total_formula = income_total_formula.replace(",", sep)
+                expense_total_formula = expense_total_formula.replace(",", sep)
+            ws_summary[f"B{r}"] = income_total_formula
+            ws_summary[f"E{r}"] = expense_total_formula
+            ws_summary[f"B{r}"].number_format = gbp_accounting
+            ws_summary[f"E{r}"].number_format = gbp_accounting
 
         for hdr in (ws_summary.oddHeader, ws_summary.evenHeader, ws_summary.firstHeader):
             hdr.left.text = left_text
