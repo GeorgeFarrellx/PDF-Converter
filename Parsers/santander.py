@@ -255,6 +255,7 @@ def _apply_global_type_rules(tx_type: str, desc: str) -> Tuple[str, str]:
             # normalize prefix casing
             raw_desc = "Returned Direct Debit" + raw_desc[len("returned direct debit"):]
             raw_desc = raw_desc.strip()
+        raw_desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", raw_desc, flags=re.IGNORECASE).strip()
         return ttype, raw_desc
 
     dlow = raw_desc.lower()
@@ -265,6 +266,7 @@ def _apply_global_type_rules(tx_type: str, desc: str) -> Tuple[str, str]:
         or "google pay" in dlow
         or raw_desc.rstrip().endswith("GB")
     ):
+        raw_desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", raw_desc, flags=re.IGNORECASE).strip()
         return "Card Payment", raw_desc
 
     # Otherwise keep wording (Title Case)
@@ -279,6 +281,7 @@ def _apply_global_type_rules(tx_type: str, desc: str) -> Tuple[str, str]:
             if raw_desc.lower().startswith(raw_type.lower() + " "):
                 raw_desc = raw_desc[len(raw_type):].strip()
 
+    raw_desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", raw_desc, flags=re.IGNORECASE).strip()
     return ttype, raw_desc
 
 

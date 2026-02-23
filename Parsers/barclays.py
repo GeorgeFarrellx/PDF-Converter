@@ -705,6 +705,8 @@ def extract_transactions(pdf_path: str) -> list[dict]:
                 return
             signed_amt = round(float(amt_mag) if is_credit else -float(amt_mag), 2)
 
+        desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", desc, flags=re.IGNORECASE).strip()
+
         txns.append(
             {
                 "Date": current_dt,

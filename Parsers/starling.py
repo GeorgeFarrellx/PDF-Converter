@@ -88,6 +88,7 @@ def _title_case_type(s: str) -> str:
 def _apply_global_transaction_type_rules(txn_type: str, desc: str) -> tuple[str, str]:
     txn_type_raw = (txn_type or "").strip()
     desc_raw = (desc or "").strip()
+    desc_raw = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", desc_raw, flags=re.IGNORECASE).strip()
 
     type_u = txn_type_raw.upper()
     desc_u = desc_raw.upper()

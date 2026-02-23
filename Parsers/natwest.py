@@ -176,6 +176,7 @@ def _clean_description(desc: str) -> str:
     # Remove duplicated commas spacing " , " -> ", "
     s = re.sub(r",\s*", ", ", s)
     s = re.sub(r"\s{2,}", " ", s).strip()
+    s = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", s, flags=re.IGNORECASE).strip()
     return s
 
 

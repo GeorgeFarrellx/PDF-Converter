@@ -307,6 +307,7 @@ def extract_transactions(pdf_path: str):
         code = current_txn.get("code", "").strip()
         base_type = HSBC_TYPE_MAP.get(code, (code.title() if code else "Transaction"))
         tx_type = _apply_global_type_rules(base_type, description)
+        description = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", description, flags=re.IGNORECASE).strip()
 
         rows.append({
             "Date": current_txn["date"],

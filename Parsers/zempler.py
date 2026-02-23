@@ -87,11 +87,13 @@ def extract_transactions(pdf_path: str) -> list[dict]:
             continue
 
         card_ending = (m.group("card") or "").strip()
+        description = (m.group("description") or "").strip()
+        description = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", description, flags=re.IGNORECASE).strip()
         transactions.append(
             {
                 "Date": tx_date,
                 "Transaction Type": "Card Payment" if card_ending else "Other",
-                "Description": (m.group("description") or "").strip(),
+                "Description": description,
                 "Amount": amount,
                 "Balance": balance,
             }
