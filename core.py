@@ -1,4 +1,4 @@
-# Version: 2.36
+# Version: 2.37
 import os
 import glob
 import re
@@ -1148,7 +1148,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ]
 
             style = TableStyleInfo(
-                name="None",
+                name="TableStyleLight1",
                 showFirstColumn=False,
                 showLastColumn=False,
                 showRowStripes=False,
@@ -1171,7 +1171,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.append([1000, "", "", "ANY", "", False, "Sort the table by Priority (smallest first). First matching rule wins."])
         rules_table = Table(displayName="ClientRules", ref="A1:G4")
         rules_style = TableStyleInfo(
-            name="None",
+            name="TableStyleLight1",
             showFirstColumn=False,
             showLastColumn=False,
             showRowStripes=False,
@@ -1193,16 +1193,30 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_summary.cell(row=1, column=4).value = "Category"
         ws_summary.cell(row=1, column=5).value = "Total"
 
-        SUMMARY_MAX_ROWS = 5000
-        income_categories_formula = '=IFERROR(SORT(UNIQUE(FILTER(TransactionData[Final],(TransactionData[Amount]>0)*(TransactionData[Final]<>"")))),"")'
-        expense_categories_formula = '=IFERROR(SORT(UNIQUE(FILTER(TransactionData[Final],(TransactionData[Amount]<0)*(TransactionData[Final]<>"")))),"")'
-        if sep != ",":
-            income_categories_formula = income_categories_formula.replace(",", sep)
-            expense_categories_formula = expense_categories_formula.replace(",", sep)
+        SUMMARY_MAX_ROWS = 500
+        summary_last_data_row = 1 + SUMMARY_MAX_ROWS
 
-        ws_summary["A2"] = income_categories_formula
-        ws_summary["D2"] = expense_categories_formula
-        for r in range(2, SUMMARY_MAX_ROWS + 1):
+        income_categories = sorted(
+            {
+                str(cat).strip()
+                for cat in df.loc[(df["Amount"] > 0) & (df["Global"].notna()), "Global"].tolist()
+                if str(cat).strip()
+            }
+        )
+        expense_categories = sorted(
+            {
+                str(cat).strip()
+                for cat in df.loc[(df["Amount"] < 0) & (df["Global"].notna()), "Global"].tolist()
+                if str(cat).strip()
+            }
+        )
+
+        for idx, category in enumerate(income_categories[:SUMMARY_MAX_ROWS], start=2):
+            ws_summary[f"A{idx}"] = category
+        for idx, category in enumerate(expense_categories[:SUMMARY_MAX_ROWS], start=2):
+            ws_summary[f"D{idx}"] = category
+
+        for r in range(2, summary_last_data_row + 1):
             income_total_formula = f'=IF(A{r}="","",SUMIFS(TransactionData[Amount],TransactionData[Final],A{r},TransactionData[Amount],">0"))'
             expense_total_formula = f'=IF(D{r}="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],D{r},TransactionData[Amount],"<0"))'
             if sep != ",":
@@ -1212,6 +1226,19 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws_summary[f"E{r}"] = expense_total_formula
             ws_summary[f"B{r}"].number_format = gbp_accounting
             ws_summary[f"E{r}"].number_format = gbp_accounting
+
+        subtotal_row = summary_last_data_row + 1
+        ws_summary[f"A{subtotal_row}"] = "Subtotal"
+        ws_summary[f"D{subtotal_row}"] = "Subtotal"
+        income_subtotal_formula = f"=SUM(B2:B{summary_last_data_row})"
+        expense_subtotal_formula = f"=SUM(E2:E{summary_last_data_row})"
+        if sep != ",":
+            income_subtotal_formula = income_subtotal_formula.replace(",", sep)
+            expense_subtotal_formula = expense_subtotal_formula.replace(",", sep)
+        ws_summary[f"B{subtotal_row}"] = income_subtotal_formula
+        ws_summary[f"E{subtotal_row}"] = expense_subtotal_formula
+        ws_summary[f"B{subtotal_row}"].number_format = gbp_accounting
+        ws_summary[f"E{subtotal_row}"].number_format = gbp_accounting
 
         for hdr in (ws_summary.oddHeader, ws_summary.evenHeader, ws_summary.firstHeader):
             hdr.left.text = left_text
