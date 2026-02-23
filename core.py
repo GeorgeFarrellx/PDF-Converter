@@ -1,4 +1,4 @@
-# Version: 2.31
+# Version: 2.32
 import os
 import glob
 import re
@@ -1259,6 +1259,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
         if bal_col:
             ws.column_dimensions[get_column_letter(bal_col)].hidden = True
+        if global_cat_col:
+            ws.column_dimensions[get_column_letter(global_cat_col)].hidden = True
+        if custom_col:
+            ws.column_dimensions[get_column_letter(custom_col)].hidden = True
 
         for col_idx in range(1, ws.max_column + 1):
             col_letter = get_column_letter(col_idx)
