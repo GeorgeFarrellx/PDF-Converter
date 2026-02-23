@@ -1017,6 +1017,41 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
 
     return audit
 
+
+def _strip_calc_chain_xlsx(xlsx_path: str) -> None:
+    temp_path = f"{xlsx_path}.tmp"
+    with zipfile.ZipFile(xlsx_path, "r") as src_zip, zipfile.ZipFile(temp_path, "w", compression=zipfile.ZIP_DEFLATED) as dst_zip:
+        for info in src_zip.infolist():
+            name = info.filename
+            if name == "xl/calcChain.xml":
+                continue
+
+            data = src_zip.read(name)
+
+            if name == "xl/_rels/workbook.xml.rels":
+                root = ET.fromstring(data)
+                for rel in list(root):
+                    if not rel.tag.endswith("Relationship"):
+                        continue
+                    rel_type = rel.attrib.get("Type", "")
+                    rel_target = rel.attrib.get("Target", "")
+                    if rel_type.endswith("/calcChain") or rel_target == "calcChain.xml":
+                        root.remove(rel)
+                data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+            elif name == "[Content_Types].xml":
+                root = ET.fromstring(data)
+                for override in list(root):
+                    if not override.tag.endswith("Override"):
+                        continue
+                    if override.attrib.get("PartName") == "/xl/calcChain.xml":
+                        root.remove(override)
+                data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+            dst_zip.writestr(name, data)
+
+    os.replace(temp_path, xlsx_path)
+
 def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = "", header_period_start=None, header_period_end=None, enable_categorisation: bool = True):
     if not transactions:
         raise ValueError("No transactions found!")
@@ -1027,7 +1062,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
         from openpyxl.styles import Border, Font
         from openpyxl.worksheet.filters import AutoFilter
-        from openpyxl.worksheet.formula import ArrayFormula
     except Exception as e:
         _show_dependency_error(
             "pandas and openpyxl are required for Excel output.\n\n"
@@ -1386,6 +1420,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     cell = ws._cells[(r, global_cat_col)]
                     if cell.value is None or cell.value == "":
                         del ws._cells[(r, global_cat_col)]
+
+    try:
+        _strip_calc_chain_xlsx(output_path)
+    except Exception:
+        pass
 
     if enable_categorisation:
         try:
