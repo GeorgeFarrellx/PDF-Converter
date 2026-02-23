@@ -433,6 +433,7 @@ def extract_transactions(pdf_path: str):
 
         desc_lines = [x for x in current_txn["desc_lines"] if x]
         description = " - ".join(desc_lines).strip()
+        description = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", description, flags=re.IGNORECASE).strip()
 
         tx_type = _apply_type_overrides(current_txn["base_type"], description)
 

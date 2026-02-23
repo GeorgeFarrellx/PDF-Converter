@@ -466,6 +466,7 @@ def _normalise_type_and_description(tx_type: str, desc: str) -> Tuple[str, str]:
             # Ensure capitalised prefix
             if not desc.startswith("Returned Direct Debit"):
                 desc = "Returned Direct Debit" + desc[len("returned direct debit") :]
+        desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", desc, flags=re.IGNORECASE).strip()
         return tx_type, desc.strip()
 
     # Card payment overrides
@@ -483,6 +484,8 @@ def _normalise_type_and_description(tx_type: str, desc: str) -> Tuple[str, str]:
     if tx_type:
         if re.match(rf"^{re.escape(tx_type)}(\s+|[-:])", desc, flags=re.I):
             desc = re.sub(rf"^{re.escape(tx_type)}(\s+|[-:])+", "", desc, flags=re.I).strip()
+
+    desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", desc, flags=re.IGNORECASE).strip()
 
     return tx_type, desc
 

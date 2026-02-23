@@ -433,6 +433,7 @@ def extract_transactions(pdf_path: str) -> list[dict]:
 
         ttype, desc = _split_type_and_description(desc_text)
         desc = (desc or "").strip()
+        desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", desc, flags=re.IGNORECASE).strip()
 
         signed_amt = None
         if prev_balance is not None:

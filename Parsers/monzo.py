@@ -366,6 +366,7 @@ def extract_transactions(pdf_path: str) -> List[Dict]:
 
         raw_type, cleaned_desc = _extract_type_from_description(raw_desc)
         tx_type, final_desc = _normalize_type_and_description(raw_type, cleaned_desc)
+        final_desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", final_desc, flags=re.IGNORECASE).strip()
 
         txns_raw.append(
             {

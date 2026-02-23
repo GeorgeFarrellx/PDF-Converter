@@ -209,6 +209,7 @@ def _normalize_type_and_desc(tx_type: str, desc: str) -> Tuple[str, str]:
         tx_type = "Direct Debit"
         if not desc.lower().startswith("returned direct debit"):
             desc = ("Returned Direct Debit " + desc).strip()
+        desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", desc, flags=re.IGNORECASE).strip()
         return tx_type, desc
 
     desc_lower = desc.lower()
@@ -223,6 +224,7 @@ def _normalize_type_and_desc(tx_type: str, desc: str) -> Tuple[str, str]:
     if tx_type and desc_lower.startswith(tx_type.lower()):
         desc = desc[len(tx_type):].strip(" -:")
 
+    desc = re.sub(r"\s+CD\s*\d{4}\b\s*$", "", desc, flags=re.IGNORECASE).strip()
     return tx_type, desc
 
 
