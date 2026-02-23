@@ -1139,12 +1139,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             hdr.right.text = right_text
 
         last_row = ws.max_row
-        tx_sheet_name = ws.title
         tx_last_row = ws.max_row
         amt_letter = get_column_letter(df.columns.get_loc("Amount") + 1)
         final_letter = get_column_letter(df.columns.get_loc("Final") + 1)
-        amt_rng = f"'{tx_sheet_name}'!${amt_letter}$2:${amt_letter}${tx_last_row}"
-        final_rng = f"'{tx_sheet_name}'!${final_letter}$2:${final_letter}${tx_last_row}"
+        amt_rng = f"'Transaction Data'!${amt_letter}$2:${amt_letter}${tx_last_row}"
+        final_rng = f"'Transaction Data'!${final_letter}$2:${final_letter}${tx_last_row}"
         last_col = ws.max_column
         if last_row >= 2 and last_col >= 1:
             ref = f"A1:{get_column_letter(last_col)}{last_row}"
@@ -1203,29 +1202,30 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         SUMMARY_MAX_ROWS = 500
         summary_last_data_row = 1 + SUMMARY_MAX_ROWS
 
-        for r in range(2, summary_last_data_row + 1):
-            ws_summary[f"A{r}"].value = None
-            ws_summary[f"D{r}"].value = None
-
-        income_array_formula = f'=IFERROR(INDEX({final_rng},MATCH(0,IF(({amt_rng}>0)*({final_rng}<>""),COUNTIF($A$1:A1,{final_rng}),1),0)),"")'
-        expense_array_formula = f'=IFERROR(INDEX({final_rng},MATCH(0,IF(({amt_rng}<0)*({final_rng}<>""),COUNTIF($D$1:D1,{final_rng}),1),0)),"")'
-        if sep != ",":
-            income_array_formula = income_array_formula.replace(",", sep)
-            expense_array_formula = expense_array_formula.replace(",", sep)
-
-        ws_summary["A2"].value = ArrayFormula(f"A2:A{summary_last_data_row}", income_array_formula)
-        ws_summary["D2"].value = ArrayFormula(f"D2:D{summary_last_data_row}", expense_array_formula)
+        subtotal_row = summary_last_data_row + 1
 
         for r in range(2, summary_last_data_row + 1):
-            income_total_formula = f'=IF(A{r}="","",SUMIFS(TransactionData[Amount],TransactionData[Final],A{r},TransactionData[Amount],">0"))'
-            expense_total_formula = f'=IF(D{r}="","",-SUMIFS(TransactionData[Amount],TransactionData[Final],D{r},TransactionData[Amount],"<0"))'
+            prev_income = "$A$1:A1" if r == 2 else f"$A$2:A{r-1}"
+            prev_expense = "$D$1:D1" if r == 2 else f"$D$2:D{r-1}"
+
+            income_category_formula = f'=IFERROR(TRIM(INDEX({final_rng},MATCH(0,IF(({amt_rng}>0)*(TRIM({final_rng})<>""),COUNTIF({prev_income},TRIM({final_rng})),1),0))),"")'
+            expense_category_formula = f'=IFERROR(TRIM(INDEX({final_rng},MATCH(0,IF(({amt_rng}<0)*(TRIM({final_rng})<>""),COUNTIF({prev_expense},TRIM({final_rng})),1),0))),"")'
+            if sep != ",":
+                income_category_formula = income_category_formula.replace(",", sep)
+                expense_category_formula = expense_category_formula.replace(",", sep)
+
+            ws_summary[f"A{r}"].value = ArrayFormula(f"A{r}", income_category_formula)
+            ws_summary[f"D{r}"].value = ArrayFormula(f"D{r}", expense_category_formula)
+
+        for r in range(2, summary_last_data_row + 1):
+            income_total_formula = f'=IF(A{r}="","",SUMIFS({amt_rng},{final_rng},A{r},{amt_rng},">0"))'
+            expense_total_formula = f'=IF(D{r}="","",-SUMIFS({amt_rng},{final_rng},D{r},{amt_rng},"<0"))'
             if sep != ",":
                 income_total_formula = income_total_formula.replace(",", sep)
                 expense_total_formula = expense_total_formula.replace(",", sep)
             ws_summary[f"B{r}"] = income_total_formula
             ws_summary[f"E{r}"] = expense_total_formula
 
-        subtotal_row = summary_last_data_row + 1
         ws_summary[f"A{subtotal_row}"] = "Subtotal"
         ws_summary[f"D{subtotal_row}"] = "Subtotal"
         income_subtotal_formula = f"=SUM(B2:B{summary_last_data_row})"
