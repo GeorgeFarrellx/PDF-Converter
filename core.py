@@ -1,4 +1,4 @@
-# Version: 2.39
+# Version: 2.40
 import os
 import glob
 import re
@@ -1229,8 +1229,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws_summary[f"J{r}"].value = ArrayFormula(f"J{r}", expense_category_formula)
 
         for r in range(start_row, summary_last_data_row + 1):
-            income_rank_formula = f'=IF(G{r}="","",COUNTIF($G${start_row}:$G${summary_last_data_row},"<"&G{r})+1)'
-            expense_rank_formula = f'=IF(J{r}="","",COUNTIF($J${start_row}:$J${summary_last_data_row},"<"&J{r})+1)'
+            income_rank_formula = f'=IF(G{r}="","",COUNTIFS($G${start_row}:$G${summary_last_data_row},"<"&G{r},$G${start_row}:$G${summary_last_data_row},"<>")+1)'
+            expense_rank_formula = f'=IF(J{r}="","",COUNTIFS($J${start_row}:$J${summary_last_data_row},"<"&J{r},$J${start_row}:$J${summary_last_data_row},"<>")+1)'
             if sep != ",":
                 income_rank_formula = income_rank_formula.replace(",", sep)
                 expense_rank_formula = expense_rank_formula.replace(",", sep)
