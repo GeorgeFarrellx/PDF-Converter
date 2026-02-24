@@ -1232,6 +1232,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         ws_summary = wb.create_sheet("Summary")
 
+        for hdr in (ws_summary.oddHeader, ws_summary.evenHeader, ws_summary.firstHeader):
+            hdr.left.text = left_text
+            hdr.center.text = "Summary"
+            hdr.right.text = right_text
+
         no_border_rules = Border()
         last_row_rules = ws_rules.max_row
         last_col_rules = ws_rules.max_column
