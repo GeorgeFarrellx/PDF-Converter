@@ -1193,7 +1193,22 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
         lo = ws_tx.ListObjects("TransactionData")
         src = lo.Range
         step = "Build SourceData address"
-        source_data = src.Address(True, True, 1, True)
+        addr = getattr(src, "Address", None)
+        if callable(addr):
+            addr = str(addr)
+        if addr is None:
+            raise RuntimeError("Range.Address unavailable")
+        if not isinstance(addr, str):
+            addr = str(addr)
+        addr = addr.strip()
+        if "!" in addr:
+            range_part = addr.split("!", 1)[1].strip()
+        else:
+            range_part = addr
+        wb_name = getattr(workbook, "Name", "")
+        sheet_name = getattr(ws_tx, "Name", "Transaction Data")
+        sheet_esc = sheet_name.replace("'", "''")
+        source_data = f"'[{wb_name}]{sheet_esc}'!{range_part}"
 
         step = "Prepare Summary 2 sheet"
         ws_p = workbook.Worksheets("Summary 2")
