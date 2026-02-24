@@ -1,4 +1,4 @@
-# Version: 2.47
+# Version: 2.48
 import os
 import glob
 import gc
@@ -1117,8 +1117,18 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
     abs_path = os.path.abspath(xlsx_path)
     pythoncom.CoInitialize()
     old_filter = None
+    filter_registered = False
     try:
-        old_filter = pythoncom.CoRegisterMessageFilter(_ExcelMessageFilter())
+        if hasattr(pythoncom, "CoRegisterMessageFilter"):
+            try:
+                old_filter = pythoncom.CoRegisterMessageFilter(_ExcelMessageFilter())
+                filter_registered = True
+            except Exception:
+                old_filter = None
+                filter_registered = False
+        else:
+            old_filter = None
+            filter_registered = False
         step = "Launch Excel"
         excel = _com_retry(lambda: win32com.client.DispatchEx("Excel.Application"))
         excel.Visible = False
@@ -1227,10 +1237,11 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
         workbook = None
         excel = None
         gc.collect()
-        try:
-            pythoncom.CoRegisterMessageFilter(old_filter)
-        except Exception:
-            pass
+        if filter_registered and hasattr(pythoncom, "CoRegisterMessageFilter"):
+            try:
+                pythoncom.CoRegisterMessageFilter(old_filter)
+            except Exception:
+                pass
         pythoncom.CoUninitialize()
 
 
