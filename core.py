@@ -1370,11 +1370,13 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 ws.cell(row=r, column=manual_col).protection = Protection(locked=False)
 
         ws.protection.sheet = True
-        ws.protection.formatCells = True
-        ws.protection.autoFilter = True
-        ws.protection.sort = True
-        ws.protection.selectLockedCells = True
-        ws.protection.selectUnlockedCells = True
+        ws.protection.formatCells = False
+        ws.protection.formatColumns = False
+        ws.protection.formatRows = False
+        ws.protection.autoFilter = False
+        ws.protection.sort = False
+        ws.protection.selectLockedCells = False
+        ws.protection.selectUnlockedCells = False
 
     try:
         _strip_calc_chain_xlsx(output_path)
