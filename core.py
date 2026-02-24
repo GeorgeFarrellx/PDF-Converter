@@ -1,6 +1,7 @@
-# Version: 2.45
+# Version: 2.46
 import os
 import glob
+import gc
 import re
 import importlib.util
 import traceback
@@ -1058,24 +1059,47 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
         return False, "Windows required for Excel COM PivotTable creation."
 
     try:
+        import pythoncom
+        import pywintypes
         import win32com.client
     except Exception:
         return False, "pywin32 not installed (win32com unavailable)."
 
     excel = None
     workbook = None
+    ws_tx = None
+    lo = None
+    ws_p = None
+    step = "Initialize COM"
+
+    def _format_com_error(e: Exception) -> str:
+        if isinstance(e, pywintypes.com_error):
+            return f"{hex(e.hresult)} {e.strerror} excepinfo={e.excepinfo}"
+        return repr(e)
+
     abs_path = os.path.abspath(xlsx_path)
+    pythoncom.CoInitialize()
     try:
+        step = "Launch Excel"
         excel = win32com.client.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-        workbook = excel.Workbooks.Open(abs_path, UpdateLinks=0)
+        step = "Open workbook"
+        workbook = excel.Workbooks.Open(abs_path, UpdateLinks=0, ReadOnly=False, IgnoreReadOnlyRecommended=True)
+        if getattr(workbook, "ReadOnly", False):
+            raise RuntimeError("Workbook opened read-only (file may be open/locked in Excel). Close it and retry.")
+
+        step = "Calculate workbook"
         excel.Application.CalculateFullRebuild()
 
+        step = "Get TransactionData ListObject"
         ws_tx = workbook.Worksheets("Transaction Data")
         lo = ws_tx.ListObjects("TransactionData")
         src = lo.Range
+        step = "Build SourceData address"
+        source_data = src.Address(True, True, 1, True)
 
+        step = "Prepare Summary 2 sheet"
         ws_p = workbook.Worksheets("Summary 2")
         ws_p.Cells.Clear()
         ws_p.Range("A1").Value = "Summary 2 (PivotTable)"
@@ -1083,35 +1107,44 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
         xlDatabase = 1
         xlRowField = 1
         xlSum = -4157
-        cache = workbook.PivotCaches().Create(SourceType=xlDatabase, SourceData=src)
+        step = "Create PivotCache"
+        cache = workbook.PivotCaches().Create(SourceType=xlDatabase, SourceData=source_data)
         cache.RefreshOnFileOpen = True
+        step = "Create PivotTable"
         pt = cache.CreatePivotTable(TableDestination=ws_p.Range("A3"), TableName="PivotSummary2")
 
+        step = "Configure PivotFields"
         pf = pt.PivotFields("Final")
         pf.Orientation = xlRowField
         pf.Position = 1
 
+        step = "Add CalculatedFields: Income"
         try:
             pt.CalculatedFields().Add("Income", "=IF(Amount>0,Amount,0)")
         except Exception:
             pass
+        step = "Add CalculatedFields: Expenses"
         try:
             pt.CalculatedFields().Add("Expenses", "=IF(Amount<0,-Amount,0)")
         except Exception:
             pass
 
+        step = "Add DataFields: Income"
         pt.AddDataField(pt.PivotFields("Income"), "Income", xlSum)
+        step = "Add DataFields: Expenses"
         pt.AddDataField(pt.PivotFields("Expenses"), "Expenses", xlSum)
+        step = "Add DataFields: Net"
         pt.AddDataField(pt.PivotFields("Amount"), "Net", xlSum)
         pt.PivotCache().RefreshOnFileOpen = True
 
         if pt.DataBodyRange is not None:
             pt.DataBodyRange.NumberFormat = "_-£* #,##0.00_-;[Red]-£* #,##0.00_-;_-£* \"-\"??_-;_-@_-"
 
+        step = "Save workbook"
         workbook.Save()
         return True, ""
     except Exception as e:
-        message = str(e) if str(e) else repr(e)
+        message = f"FAILED at {step}: {_format_com_error(e)}"
         try:
             if workbook is not None:
                 ws_p = workbook.Worksheets("Summary 2")
@@ -1134,7 +1167,7 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
     finally:
         if workbook is not None:
             try:
-                workbook.Close(SaveChanges=False)
+                workbook.Close(SaveChanges=True)
             except Exception:
                 pass
         if excel is not None:
@@ -1142,6 +1175,13 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
                 excel.Quit()
             except Exception:
                 pass
+        ws_p = None
+        lo = None
+        ws_tx = None
+        workbook = None
+        excel = None
+        gc.collect()
+        pythoncom.CoUninitialize()
 
 
 def _enable_summary_dynamic_arrays_xlsx(xlsx_path: str) -> None:
