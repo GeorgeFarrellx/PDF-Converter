@@ -1053,14 +1053,14 @@ def _strip_calc_chain_xlsx(xlsx_path: str) -> None:
     os.replace(temp_path, xlsx_path)
 
 
-def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> bool:
+def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]:
     if not platform.system().lower().startswith("win"):
-        return False
+        return False, "Windows required for Excel COM PivotTable creation."
 
     try:
         import win32com.client
     except Exception:
-        return False
+        return False, "pywin32 not installed (win32com unavailable)."
 
     excel = None
     workbook = None
@@ -1069,56 +1069,68 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> bool:
         excel = win32com.client.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-        excel.Interactive = False
+        workbook = excel.Workbooks.Open(abs_path, UpdateLinks=0)
+        excel.Application.CalculateFullRebuild()
 
-        workbook = excel.Workbooks.Open(abs_path)
         ws_tx = workbook.Worksheets("Transaction Data")
         lo = ws_tx.ListObjects("TransactionData")
-        src_range = lo.Range
+        src = lo.Range
 
         ws_p = workbook.Worksheets("Summary 2")
         ws_p.Cells.Clear()
-        ws_p.Range("A1").Value = "Summary 2 PivotTable"
+        ws_p.Range("A1").Value = "Summary 2 (PivotTable)"
 
-        pc = workbook.PivotCaches().Create(SourceType=1, SourceData=src_range)
-        pc.RefreshOnFileOpen = True
-        pt = pc.CreatePivotTable(TableDestination=ws_p.Range("A3"), TableName="PivotSummary2")
+        xlDatabase = 1
+        xlRowField = 1
+        xlSum = -4157
+        cache = workbook.PivotCaches().Create(SourceType=xlDatabase, SourceData=src)
+        cache.RefreshOnFileOpen = True
+        pt = cache.CreatePivotTable(TableDestination=ws_p.Range("A3"), TableName="PivotSummary2")
 
         pf = pt.PivotFields("Final")
-        pf.Orientation = 1
+        pf.Orientation = xlRowField
         pf.Position = 1
 
-        pt.CalculatedFields().Add("Income", "=IF(Amount>0,Amount,0)")
-        pt.CalculatedFields().Add("Expenses", "=IF(Amount<0,-Amount,0)")
-
-        pt.AddDataField(pt.PivotFields("Income"), "Income", -4157)
-        pt.AddDataField(pt.PivotFields("Expenses"), "Expenses", -4157)
-        pt.AddDataField(pt.PivotFields("Amount"), "Net", -4157)
-
-        pt.ShowTableStyleRowStripes = False
         try:
-            pt.RowAxisLayout(1)
+            pt.CalculatedFields().Add("Income", "=IF(Amount>0,Amount,0)")
         except Exception:
             pass
         try:
-            if pt.DataBodyRange is not None:
-                pt.DataBodyRange.NumberFormat = "_-£* #,##0.00_-;[Red]-£* #,##0.00_-;_-£* \"-\"??_-;_-@_-"
+            pt.CalculatedFields().Add("Expenses", "=IF(Amount<0,-Amount,0)")
         except Exception:
             pass
+
+        pt.AddDataField(pt.PivotFields("Income"), "Income", xlSum)
+        pt.AddDataField(pt.PivotFields("Expenses"), "Expenses", xlSum)
+        pt.AddDataField(pt.PivotFields("Amount"), "Net", xlSum)
         pt.PivotCache().RefreshOnFileOpen = True
 
+        if pt.DataBodyRange is not None:
+            pt.DataBodyRange.NumberFormat = "_-£* #,##0.00_-;[Red]-£* #,##0.00_-;_-£* \"-\"??_-;_-@_-"
+
         workbook.Save()
-        return True
+        return True, ""
     except Exception as e:
-        if workbook is not None:
-            try:
+        message = str(e) if str(e) else repr(e)
+        try:
+            if workbook is not None:
                 ws_p = workbook.Worksheets("Summary 2")
                 ws_p.Cells.Clear()
-                ws_p.Range("A1").Value = f"PivotTable generation failed: {e}"
+                ws_p.Range("A1").Value = "Summary 2 (PivotTable creation FAILED)"
+                ws_p.Range("A2").Value = message
                 workbook.Save()
-            except Exception:
-                pass
-        return False
+            else:
+                from openpyxl import load_workbook
+
+                wb = load_workbook(abs_path)
+                ws_p = wb["Summary 2"] if "Summary 2" in wb.sheetnames else wb.create_sheet("Summary 2")
+                ws_p["A1"] = "Summary 2 (PivotTable creation FAILED)"
+                ws_p["A2"] = message
+                wb.save(abs_path)
+                wb.close()
+        except Exception:
+            pass
+        return False, message
     finally:
         if workbook is not None:
             try:
@@ -1461,7 +1473,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             hdr.right.text = right_text
 
         ws_summary2 = wb.create_sheet("Summary 2")
-        ws_summary2["A1"] = "PivotTable will be generated after export (requires Excel installed)."
+        ws_summary2["A1"] = "Creating PivotTable… (requires Excel installed). If this stays here, pivot creation failed — see below."
+        ws_summary2["A2"] = ""
+        ws_summary2["A1"].font = bold_font
         for hdr in (ws_summary2.oddHeader, ws_summary2.evenHeader, ws_summary2.firstHeader):
             hdr.left.text = left_text
             hdr.center.text = "Summary 2"
@@ -1596,12 +1610,24 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                         del ws._cells[(r, global_cat_col)]
 
     try:
-        _strip_calc_chain_xlsx(output_path)
+        pivot_ok, pivot_message = _try_create_summary2_pivot_via_excel_com(output_path)
+        if not pivot_ok and pivot_message:
+            try:
+                from openpyxl import load_workbook
+
+                wb_fail = load_workbook(output_path)
+                ws_fail = wb_fail["Summary 2"] if "Summary 2" in wb_fail.sheetnames else wb_fail.create_sheet("Summary 2")
+                ws_fail["A1"] = "Summary 2 (PivotTable creation FAILED)"
+                ws_fail["A2"] = pivot_message
+                wb_fail.save(output_path)
+                wb_fail.close()
+            except Exception:
+                pass
     except Exception:
         pass
 
     try:
-        _try_create_summary2_pivot_via_excel_com(output_path)
+        _strip_calc_chain_xlsx(output_path)
     except Exception:
         pass
 
