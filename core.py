@@ -1,4 +1,4 @@
-# Version: 2.44
+# Version: 2.45
 import os
 import glob
 import re
@@ -1053,6 +1053,85 @@ def _strip_calc_chain_xlsx(xlsx_path: str) -> None:
     os.replace(temp_path, xlsx_path)
 
 
+def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> bool:
+    if not platform.system().lower().startswith("win"):
+        return False
+
+    try:
+        import win32com.client
+    except Exception:
+        return False
+
+    excel = None
+    workbook = None
+    abs_path = os.path.abspath(xlsx_path)
+    try:
+        excel = win32com.client.DispatchEx("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        excel.Interactive = False
+
+        workbook = excel.Workbooks.Open(abs_path)
+        ws_tx = workbook.Worksheets("Transaction Data")
+        lo = ws_tx.ListObjects("TransactionData")
+        src_range = lo.Range
+
+        ws_p = workbook.Worksheets("Summary 2")
+        ws_p.Cells.Clear()
+        ws_p.Range("A1").Value = "Summary 2 PivotTable"
+
+        pc = workbook.PivotCaches().Create(SourceType=1, SourceData=src_range)
+        pc.RefreshOnFileOpen = True
+        pt = pc.CreatePivotTable(TableDestination=ws_p.Range("A3"), TableName="PivotSummary2")
+
+        pf = pt.PivotFields("Final")
+        pf.Orientation = 1
+        pf.Position = 1
+
+        pt.CalculatedFields().Add("Income", "=IF(Amount>0,Amount,0)")
+        pt.CalculatedFields().Add("Expenses", "=IF(Amount<0,-Amount,0)")
+
+        pt.AddDataField(pt.PivotFields("Income"), "Income", -4157)
+        pt.AddDataField(pt.PivotFields("Expenses"), "Expenses", -4157)
+        pt.AddDataField(pt.PivotFields("Amount"), "Net", -4157)
+
+        pt.ShowTableStyleRowStripes = False
+        try:
+            pt.RowAxisLayout(1)
+        except Exception:
+            pass
+        try:
+            if pt.DataBodyRange is not None:
+                pt.DataBodyRange.NumberFormat = "_-£* #,##0.00_-;[Red]-£* #,##0.00_-;_-£* \"-\"??_-;_-@_-"
+        except Exception:
+            pass
+        pt.PivotCache().RefreshOnFileOpen = True
+
+        workbook.Save()
+        return True
+    except Exception as e:
+        if workbook is not None:
+            try:
+                ws_p = workbook.Worksheets("Summary 2")
+                ws_p.Cells.Clear()
+                ws_p.Range("A1").Value = f"PivotTable generation failed: {e}"
+                workbook.Save()
+            except Exception:
+                pass
+        return False
+    finally:
+        if workbook is not None:
+            try:
+                workbook.Close(SaveChanges=False)
+            except Exception:
+                pass
+        if excel is not None:
+            try:
+                excel.Quit()
+            except Exception:
+                pass
+
+
 def _enable_summary_dynamic_arrays_xlsx(xlsx_path: str) -> None:
     rel_ns = "http://schemas.openxmlformats.org/package/2006/relationships"
     wb_ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -1365,32 +1444,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         for header_cell in ("A1", "B1", "D1", "E1", "A2", "B2", "D2", "E2"):
             ws_summary[header_cell].font = bold_font
 
-        SUMMARY_MAX_ROWS = 500
-        start_row = 4
-        summary_last_data_row = start_row + SUMMARY_MAX_ROWS - 1
-        subtotal_row = summary_last_data_row + 1
-
-        ws_summary[f"A{start_row}"] = f'=IFERROR(_xlfn._xlws.SORT(_xlfn.UNIQUE(_xlfn._xlws.FILTER({final_rng},({amt_rng}>0)*({final_rng}<>"")))),"")'
-        ws_summary[f"D{start_row}"] = f'=IFERROR(_xlfn._xlws.SORT(_xlfn.UNIQUE(_xlfn._xlws.FILTER({final_rng},({amt_rng}<0)*({final_rng}<>"")))),"")'
-
-        for r in range(start_row, summary_last_data_row + 1):
-            income_total_formula = f'=IF(A{r}="","",SUMIFS({amt_rng},{final_rng},A{r},{amt_rng},">0"))'
-            expense_total_formula = f'=IF(D{r}="","",-SUMIFS({amt_rng},{final_rng},D{r},{amt_rng},"<0"))'
-            ws_summary[f"B{r}"] = income_total_formula
-            ws_summary[f"E{r}"] = expense_total_formula
-
-        ws_summary[f"A{subtotal_row}"] = "Subtotal"
-        ws_summary[f"D{subtotal_row}"] = "Subtotal"
-        income_subtotal_formula = f"=SUM(B{start_row}:B{summary_last_data_row})"
-        expense_subtotal_formula = f"=SUM(E{start_row}:E{summary_last_data_row})"
-        ws_summary[f"B{subtotal_row}"] = income_subtotal_formula
-        ws_summary[f"E{subtotal_row}"] = expense_subtotal_formula
+        ws_summary["A4"] = "See 'Summary 2' for the PivotTable (auto-expanding category totals)."
 
         ws_summary["B2"].number_format = gbp_accounting
         ws_summary["E2"].number_format = gbp_accounting
-        for r in range(start_row, subtotal_row + 1):
-            ws_summary[f"B{r}"].number_format = gbp_accounting
-            ws_summary[f"E{r}"].number_format = gbp_accounting
+        ws_summary["A4"].font = bold_font
 
         ws_summary.column_dimensions["G"].hidden = True
         ws_summary.column_dimensions["H"].hidden = True
@@ -1400,6 +1458,13 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         for hdr in (ws_summary.oddHeader, ws_summary.evenHeader, ws_summary.firstHeader):
             hdr.left.text = left_text
             hdr.center.text = "Summary"
+            hdr.right.text = right_text
+
+        ws_summary2 = wb.create_sheet("Summary 2")
+        ws_summary2["A1"] = "PivotTable will be generated after export (requires Excel installed)."
+        for hdr in (ws_summary2.oddHeader, ws_summary2.evenHeader, ws_summary2.firstHeader):
+            hdr.left.text = left_text
+            hdr.center.text = "Summary 2"
             hdr.right.text = right_text
 
         no_border_rules = Border()
@@ -1536,7 +1601,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         pass
 
     try:
-        _enable_summary_dynamic_arrays_xlsx(output_path)
+        _try_create_summary2_pivot_via_excel_com(output_path)
     except Exception:
         pass
 
