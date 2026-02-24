@@ -1,4 +1,4 @@
-# Version: 2.41
+# Version: 2.42
 import os
 import glob
 import re
@@ -1236,9 +1236,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_summary.cell(row=2, column=4).value = "Grand Total"
         ws_summary["B2"] = f'=SUMIF({amt_rng},">0")'
         ws_summary["E2"] = f'=-SUMIF({amt_rng},"<0")'
-        if sep != ",":
-            ws_summary["B2"] = ws_summary["B2"].value.replace(",", sep)
-            ws_summary["E2"] = ws_summary["E2"].value.replace(",", sep)
 
         bold_font = Font(bold=True)
         for header_cell in ("A1", "B1", "D1", "E1", "A2", "B2", "D2", "E2"):
@@ -1249,21 +1246,12 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         summary_last_data_row = start_row + SUMMARY_MAX_ROWS - 1
         subtotal_row = summary_last_data_row + 1
 
-        for r in range(start_row, summary_last_data_row + 1):
-            income_category_formula = f'=LET(_cats,SORT(UNIQUE(FILTER({final_rng},({amt_rng}>0)*(TRIM({final_rng})<>"")))),IFERROR(INDEX(_cats,ROWS($A${start_row}:A{r})),""))'
-            expense_category_formula = f'=LET(_cats,SORT(UNIQUE(FILTER({final_rng},({amt_rng}<0)*(TRIM({final_rng})<>"")))),IFERROR(INDEX(_cats,ROWS($D${start_row}:D{r})),""))'
-            if sep != ",":
-                income_category_formula = income_category_formula.replace(",", sep)
-                expense_category_formula = expense_category_formula.replace(",", sep)
-            ws_summary[f"A{r}"] = income_category_formula
-            ws_summary[f"D{r}"] = expense_category_formula
+        ws_summary[f"A{start_row}"] = f'=IFERROR(SORT(UNIQUE(FILTER({final_rng},({amt_rng}>0)*(TRIM({final_rng})<>"")))),"")'
+        ws_summary[f"D{start_row}"] = f'=IFERROR(SORT(UNIQUE(FILTER({final_rng},({amt_rng}<0)*(TRIM({final_rng})<>"")))),"")'
 
         for r in range(start_row, summary_last_data_row + 1):
             income_total_formula = f'=IF(A{r}="","",SUMIFS({amt_rng},{final_rng},A{r},{amt_rng},">0"))'
             expense_total_formula = f'=IF(D{r}="","",-SUMIFS({amt_rng},{final_rng},D{r},{amt_rng},"<0"))'
-            if sep != ",":
-                income_total_formula = income_total_formula.replace(",", sep)
-                expense_total_formula = expense_total_formula.replace(",", sep)
             ws_summary[f"B{r}"] = income_total_formula
             ws_summary[f"E{r}"] = expense_total_formula
 
@@ -1271,9 +1259,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_summary[f"D{subtotal_row}"] = "Subtotal"
         income_subtotal_formula = f"=SUM(B{start_row}:B{summary_last_data_row})"
         expense_subtotal_formula = f"=SUM(E{start_row}:E{summary_last_data_row})"
-        if sep != ",":
-            income_subtotal_formula = income_subtotal_formula.replace(",", sep)
-            expense_subtotal_formula = expense_subtotal_formula.replace(",", sep)
         ws_summary[f"B{subtotal_row}"] = income_subtotal_formula
         ws_summary[f"E{subtotal_row}"] = expense_subtotal_formula
 
