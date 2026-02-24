@@ -1,4 +1,4 @@
-# Version: 2.46
+# Version: 2.47
 import os
 import glob
 import gc
@@ -10,6 +10,7 @@ import sys
 import hashlib
 import json
 import platform
+import time
 import zipfile
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -1074,18 +1075,63 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
 
     def _format_com_error(e: Exception) -> str:
         if isinstance(e, pywintypes.com_error):
-            return f"{hex(e.hresult)} {e.strerror} excepinfo={e.excepinfo}"
+            hr = e.hresult & 0xFFFFFFFF
+            hex_hr = hex(hr)
+            return f"{hex_hr} {e.strerror} excepinfo={e.excepinfo}"
         return repr(e)
+
+    RPC_E_CALL_REJECTED = 0x80010001
+    RPC_E_SERVERCALL_RETRYLATER = 0x8001010A
+
+    class _ExcelMessageFilter:
+        def HandleInComingCall(self, dwCallType, htaskCaller, dwTickCount, lpInterfaceInfo):
+            return pythoncom.SERVERCALL_ISHANDLED
+
+        def RetryRejectedCall(self, htaskCallee, dwTickCount, dwRejectType):
+            if dwRejectType == pythoncom.SERVERCALL_RETRYLATER:
+                return 150
+            return -1
+
+        def MessagePending(self, htaskCallee, dwTickCount, dwPendingType):
+            return pythoncom.PENDINGMSG_WAITDEFPROCESS
+
+    def _com_retry(callable_obj, *, tries=40, delay_ms=250, pump=True):
+        last_exc = None
+        for attempt in range(tries):
+            try:
+                return callable_obj()
+            except pywintypes.com_error as e:
+                hr = e.hresult & 0xFFFFFFFF
+                if hr not in (RPC_E_CALL_REJECTED, RPC_E_SERVERCALL_RETRYLATER):
+                    raise
+                last_exc = e
+                if attempt == tries - 1:
+                    break
+                if pump:
+                    pythoncom.PumpWaitingMessages()
+                time.sleep(delay_ms / 1000.0)
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("COM retry failed without exception")
 
     abs_path = os.path.abspath(xlsx_path)
     pythoncom.CoInitialize()
+    old_filter = None
     try:
+        old_filter = pythoncom.CoRegisterMessageFilter(_ExcelMessageFilter())
         step = "Launch Excel"
-        excel = win32com.client.DispatchEx("Excel.Application")
+        excel = _com_retry(lambda: win32com.client.DispatchEx("Excel.Application"))
         excel.Visible = False
         excel.DisplayAlerts = False
         step = "Open workbook"
-        workbook = excel.Workbooks.Open(abs_path, UpdateLinks=0, ReadOnly=False, IgnoreReadOnlyRecommended=True)
+        workbook = _com_retry(
+            lambda: excel.Workbooks.Open(
+                abs_path,
+                UpdateLinks=0,
+                ReadOnly=False,
+                IgnoreReadOnlyRecommended=True,
+            )
+        )
         if getattr(workbook, "ReadOnly", False):
             raise RuntimeError("Workbook opened read-only (file may be open/locked in Excel). Close it and retry.")
 
@@ -1108,10 +1154,10 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
         xlRowField = 1
         xlSum = -4157
         step = "Create PivotCache"
-        cache = workbook.PivotCaches().Create(SourceType=xlDatabase, SourceData=source_data)
+        cache = _com_retry(lambda: workbook.PivotCaches().Create(SourceType=xlDatabase, SourceData=source_data))
         cache.RefreshOnFileOpen = True
         step = "Create PivotTable"
-        pt = cache.CreatePivotTable(TableDestination=ws_p.Range("A3"), TableName="PivotSummary2")
+        pt = _com_retry(lambda: cache.CreatePivotTable(TableDestination=ws_p.Range("A3"), TableName="PivotSummary2"))
 
         step = "Configure PivotFields"
         pf = pt.PivotFields("Final")
@@ -1181,6 +1227,10 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
         workbook = None
         excel = None
         gc.collect()
+        try:
+            pythoncom.CoRegisterMessageFilter(old_filter)
+        except Exception:
+            pass
         pythoncom.CoUninitialize()
 
 
