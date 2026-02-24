@@ -1217,10 +1217,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         ws_rules = wb.create_sheet("Custom Rules")
         ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
-        ws_rules.append([10, "Tools & Materials", "ELECTRICAL", "ANY", "", True, "TEMP seed rule for testing"])
-        ws_rules.append([11, "Tools & Materials", "SCREWFIX", "ANY", "", True, "TEMP seed rule for testing"])
-        ws_rules.append([1000, "", "", "ANY", "", False, "Sort the table by Priority (smallest first). First matching rule wins."])
-        rules_table = Table(displayName="ClientRules", ref="A1:G4")
+        for _ in range(10):
+            ws_rules.append(["", "", "", "ANY", "", True, ""])
+        rules_table = Table(displayName="ClientRules", ref="A1:G11")
         rules_style = TableStyleInfo(
             name="TableStyleLight1",
             showFirstColumn=False,
@@ -1232,6 +1231,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         rules_table.tableStyleInfo = rules_style
         ws_rules.add_table(rules_table)
         ws_rules.freeze_panes = "A2"
+        ws_rules["A13"] = "Sort the table by Priority (smallest first). First matching rule wins."
 
         ws_rules["I1"] = "ANY"
         ws_rules["I2"] = "DEBIT"
@@ -1241,11 +1241,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.column_dimensions["I"].hidden = True
         ws_rules.column_dimensions["J"].hidden = True
 
-        priority_validation = DataValidation(type="whole", operator="between", formula1="1", formula2="9999", allow_blank=True)
+        priority_validation = DataValidation(type="whole", allow_blank=True)
         priority_validation.promptTitle = "Priority"
-        priority_validation.prompt = "Enter a whole number between 1 and 9999."
+        priority_validation.prompt = "Enter a whole number."
         priority_validation.errorTitle = "Invalid Priority"
-        priority_validation.error = "Priority must be a whole number between 1 and 9999."
+        priority_validation.error = "Priority must be a whole number."
         ws_rules.add_data_validation(priority_validation)
         priority_validation.add("A2:A5000")
 
