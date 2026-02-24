@@ -248,7 +248,7 @@ def show_reconciliation_popup(
     ttk.Separator(outer).pack(fill="x", pady=(8, 0))
 
     txt = tk.Text(outer, height=22, wrap="word")
-    txt.pack(fill="both", expand=True, pady=(12, 0))
+    txt.pack(fill="both", expand=True, pady=(8, 0))
 
     txt.tag_configure("section", font=("Segoe UI", 10, "bold"))
     txt.tag_configure("ok", foreground="#0b6e0b")
