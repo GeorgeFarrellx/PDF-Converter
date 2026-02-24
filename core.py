@@ -1063,7 +1063,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         import pandas as pd
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
-        from openpyxl.styles import Border, Font
+        from openpyxl.styles import Border, Font, Protection
         from openpyxl.worksheet.filters import AutoFilter
     except Exception as e:
         _show_dependency_error(
@@ -1364,6 +1364,17 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     cell = ws._cells[(r, global_cat_col)]
                     if cell.value is None or cell.value == "":
                         del ws._cells[(r, global_cat_col)]
+
+        if manual_col:
+            for r in range(2, max_r + 1):
+                ws.cell(row=r, column=manual_col).protection = Protection(locked=False)
+
+        ws.protection.sheet = True
+        ws.protection.formatCells = True
+        ws.protection.autoFilter = True
+        ws.protection.sort = True
+        ws.protection.selectLockedCells = True
+        ws.protection.selectUnlockedCells = True
 
     try:
         _strip_calc_chain_xlsx(output_path)
