@@ -1462,7 +1462,12 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     except Exception:
         pass
 
-    if enable_categorisation:
+    run_categorisation_audit = (
+        bool(enable_categorisation)
+        and str(os.environ.get("PDF_CONVERTER_CATEGORISATION_AUDIT", "")).strip().lower() in ("1", "true", "yes", "y", "on")
+    )
+
+    if run_categorisation_audit:
         try:
             ensure_folder(LOGS_DIR)
             audit = _audit_xlsx_categorisation(output_path)
