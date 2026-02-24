@@ -138,7 +138,7 @@ def show_reconciliation_popup(
     win.transient(parent)
     win.grab_set()
 
-    win.title("Reconciliation warning" if any_warn else "Success")
+    win.title("Audit Checks (Warnings)" if any_warn else "Audit Checks")
     win.geometry("820x560")
 
     outer = ttk.Frame(win, padding=14)
@@ -152,9 +152,7 @@ def show_reconciliation_popup(
 
     ttk.Label(head, text=icon, foreground=icon_color, font=("Segoe UI", 18, "bold")).pack(side="left")
 
-    title_text = "Checks completed with warnings" if any_warn else (
-        "Checks completed" if pre_save else "Excel created successfully"
-    )
+    title_text = "Audit Checks completed with warnings" if any_warn else "Audit Checks"
     ttk.Label(head, text=title_text, font=("Segoe UI", 13, "bold")).pack(side="left", padx=(10, 0))
 
     path_row = ttk.Frame(outer)
@@ -162,6 +160,66 @@ def show_reconciliation_popup(
 
     ttk.Label(path_row, text="Output:").pack(side="left")
     ttk.Label(path_row, text=output_path, foreground="#333").pack(side="left", padx=(6, 0))
+
+    if coverage_period:
+        if any_warn:
+            line = (
+                f"The bank statements cover the period from {coverage_period} "
+                "(however, some checks could not be completed or warnings were detected — see below)."
+            )
+        else:
+            line = f"The bank statements cover the period from {coverage_period}."
+        ttk.Label(outer, text=line, foreground="#333").pack(anchor="w", pady=(10, 0))
+
+    summary_cols = ("file", "reconciliation", "balance_walk", "row_shape")
+    summary_table = ttk.Treeview(outer, columns=summary_cols, show="headings", height=min(max(len(recon_results), 1), 8))
+    summary_table.heading("file", text="File")
+    summary_table.heading("reconciliation", text="Reconciliation")
+    summary_table.heading("balance_walk", text="Balance Walk")
+    summary_table.heading("row_shape", text="Row Shape")
+    summary_table.column("file", width=390, anchor="w")
+    summary_table.column("reconciliation", width=120, anchor="center")
+    summary_table.column("balance_walk", width=120, anchor="center")
+    summary_table.column("row_shape", width=120, anchor="center")
+    summary_table.pack(fill="x", pady=(8, 0))
+
+    audit_by_pdf = {
+        str(a.get("pdf") or ""): a
+        for a in (audit_results or [])
+        if isinstance(a, dict)
+    }
+
+    for r in recon_results:
+        status = str(r.get("status") or "").strip()
+        if status == "OK":
+            recon_symbol = "✅"
+        elif status == "Mismatch":
+            recon_symbol = "❌"
+        elif status in ("Statement balances not found", "Not supported by parser") or "NOT CHECKED" in status.upper():
+            recon_symbol = "—"
+        else:
+            recon_symbol = "❌"
+
+        pdf = str(r.get("pdf") or "")
+        a = audit_by_pdf.get(pdf, {})
+
+        bw_status = str(a.get("balance_walk_status") or "").strip()
+        if not bw_status or bw_status.upper() == "NOT CHECKED":
+            bw_symbol = "—"
+        elif bw_status == "OK":
+            bw_symbol = "✅"
+        else:
+            bw_symbol = "❌"
+
+        rs_status = str(a.get("row_shape_status") or "").strip()
+        if not rs_status or rs_status.upper() == "NOT CHECKED":
+            rs_symbol = "—"
+        elif rs_status == "OK":
+            rs_symbol = "✅"
+        else:
+            rs_symbol = "❌"
+
+        summary_table.insert("", "end", values=(pdf, recon_symbol, bw_symbol, rs_symbol))
 
     txt = tk.Text(outer, height=22, wrap="word")
     txt.pack(fill="both", expand=True, pady=(12, 0))
@@ -171,17 +229,6 @@ def show_reconciliation_popup(
     txt.tag_configure("bad", foreground="#b00020")
     txt.tag_configure("warn", foreground="#8a6d3b")
     txt.tag_configure("info", foreground="#333")
-
-    if coverage_period:
-        if any_warn:
-            line = (
-                f"The bank statements cover the period from {coverage_period} "
-                "(however, some checks could not be completed or warnings were detected — see below).\n\n"
-            )
-        else:
-            line = f"The bank statements cover the period from {coverage_period}.\n\n"
-
-        txt.insert("end", line, "info")
 
     txt.insert("end", "Reconciliation check:\n", "section")
     for r in recon_results:
@@ -339,11 +386,6 @@ def show_reconciliation_popup(
 
     if audit_results:
         txt.insert("end", "Audit checks:\n", "section")
-        audit_by_pdf = {
-            str(a.get("pdf") or ""): a
-            for a in (audit_results or [])
-            if isinstance(a, dict)
-        }
         for r in recon_results:
             pdf = str(r.get("pdf") or "")
             a = audit_by_pdf.get(pdf, {})
