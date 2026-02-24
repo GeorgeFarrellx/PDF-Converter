@@ -1,4 +1,4 @@
-# Version: 2.42
+# Version: 2.43
 import os
 import glob
 import re
@@ -1246,8 +1246,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         summary_last_data_row = start_row + SUMMARY_MAX_ROWS - 1
         subtotal_row = summary_last_data_row + 1
 
-        ws_summary[f"A{start_row}"] = f'=IFERROR(SORT(UNIQUE(FILTER({final_rng},({amt_rng}>0)*(TRIM({final_rng})<>"")))),"")'
-        ws_summary[f"D{start_row}"] = f'=IFERROR(SORT(UNIQUE(FILTER({final_rng},({amt_rng}<0)*(TRIM({final_rng})<>"")))),"")'
+        ws_summary[f"A{start_row}"] = f'=IFERROR(_xlfn.SORT(_xlfn.UNIQUE(_xlfn._xlws.FILTER({final_rng},({amt_rng}>0)*({final_rng}<>"")))),"")'
+        ws_summary[f"D{start_row}"] = f'=IFERROR(_xlfn.SORT(_xlfn.UNIQUE(_xlfn._xlws.FILTER({final_rng},({amt_rng}<0)*({final_rng}<>"")))),"")'
 
         for r in range(start_row, summary_last_data_row + 1):
             income_total_formula = f'=IF(A{r}="","",SUMIFS({amt_rng},{final_rng},A{r},{amt_rng},">0"))'
