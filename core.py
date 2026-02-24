@@ -1,4 +1,4 @@
-# Version: 2.48
+# Version: 2.49
 import os
 import glob
 import gc
@@ -1131,8 +1131,43 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
             filter_registered = False
         step = "Launch Excel"
         excel = _com_retry(lambda: win32com.client.DispatchEx("Excel.Application"))
-        excel.Visible = False
-        excel.DisplayAlerts = False
+        try:
+            excel.Visible = False
+        except Exception:
+            pass
+        try:
+            excel.DisplayAlerts = False
+        except Exception:
+            pass
+        try:
+            excel.EnableEvents = False
+        except Exception:
+            pass
+        try:
+            excel.Interactive = False
+        except Exception:
+            pass
+        try:
+            excel.ScreenUpdating = False
+        except Exception:
+            pass
+        try:
+            excel.AskToUpdateLinks = False
+        except Exception:
+            pass
+        try:
+            excel.AutomationSecurity = 3
+        except Exception:
+            pass
+
+        step = "Wait for Excel ready"
+        for _ in range(240):
+            ready = _com_retry(lambda: bool(getattr(excel, "Ready", True)), tries=1, delay_ms=250)
+            if ready:
+                break
+            pythoncom.PumpWaitingMessages()
+            time.sleep(0.25)
+
         step = "Open workbook"
         workbook = _com_retry(
             lambda: excel.Workbooks.Open(
@@ -1140,7 +1175,12 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
                 UpdateLinks=0,
                 ReadOnly=False,
                 IgnoreReadOnlyRecommended=True,
-            )
+                AddToMru=False,
+                Notify=False,
+                Local=True,
+            ),
+            tries=240,
+            delay_ms=500,
         )
         if getattr(workbook, "ReadOnly", False):
             raise RuntimeError("Workbook opened read-only (file may be open/locked in Excel). Close it and retry.")
@@ -1201,6 +1241,11 @@ def _try_create_summary2_pivot_via_excel_com(xlsx_path: str) -> tuple[bool, str]
         return True, ""
     except Exception as e:
         message = f"FAILED at {step}: {_format_com_error(e)}"
+        hr = None
+        if isinstance(e, pywintypes.com_error):
+            hr = e.hresult & 0xFFFFFFFF
+        if "0x80010001" in message or hr == 0x80010001:
+            message += " (Excel is busy. Close all Excel windows/dialogs and retry.)"
         try:
             if workbook is not None:
                 ws_p = workbook.Worksheets("Summary 2")
