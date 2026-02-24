@@ -1,4 +1,4 @@
-# Version: 2.43
+# Version: 2.44
 import os
 import glob
 import re
@@ -1052,6 +1052,130 @@ def _strip_calc_chain_xlsx(xlsx_path: str) -> None:
 
     os.replace(temp_path, xlsx_path)
 
+
+def _enable_summary_dynamic_arrays_xlsx(xlsx_path: str) -> None:
+    rel_ns = "http://schemas.openxmlformats.org/package/2006/relationships"
+    wb_ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    office_rel_ns = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    ct_ns = "http://schemas.openxmlformats.org/package/2006/content-types"
+
+    def _norm_target(base_path: str, target: str) -> str:
+        base_dir = os.path.dirname(base_path)
+        joined = os.path.normpath(os.path.join(base_dir, target))
+        return joined.replace("\\", "/")
+
+    metadata_xml = (
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+        "<metadata xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" "
+        "xmlns:xda=\"http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray\">"
+        "<metadataTypes count=\"1\">"
+        "<metadataType name=\"XLDAPR\" minSupportedVersion=\"120000\" copy=\"1\" pasteAll=\"1\" pasteValues=\"1\" merge=\"1\" "
+        "splitFirst=\"1\" rowColShift=\"1\" clearFormats=\"1\" clearComments=\"1\" assign=\"1\" coerce=\"1\" cellMeta=\"1\"/>"
+        "</metadataTypes>"
+        "<futureMetadata name=\"XLDAPR\" count=\"1\">"
+        "<bk><extLst><ext uri=\"{bdbb8cdc-fa1e-496e-a857-3c3f30c029c3}\"><xda:dynamicArrayProperties fDynamic=\"1\" fCollapsed=\"0\"/>"
+        "</ext></extLst></bk>"
+        "</futureMetadata>"
+        "<cellMetadata count=\"1\"><bk><rc t=\"1\" v=\"0\"/></bk></cellMetadata>"
+        "</metadata>"
+    ).encode("utf-8")
+
+    temp_path = f"{xlsx_path}.tmp"
+    with zipfile.ZipFile(xlsx_path, "r") as src_zip:
+        file_data = {info.filename: src_zip.read(info.filename) for info in src_zip.infolist()}
+
+    workbook_xml = file_data.get("xl/workbook.xml")
+    workbook_rels_xml = file_data.get("xl/_rels/workbook.xml.rels")
+    content_types_xml = file_data.get("[Content_Types].xml")
+    if workbook_xml is None or workbook_rels_xml is None or content_types_xml is None:
+        return
+
+    wb_root = ET.fromstring(workbook_xml)
+    wb_rels_root = ET.fromstring(workbook_rels_xml)
+    ct_root = ET.fromstring(content_types_xml)
+
+    summary_rid = None
+    sheets_node = wb_root.find(f"{{{wb_ns}}}sheets")
+    if sheets_node is not None:
+        for sheet_node in sheets_node.findall(f"{{{wb_ns}}}sheet"):
+            if sheet_node.attrib.get("name") == "Summary":
+                summary_rid = sheet_node.attrib.get(f"{{{office_rel_ns}}}id")
+                break
+    if not summary_rid:
+        return
+
+    summary_target = None
+    existing_rids = []
+    has_sheet_metadata_rel = False
+    for rel in wb_rels_root.findall(f"{{{rel_ns}}}Relationship"):
+        rid = rel.attrib.get("Id", "")
+        if rid.startswith("rId"):
+            try:
+                existing_rids.append(int(rid[3:]))
+            except Exception:
+                pass
+        rel_type = rel.attrib.get("Type", "")
+        if rel_type.endswith("/sheetMetadata"):
+            has_sheet_metadata_rel = True
+        if rel.attrib.get("Id") == summary_rid:
+            summary_target = rel.attrib.get("Target")
+
+    if summary_target:
+        summary_sheet_path = _norm_target("xl/workbook.xml", summary_target)
+        ws_xml = file_data.get(summary_sheet_path)
+        if ws_xml is not None:
+            ws_root = ET.fromstring(ws_xml)
+            sheet_data = ws_root.find(f"{{{wb_ns}}}sheetData")
+            if sheet_data is not None:
+                for row_node in sheet_data.findall(f"{{{wb_ns}}}row"):
+                    for cell in row_node.findall(f"{{{wb_ns}}}c"):
+                        ref = cell.attrib.get("r")
+                        if ref in ("A4", "D4"):
+                            cell.attrib["cm"] = "1"
+                            formula = cell.find(f"{{{wb_ns}}}f")
+                            if formula is not None:
+                                formula.attrib["t"] = "array"
+                                formula.attrib["ref"] = ref
+            file_data[summary_sheet_path] = ET.tostring(ws_root, encoding="utf-8", xml_declaration=True)
+
+    if not has_sheet_metadata_rel:
+        new_rid = f"rId{(max(existing_rids) if existing_rids else 0) + 1}"
+        ET.SubElement(
+            wb_rels_root,
+            f"{{{rel_ns}}}Relationship",
+            {
+                "Id": new_rid,
+                "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata",
+                "Target": "metadata.xml",
+            },
+        )
+    file_data["xl/_rels/workbook.xml.rels"] = ET.tostring(wb_rels_root, encoding="utf-8", xml_declaration=True)
+
+    has_metadata_override = False
+    for override in ct_root.findall(f"{{{ct_ns}}}Override"):
+        if override.attrib.get("PartName") == "/xl/metadata.xml":
+            has_metadata_override = True
+            break
+    if not has_metadata_override:
+        ET.SubElement(
+            ct_root,
+            f"{{{ct_ns}}}Override",
+            {
+                "PartName": "/xl/metadata.xml",
+                "ContentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml",
+            },
+        )
+    file_data["[Content_Types].xml"] = ET.tostring(ct_root, encoding="utf-8", xml_declaration=True)
+
+    if "xl/metadata.xml" not in file_data:
+        file_data["xl/metadata.xml"] = metadata_xml
+
+    with zipfile.ZipFile(temp_path, "w", compression=zipfile.ZIP_DEFLATED) as dst_zip:
+        for name, data in file_data.items():
+            dst_zip.writestr(name, data)
+
+    os.replace(temp_path, xlsx_path)
+
 def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = "", header_period_start=None, header_period_end=None, enable_categorisation: bool = True):
     if not transactions:
         raise ValueError("No transactions found!")
@@ -1246,8 +1370,8 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         summary_last_data_row = start_row + SUMMARY_MAX_ROWS - 1
         subtotal_row = summary_last_data_row + 1
 
-        ws_summary[f"A{start_row}"] = f'=IFERROR(_xlfn.SORT(_xlfn.UNIQUE(_xlfn._xlws.FILTER({final_rng},({amt_rng}>0)*({final_rng}<>"")))),"")'
-        ws_summary[f"D{start_row}"] = f'=IFERROR(_xlfn.SORT(_xlfn.UNIQUE(_xlfn._xlws.FILTER({final_rng},({amt_rng}<0)*({final_rng}<>"")))),"")'
+        ws_summary[f"A{start_row}"] = f'=IFERROR(_xlfn._xlws.SORT(_xlfn.UNIQUE(_xlfn._xlws.FILTER({final_rng},({amt_rng}>0)*({final_rng}<>"")))),"")'
+        ws_summary[f"D{start_row}"] = f'=IFERROR(_xlfn._xlws.SORT(_xlfn.UNIQUE(_xlfn._xlws.FILTER({final_rng},({amt_rng}<0)*({final_rng}<>"")))),"")'
 
         for r in range(start_row, summary_last_data_row + 1):
             income_total_formula = f'=IF(A{r}="","",SUMIFS({amt_rng},{final_rng},A{r},{amt_rng},">0"))'
@@ -1408,6 +1532,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
     try:
         _strip_calc_chain_xlsx(output_path)
+    except Exception:
+        pass
+
+    try:
+        _enable_summary_dynamic_arrays_xlsx(output_path)
     except Exception:
         pass
 
