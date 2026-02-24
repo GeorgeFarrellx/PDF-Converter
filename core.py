@@ -873,6 +873,8 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
         "openpyxl_version": None,
         "artifact_paths": {},
         "transaction_data_sheet_xml": None,
+        "transaction_data_sheet_protection_attrs": None,
+        "transaction_data_sheet_protection_xml": None,
         "categorisation_rules_sheet_xml": None,
         "transaction_data_formula_count": 0,
         "transaction_data_formula_samples": [],
@@ -995,6 +997,11 @@ def _audit_xlsx_categorisation(output_path: str) -> dict:
 
         if transaction_sheet_xml and transaction_sheet_xml in names:
             transaction_sheet_xml_raw = zf.read(transaction_sheet_xml).decode("utf-8", errors="replace")
+            tx_root = ET.fromstring(transaction_sheet_xml_raw)
+            sp = tx_root.find("main:sheetProtection", ns)
+            if sp is not None:
+                audit["transaction_data_sheet_protection_attrs"] = dict(sp.attrib)
+                audit["transaction_data_sheet_protection_xml"] = ET.tostring(sp, encoding="unicode")
 
     if transaction_sheet_xml_raw is not None:
         artifact_path = os.path.abspath(os.path.join(LOGS_DIR, f"categorisation_audit_{ts}_transaction_sheet.xml"))
