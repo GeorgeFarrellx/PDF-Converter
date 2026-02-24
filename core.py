@@ -11,6 +11,7 @@ import hashlib
 import json
 import platform
 import time
+import shutil
 import zipfile
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -1133,49 +1134,40 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     df["Custom"] = None
     df["Final"] = None
 
-    ensure_folder(os.path.dirname(output_path))
-    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        wb = writer.book
-        wb.calculation.calcMode = "auto"
-        wb.calculation.fullCalcOnLoad = True
-
-        df.to_excel(writer, index=False, sheet_name="Transaction Data")
-
-        ws = writer.sheets["Transaction Data"]
-
-        def _coerce_header_period_date(v):
-            try:
-                if v is None or v == "":
-                    return None
-                if hasattr(v, "to_pydatetime"):
-                    v = v.to_pydatetime()
-                if isinstance(v, datetime):
-                    return v.date()
-                if isinstance(v, date):
-                    return v
-            except Exception:
-                return None
-            return None
-
-        hp_start = _coerce_header_period_date(header_period_start)
-        hp_end = _coerce_header_period_date(header_period_end)
-
-        use_start = hp_start if hp_start else df["Date"].min()
-        use_end = hp_end if hp_end else df["Date"].max()
-
-        period = ""
+    def _coerce_header_period_date(v):
         try:
-            if pd.notna(use_start) and pd.notna(use_end):
-                period = f"{use_start.strftime('%d/%m/%y')} - {use_end.strftime('%d/%m/%y')}"
+            if v is None or v == "":
+                return None
+            if hasattr(v, "to_pydatetime"):
+                v = v.to_pydatetime()
+            if isinstance(v, datetime):
+                return v.date()
+            if isinstance(v, date):
+                return v
         except Exception:
-            period = ""
+            return None
+        return None
 
-        gbp_accounting = "_-£* #,##0.00_-;[Red]-£* #,##0.00_-;_-£* \"-\"??_-;_-@_-"
-        sep = _excel_list_separator()
+    hp_start = _coerce_header_period_date(header_period_start)
+    hp_end = _coerce_header_period_date(header_period_end)
 
-        left_text = (client_name or "").strip()
-        right_text = period
+    use_start = hp_start if hp_start else df["Date"].min()
+    use_end = hp_end if hp_end else df["Date"].max()
 
+    period = ""
+    try:
+        if pd.notna(use_start) and pd.notna(use_end):
+            period = f"{use_start.strftime('%d/%m/%y')} - {use_end.strftime('%d/%m/%y')}"
+    except Exception:
+        period = ""
+
+    gbp_accounting = "_-£* #,##0.00_-;[Red]-£* #,##0.00_-;_-£* \"-\"??_-;_-@_-"
+    sep = _excel_list_separator()
+
+    left_text = (client_name or "").strip()
+    right_text = period
+
+    def _post_write_formatting(wb, ws):
         center_text = "Transaction Data"
 
         for hdr in (ws.oddHeader, ws.evenHeader, ws.firstHeader):
@@ -1192,97 +1184,110 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         last_col = ws.max_column
         if last_row >= 2 and last_col >= 1:
             ref = f"A1:{get_column_letter(last_col)}{last_row}"
-            table = Table(displayName="TransactionData", ref=ref)
-            table.tableColumns = [
-                TableColumn(id=idx, name=header)
-                for idx, header in enumerate(df.columns, start=1)
-            ]
+            if "TransactionData" in ws.tables:
+                table = ws.tables["TransactionData"]
+                table.ref = ref
+                table.tableColumns = [
+                    TableColumn(id=idx, name=header)
+                    for idx, header in enumerate(df.columns, start=1)
+                ]
+                table.autoFilter = AutoFilter(ref=table.ref)
+            else:
+                table = Table(displayName="TransactionData", ref=ref)
+                table.tableColumns = [
+                    TableColumn(id=idx, name=header)
+                    for idx, header in enumerate(df.columns, start=1)
+                ]
 
-            style = TableStyleInfo(
-                name="TableStyleLight1",
-                showFirstColumn=False,
-                showLastColumn=False,
-                showRowStripes=False,
-                showColumnStripes=False,
-            )
-            table.totalsRowShown = False
-            table.tableStyleInfo = style
-            table.autoFilter = AutoFilter(ref=table.ref)
-            ws.add_table(table)
+                style = TableStyleInfo(
+                    name="TableStyleLight1",
+                    showFirstColumn=False,
+                    showLastColumn=False,
+                    showRowStripes=False,
+                    showColumnStripes=False,
+                )
+                table.totalsRowShown = False
+                table.tableStyleInfo = style
+                table.autoFilter = AutoFilter(ref=table.ref)
+                ws.add_table(table)
 
             no_border = Border()
             for row in ws.iter_rows(min_row=1, max_row=last_row, min_col=1, max_col=last_col):
                 for cell in row:
                     cell.border = no_border
 
-        ws_rules = wb.create_sheet("Custom Rules")
-        ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
-        for _ in range(10):
-            ws_rules.append(["", "", "", "ANY", "", True, ""])
-        rules_table = Table(displayName="ClientRules", ref="A1:G11")
-        rules_style = TableStyleInfo(
-            name="TableStyleLight1",
-            showFirstColumn=False,
-            showLastColumn=False,
-            showRowStripes=False,
-            showColumnStripes=False,
-        )
-        rules_table.totalsRowShown = False
-        rules_table.tableStyleInfo = rules_style
-        ws_rules.add_table(rules_table)
-        ws_rules.freeze_panes = "A2"
-        ws_rules["A13"] = "Sort the table by Priority (smallest first). First matching rule wins."
+        rules_sheet_created = "Custom Rules" not in wb.sheetnames
+        ws_rules = wb["Custom Rules"] if not rules_sheet_created else wb.create_sheet("Custom Rules")
+        if rules_sheet_created:
+            ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
+            for _ in range(10):
+                ws_rules.append(["", "", "", "ANY", "", True, ""])
+            rules_table = Table(displayName="ClientRules", ref="A1:G11")
+            rules_style = TableStyleInfo(
+                name="TableStyleLight1",
+                showFirstColumn=False,
+                showLastColumn=False,
+                showRowStripes=False,
+                showColumnStripes=False,
+            )
+            rules_table.totalsRowShown = False
+            rules_table.tableStyleInfo = rules_style
+            ws_rules.add_table(rules_table)
+            ws_rules.freeze_panes = "A2"
+            ws_rules["A13"] = "Sort the table by Priority (smallest first). First matching rule wins."
 
-        ws_rules["I1"] = "ANY"
-        ws_rules["I2"] = "DEBIT"
-        ws_rules["I3"] = "CREDIT"
-        ws_rules["J1"] = True
-        ws_rules["J2"] = False
-        ws_rules.column_dimensions["I"].hidden = True
-        ws_rules.column_dimensions["J"].hidden = True
+            ws_rules["I1"] = "ANY"
+            ws_rules["I2"] = "DEBIT"
+            ws_rules["I3"] = "CREDIT"
+            ws_rules["J1"] = True
+            ws_rules["J2"] = False
+            ws_rules.column_dimensions["I"].hidden = True
+            ws_rules.column_dimensions["J"].hidden = True
 
-        priority_validation = DataValidation(type="whole", allow_blank=True)
-        priority_validation.promptTitle = "Priority"
-        priority_validation.prompt = "Enter a whole number."
-        priority_validation.errorTitle = "Invalid Priority"
-        priority_validation.error = "Priority must be a whole number."
-        ws_rules.add_data_validation(priority_validation)
-        priority_validation.add("A2:A5000")
+            priority_validation = DataValidation(type="whole", allow_blank=True)
+            priority_validation.promptTitle = "Priority"
+            priority_validation.prompt = "Enter a whole number."
+            priority_validation.errorTitle = "Invalid Priority"
+            priority_validation.error = "Priority must be a whole number."
+            ws_rules.add_data_validation(priority_validation)
+            priority_validation.add("A2:A5000")
 
-        direction_validation = DataValidation(type="list", formula1="=$I$1:$I$3", allow_blank=True)
-        direction_validation.promptTitle = "Direction"
-        direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
-        direction_validation.errorTitle = "Invalid Direction"
-        direction_validation.error = "Select a value from the Direction dropdown."
-        ws_rules.add_data_validation(direction_validation)
-        direction_validation.add("D2:D5000")
+            direction_validation = DataValidation(type="list", formula1="=$I$1:$I$3", allow_blank=True)
+            direction_validation.promptTitle = "Direction"
+            direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
+            direction_validation.errorTitle = "Invalid Direction"
+            direction_validation.error = "Select a value from the Direction dropdown."
+            ws_rules.add_data_validation(direction_validation)
+            direction_validation.add("D2:D5000")
 
-        active_validation = DataValidation(type="list", formula1="=$J$1:$J$2", allow_blank=True)
-        active_validation.promptTitle = "Active"
-        active_validation.prompt = "Choose TRUE or FALSE."
-        active_validation.errorTitle = "Invalid Active Value"
-        active_validation.error = "Select TRUE or FALSE from the Active dropdown."
-        ws_rules.add_data_validation(active_validation)
-        active_validation.add("F2:F5000")
+            active_validation = DataValidation(type="list", formula1="=$J$1:$J$2", allow_blank=True)
+            active_validation.promptTitle = "Active"
+            active_validation.prompt = "Choose TRUE or FALSE."
+            active_validation.errorTitle = "Invalid Active Value"
+            active_validation.error = "Select TRUE or FALSE from the Active dropdown."
+            ws_rules.add_data_validation(active_validation)
+            active_validation.add("F2:F5000")
 
         for hdr in (ws_rules.oddHeader, ws_rules.evenHeader, ws_rules.firstHeader):
             hdr.left.text = left_text
             hdr.center.text = "Custom Rules"
             hdr.right.text = right_text
 
-        ws_summary = wb.create_sheet("Summary")
+        summary_sheet_created = "Summary" not in wb.sheetnames
+        ws_summary = wb["Summary"] if not summary_sheet_created else wb.create_sheet("Summary")
 
         for hdr in (ws_summary.oddHeader, ws_summary.evenHeader, ws_summary.firstHeader):
             hdr.left.text = left_text
             hdr.center.text = "Summary"
             hdr.right.text = right_text
 
-        no_border_rules = Border()
-        last_row_rules = ws_rules.max_row
-        last_col_rules = ws_rules.max_column
-        for row in ws_rules.iter_rows(min_row=1, max_row=last_row_rules, min_col=1, max_col=last_col_rules):
-            for cell in row:
-                cell.border = no_border_rules
+        if rules_sheet_created:
+            no_border_rules = Border()
+            last_row_rules = ws_rules.max_row
+            last_col_rules = ws_rules.max_column
+            for row in ws_rules.iter_rows(min_row=1, max_row=last_row_rules, min_col=1, max_col=last_col_rules):
+                for cell in row:
+                    cell.border = no_border_rules
 
         header_to_col = {}
         for col_idx in range(1, ws.max_column + 1):
@@ -1404,6 +1409,44 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     cell = ws._cells[(r, global_cat_col)]
                     if cell.value is None or cell.value == "":
                         del ws._cells[(r, global_cat_col)]
+
+    template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ExcelTemplate.xlsx")
+    use_template = os.path.exists(template_path)
+
+    ensure_folder(os.path.dirname(output_path))
+    if use_template:
+        shutil.copyfile(template_path, output_path)
+        from openpyxl import load_workbook
+
+        wb = load_workbook(output_path)
+        wb.calculation.calcMode = "auto"
+        wb.calculation.fullCalcOnLoad = True
+
+        ws = wb["Transaction Data"] if "Transaction Data" in wb.sheetnames else wb.create_sheet("Transaction Data")
+        for col_idx, header in enumerate(df.columns, start=1):
+            ws.cell(row=1, column=col_idx).value = header
+
+        max_existing_row = ws.max_row
+        for row_idx in range(2, max_existing_row + 1):
+            for col_idx in range(1, len(df.columns) + 1):
+                ws.cell(row=row_idx, column=col_idx).value = None
+
+        for row_idx, row_vals in enumerate(df.itertuples(index=False, name=None), start=2):
+            for col_idx, value in enumerate(row_vals, start=1):
+                ws.cell(row=row_idx, column=col_idx).value = value
+
+        _post_write_formatting(wb, ws)
+        wb.save(output_path)
+    else:
+        with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+            wb = writer.book
+            wb.calculation.calcMode = "auto"
+            wb.calculation.fullCalcOnLoad = True
+
+            df.to_excel(writer, index=False, sheet_name="Transaction Data")
+
+            ws = writer.sheets["Transaction Data"]
+            _post_write_formatting(wb, ws)
 
     try:
         _strip_calc_chain_xlsx(output_path)
