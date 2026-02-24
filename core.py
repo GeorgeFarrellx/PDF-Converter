@@ -1410,6 +1410,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     if cell.value is None or cell.value == "":
                         del ws._cells[(r, global_cat_col)]
 
+        if "Transaction Data" in wb.sheetnames:
+            for default_sheet_name in ("Sheet1", "Sheet 1", "Sheet"):
+                if default_sheet_name in wb.sheetnames and len(wb.sheetnames) > 1:
+                    try:
+                        if default_sheet_name not in ("Transaction Data", "Custom Rules", "Summary"):
+                            wb.remove(wb[default_sheet_name])
+                    except Exception:
+                        pass
+
     template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ExcelTemplate.xlsx")
     use_template = os.path.exists(template_path)
 
