@@ -1072,6 +1072,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn
         from openpyxl.styles import Border, Font
         from openpyxl.worksheet.filters import AutoFilter
+        from openpyxl.worksheet.datavalidation import DataValidation
     except Exception as e:
         _show_dependency_error(
             "pandas and openpyxl are required for Excel output.\n\n"
@@ -1216,10 +1217,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         ws_rules = wb.create_sheet("Custom Rules")
         ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
-        ws_rules.append([10, "Tools & Materials", "ELECTRICAL", "ANY", "", True, "TEMP seed rule for testing"])
-        ws_rules.append([11, "Tools & Materials", "SCREWFIX", "ANY", "", True, "TEMP seed rule for testing"])
-        ws_rules.append([1000, "", "", "ANY", "", False, "Sort the table by Priority (smallest first). First matching rule wins."])
-        rules_table = Table(displayName="ClientRules", ref="A1:G4")
+        for _ in range(10):
+            ws_rules.append(["", "", "", "ANY", "", True, ""])
+        rules_table = Table(displayName="ClientRules", ref="A1:G11")
         rules_style = TableStyleInfo(
             name="TableStyleLight1",
             showFirstColumn=False,
@@ -1231,6 +1231,39 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         rules_table.tableStyleInfo = rules_style
         ws_rules.add_table(rules_table)
         ws_rules.freeze_panes = "A2"
+        ws_rules["A13"] = "Sort the table by Priority (smallest first). First matching rule wins."
+
+        ws_rules["I1"] = "ANY"
+        ws_rules["I2"] = "DEBIT"
+        ws_rules["I3"] = "CREDIT"
+        ws_rules["J1"] = True
+        ws_rules["J2"] = False
+        ws_rules.column_dimensions["I"].hidden = True
+        ws_rules.column_dimensions["J"].hidden = True
+
+        priority_validation = DataValidation(type="whole", allow_blank=True)
+        priority_validation.promptTitle = "Priority"
+        priority_validation.prompt = "Enter a whole number."
+        priority_validation.errorTitle = "Invalid Priority"
+        priority_validation.error = "Priority must be a whole number."
+        ws_rules.add_data_validation(priority_validation)
+        priority_validation.add("A2:A5000")
+
+        direction_validation = DataValidation(type="list", formula1="=$I$1:$I$3", allow_blank=True)
+        direction_validation.promptTitle = "Direction"
+        direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
+        direction_validation.errorTitle = "Invalid Direction"
+        direction_validation.error = "Select a value from the Direction dropdown."
+        ws_rules.add_data_validation(direction_validation)
+        direction_validation.add("D2:D5000")
+
+        active_validation = DataValidation(type="list", formula1="=$J$1:$J$2", allow_blank=True)
+        active_validation.promptTitle = "Active"
+        active_validation.prompt = "Choose TRUE or FALSE."
+        active_validation.errorTitle = "Invalid Active Value"
+        active_validation.error = "Select TRUE or FALSE from the Active dropdown."
+        ws_rules.add_data_validation(active_validation)
+        active_validation.add("F2:F5000")
 
         for hdr in (ws_rules.oddHeader, ws_rules.evenHeader, ws_rules.firstHeader):
             hdr.left.text = left_text
