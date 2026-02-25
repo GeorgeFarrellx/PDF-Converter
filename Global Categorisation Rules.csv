@@ -347,3 +347,5 @@
 1060,Motor Expenses,regex,GREEN\s*FLAG,DEBIT,,TRUE,Breakdown cover (Green Flag)
 1061,Protective Clothing,regex,JD\s*SPORTS,DEBIT,,TRUE,Retail clothing (JD Sports)
 1062,Groceries,regex,MARKS\s*&\s*SPENCER\s*PLC,DEBIT,,TRUE,Marks & Spencer PLC variant
+1063,Food & Drink,regex,(?i)RESTAURAN,DEBIT,,TRUE,Restaurants (matches "Restauran/Restaurant")
+1064,Personal,regex,(?i)SMYTHS\\s*TOYS,DEBIT,,TRUE,Smyths Toys
