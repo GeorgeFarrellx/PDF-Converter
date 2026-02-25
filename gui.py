@@ -140,7 +140,8 @@ def show_reconciliation_popup(
     win.grab_set()
 
     win.title("Audit Checks (Warnings)" if any_warn else "Audit Checks")
-    win.geometry("820x560")
+    win.geometry("1200x560")
+    win.minsize(1100, 560)
 
     outer = ttk.Frame(win, padding=14)
     outer.pack(fill="both", expand=True)
