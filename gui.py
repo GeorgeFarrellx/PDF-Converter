@@ -443,74 +443,6 @@ def show_reconciliation_popup(
                 justify="left" if c == 0 else "center",
             )
 
-    txt.insert("end", "Balance Walk:\n", "section")
-    bw_tbl = ttk.Frame(txt)
-    txt.window_create("end", window=bw_tbl)
-    txt.insert("end", "\n\n")
-
-    bw_headers = ["File", "Status", "Summary"]
-    for c, title in enumerate(bw_headers):
-        _tbl_cell(bw_tbl, title, 0, c, header=True, anchor="w")
-
-    for row_idx, r in enumerate(recon_results, start=1):
-        pdf = str(r.get("pdf") or "")
-        if len(pdf) > recon_file_width_chars:
-            pdf_disp = pdf[: recon_file_width_chars - 1] + "…"
-        else:
-            pdf_disp = pdf
-
-        a = audit_by_pdf.get(pdf, {})
-        bw_status = str(a.get("balance_walk_status") or "NOT CHECKED").strip()
-        bw_summary = str(a.get("balance_walk_summary") or "").strip()
-
-        if not bw_status or bw_status.upper() == "NOT CHECKED":
-            bw_status_text = "NOT CHECKED"
-            bw_status_fg = na_grey
-        elif bw_status == "OK":
-            bw_status_text = bw_status
-            bw_status_fg = pass_green
-        else:
-            bw_status_text = bw_status
-            bw_status_fg = fail_red
-
-        _tbl_cell(bw_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
-        _tbl_cell(bw_tbl, bw_status_text, row_idx, 1, fg=bw_status_fg, anchor="w")
-        _tbl_cell(bw_tbl, bw_summary, row_idx, 2, anchor="w")
-
-    txt.insert("end", "Row Shape Sanity:\n", "section")
-    rs_tbl = ttk.Frame(txt)
-    txt.window_create("end", window=rs_tbl)
-    txt.insert("end", "\n\n")
-
-    rs_headers = ["File", "Status", "Summary"]
-    for c, title in enumerate(rs_headers):
-        _tbl_cell(rs_tbl, title, 0, c, header=True, anchor="w")
-
-    for row_idx, r in enumerate(recon_results, start=1):
-        pdf = str(r.get("pdf") or "")
-        if len(pdf) > recon_file_width_chars:
-            pdf_disp = pdf[: recon_file_width_chars - 1] + "…"
-        else:
-            pdf_disp = pdf
-
-        a = audit_by_pdf.get(pdf, {})
-        rs_status = str(a.get("row_shape_status") or "NOT CHECKED").strip()
-        rs_summary = str(a.get("row_shape_summary") or "").strip()
-
-        if not rs_status or rs_status.upper() == "NOT CHECKED":
-            rs_status_text = "NOT CHECKED"
-            rs_status_fg = na_grey
-        elif rs_status == "OK":
-            rs_status_text = rs_status
-            rs_status_fg = pass_green
-        else:
-            rs_status_text = rs_status
-            rs_status_fg = fail_red
-
-        _tbl_cell(rs_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
-        _tbl_cell(rs_tbl, rs_status_text, row_idx, 1, fg=rs_status_fg, anchor="w")
-        _tbl_cell(rs_tbl, rs_summary, row_idx, 2, anchor="w")
-
     txt.insert("end", "Continuity:\n", "section")
     cont_tbl = ttk.Frame(txt)
     txt.window_create("end", window=cont_tbl)
@@ -583,100 +515,77 @@ def show_reconciliation_popup(
             status_fg = na_grey
         _tbl_cell(cont_tbl, status_text, row_idx, 6, fg=status_fg, anchor="w")
 
+    txt.insert("end", "Balance Walk:\n", "section")
+    bw_tbl = ttk.Frame(txt)
+    txt.window_create("end", window=bw_tbl)
+    txt.insert("end", "\n\n")
+
+    bw_headers = ["File", "Status", "Summary"]
+    for c, title in enumerate(bw_headers):
+        _tbl_cell(bw_tbl, title, 0, c, header=True, anchor="w")
+
+    for row_idx, r in enumerate(recon_results, start=1):
+        pdf = str(r.get("pdf") or "")
+        if len(pdf) > recon_file_width_chars:
+            pdf_disp = pdf[: recon_file_width_chars - 1] + "…"
+        else:
+            pdf_disp = pdf
+
+        a = audit_by_pdf.get(pdf, {})
+        bw_status = str(a.get("balance_walk_status") or "NOT CHECKED").strip()
+        bw_summary = str(a.get("balance_walk_summary") or "").strip()
+
+        if not bw_status or bw_status.upper() == "NOT CHECKED":
+            bw_status_text = "NOT CHECKED"
+            bw_status_fg = na_grey
+        elif bw_status == "OK":
+            bw_status_text = bw_status
+            bw_status_fg = pass_green
+        else:
+            bw_status_text = bw_status
+            bw_status_fg = fail_red
+
+        _tbl_cell(bw_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
+        _tbl_cell(bw_tbl, bw_status_text, row_idx, 1, fg=bw_status_fg, anchor="w")
+        _tbl_cell(bw_tbl, bw_summary, row_idx, 2, anchor="w")
+
+    txt.insert("end", "Row Shape Sanity:\n", "section")
+    rs_tbl = ttk.Frame(txt)
+    txt.window_create("end", window=rs_tbl)
+    txt.insert("end", "\n\n")
+
+    rs_headers = ["File", "Status", "Summary"]
+    for c, title in enumerate(rs_headers):
+        _tbl_cell(rs_tbl, title, 0, c, header=True, anchor="w")
+
+    for row_idx, r in enumerate(recon_results, start=1):
+        pdf = str(r.get("pdf") or "")
+        if len(pdf) > recon_file_width_chars:
+            pdf_disp = pdf[: recon_file_width_chars - 1] + "…"
+        else:
+            pdf_disp = pdf
+
+        a = audit_by_pdf.get(pdf, {})
+        rs_status = str(a.get("row_shape_status") or "NOT CHECKED").strip()
+        rs_summary = str(a.get("row_shape_summary") or "").strip()
+
+        if not rs_status or rs_status.upper() == "NOT CHECKED":
+            rs_status_text = "NOT CHECKED"
+            rs_status_fg = na_grey
+        elif rs_status == "OK":
+            rs_status_text = rs_status
+            rs_status_fg = pass_green
+        else:
+            rs_status_text = rs_status
+            rs_status_fg = fail_red
+
+        _tbl_cell(rs_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
+        _tbl_cell(rs_tbl, rs_status_text, row_idx, 1, fg=rs_status_fg, anchor="w")
+        _tbl_cell(rs_tbl, rs_summary, row_idx, 2, anchor="w")
+
     txt.insert("end", "\n")
 
-    if continuity_results:
-        txt.insert("end", "Statement continuity check:\n", "section")
-
-        for c in continuity_results:
-            status = (c.get("display_status") or c.get("status") or "").strip()
-            prev_pdf = c.get("prev_pdf") or ""
-            next_pdf = c.get("next_pdf") or ""
-
-            prev_end = c.get("prev_end")
-            next_start = c.get("next_start")
-
-            prev_period = period_by_pdf.get(prev_pdf, "")
-            next_period = period_by_pdf.get(next_pdf, "")
-            if prev_period and next_period:
-                period_value = f"{prev_period} --> {next_period}"
-            elif prev_period:
-                period_value = prev_period
-            elif next_period:
-                period_value = next_period
-            else:
-                period_value = ""
-            period_part = f" | Period: {period_value}" if period_value else ""
-
-            if prev_end is None or next_start is None:
-                msg = (
-                    f"NOT CHECKED: {prev_pdf} --> {next_pdf} (balances not found) "
-                    f"[prev_end_raw={c.get('prev_end_raw')!r}, next_start_raw={c.get('next_start_raw')!r}, "
-                    f"prev_end={c.get('prev_end')!r}, next_start={c.get('next_start')!r}]"
-                )
-                msg = msg + period_part
-                tag = "warn"
-            elif status.upper().startswith("OK"):
-                status_prefix = status if status != "OK" else "OK"
-                msg = f"{status_prefix}: {prev_pdf} --> {next_pdf}{period_part} (Balance Match)"
-                tag = "ok"
-            elif status.upper().startswith("MISMATCH"):
-                missing = ""
-                try:
-                    mf = c.get("missing_from")
-                    mt = c.get("missing_to")
-                    if mf and mt and hasattr(mf, "strftime") and hasattr(mt, "strftime"):
-                        missing = f" Missing: {mf.strftime('%d/%m/%Y')} - {mt.strftime('%d/%m/%Y')}"
-                except Exception:
-                    missing = ""
-
-                msg = (
-                    f"MISMATCH: {prev_pdf} --> {next_pdf} "
-                    f"(End {_fmt_money(prev_end)} vs Start {_fmt_money(next_start)}, Diff {_fmt_money(c.get('diff'))}){missing}"
-                )
-                msg = msg + period_part
-                tag = "bad"
-            else:
-                msg = (
-                    f"{status or 'NOT CHECKED'}: {prev_pdf} --> {next_pdf} "
-                    f"(End {_fmt_money(prev_end)} vs Start {_fmt_money(next_start)}, Diff {_fmt_money(c.get('diff'))})"
-                )
-                msg = msg + period_part
-                tag = "warn"
-
-            txt.insert("end", msg + "\n", tag)
-
-        txt.insert("end", "\n")
-
-    if audit_results:
-        txt.insert("end", "Audit checks:\n", "section")
-        for r in recon_results:
-            pdf = str(r.get("pdf") or "")
-            a = audit_by_pdf.get(pdf, {})
-            overall = str(a.get("status") or "WARN")
-            bw_status = str(a.get("balance_walk_status") or "NOT CHECKED")
-            bw_summary = str(a.get("balance_walk_summary") or "")
-            rs_status = str(a.get("row_shape_status") or "WARN")
-            rs_summary = str(a.get("row_shape_summary") or "")
-
-            if overall == "OK":
-                tag = "ok"
-            elif overall == "MISMATCH":
-                tag = "bad"
-            else:
-                tag = "warn"
-
-            bw_part = f"Balance Walk: {bw_status}"
-            if bw_summary:
-                bw_part = bw_part + f" ({bw_summary})"
-            rs_part = f"Row Shape Sanity: {rs_status}"
-            if rs_summary and rs_status != "OK":
-                rs_part = rs_part + f" ({rs_summary})"
-
-            msg = f"{overall}: {pdf} | {bw_part} | {rs_part}"
-            txt.insert("end", msg + "\n", tag)
-
-        txt.insert("end", "\n")
+    txt.configure(state="disabled")
 
     btn_row = ttk.Frame(win)
     btn_row.pack(fill="x", pady=(8, 10))
