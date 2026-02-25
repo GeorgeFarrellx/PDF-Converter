@@ -1,4 +1,4 @@
-# Version: 2.50
+# Version: 2.51
 import os
 import glob
 import gc
@@ -1198,18 +1198,18 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     TableColumn(id=idx, name=header)
                     for idx, header in enumerate(df.columns, start=1)
                 ]
-
-                style = TableStyleInfo(
-                    name="TableStyleLight1",
-                    showFirstColumn=False,
-                    showLastColumn=False,
-                    showRowStripes=False,
-                    showColumnStripes=False,
-                )
-                table.totalsRowShown = False
-                table.tableStyleInfo = style
                 table.autoFilter = AutoFilter(ref=table.ref)
                 ws.add_table(table)
+
+            style = TableStyleInfo(
+                name="None",
+                showFirstColumn=False,
+                showLastColumn=False,
+                showRowStripes=False,
+                showColumnStripes=False,
+            )
+            table.totalsRowShown = False
+            table.tableStyleInfo = style
 
             no_border = Border()
             for row in ws.iter_rows(min_row=1, max_row=last_row, min_col=1, max_col=last_col):
@@ -1218,13 +1218,24 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
         rules_sheet_created = "Custom Rules" not in wb.sheetnames
         ws_rules = wb["Custom Rules"] if not rules_sheet_created else wb.create_sheet("Custom Rules")
+        if "ClientRules" in ws_rules.tables:
+            rules_table = ws_rules.tables["ClientRules"]
+            rules_style = TableStyleInfo(
+                name="None",
+                showFirstColumn=False,
+                showLastColumn=False,
+                showRowStripes=False,
+                showColumnStripes=False,
+            )
+            rules_table.totalsRowShown = False
+            rules_table.tableStyleInfo = rules_style
         if rules_sheet_created:
             ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
             for _ in range(10):
                 ws_rules.append(["", "", "", "ANY", "", True, ""])
             rules_table = Table(displayName="ClientRules", ref="A1:G11")
             rules_style = TableStyleInfo(
-                name="TableStyleLight1",
+                name="None",
                 showFirstColumn=False,
                 showLastColumn=False,
                 showRowStripes=False,
@@ -1281,13 +1292,12 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             hdr.center.text = "Summary"
             hdr.right.text = right_text
 
-        if rules_sheet_created:
-            no_border_rules = Border()
-            last_row_rules = ws_rules.max_row
-            last_col_rules = ws_rules.max_column
-            for row in ws_rules.iter_rows(min_row=1, max_row=last_row_rules, min_col=1, max_col=last_col_rules):
-                for cell in row:
-                    cell.border = no_border_rules
+        no_border_rules = Border()
+        last_row_rules = ws_rules.max_row
+        last_col_rules = ws_rules.max_column
+        for row in ws_rules.iter_rows(min_row=1, max_row=last_row_rules, min_col=1, max_col=last_col_rules):
+            for cell in row:
+                cell.border = no_border_rules
 
         header_to_col = {}
         for col_idx in range(1, ws.max_column + 1):
