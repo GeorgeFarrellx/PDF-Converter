@@ -343,3 +343,7 @@
 1056,Loan Repayment,contains,HSBC PLC LOANS,DEBIT,,TRUE,Loan Repayment
 1057,Credit Card,contains,B/CARD PLAT VISA,DEBIT,,TRUE,Credit Card Repayment
 1058,Motor Expenses,contains,HALFORDS,DEBIT,,TRUE,Car parts/maintenance
+1059,Stationary,contains,WH SMITH,DEBIT,,TRUE,WH Smith variant with space
+1060,Motor Expenses,regex,GREEN\s*FLAG,DEBIT,,TRUE,Breakdown cover (Green Flag)
+1061,Protective Clothing,regex,JD\s*SPORTS,DEBIT,,TRUE,Retail clothing (JD Sports)
+1062,Groceries,regex,MARKS\s*&\s*SPENCER\s*PLC,DEBIT,,TRUE,Marks & Spencer PLC variant
