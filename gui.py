@@ -249,9 +249,9 @@ def show_reconciliation_popup(
 
     cn = str(client_name or "").strip()
     if cn:
-        txt.insert("end", f"Client: {cn}\n", "section")
+        txt.insert("end", f"{cn}\n", "section")
     else:
-        txt.insert("end", "Client: (unknown)\n", "section")
+        txt.insert("end", "(unknown)\n", "section")
 
     if coverage_period:
         if any_warn:
