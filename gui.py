@@ -986,12 +986,22 @@ def show_reconciliation_popup(
 
     btn_row = ttk.Frame(win)
     btn_row.pack(fill="x", pady=(8, 10))
+    create_support_bundle = getattr(parent, "create_support_bundle_zip", None)
+
+    def _create_support_bundle():
+        try:
+            create_support_bundle()
+        except Exception as e:
+            messagebox.showerror("Support bundle error", str(e))
 
     if any_warn and callable(open_log_folder_callback):
         ttk.Button(btn_row, text="Open Log", command=open_log_folder_callback).pack(side="left", padx=(0, 8))
 
     close_btn = ttk.Button(btn_row, text="Close", command=_close)
     close_btn.pack(side="left")
+
+    if callable(create_support_bundle):
+        ttk.Button(btn_row, text="Create Support Bundle", command=_create_support_bundle).pack(side="left", padx=(8, 0))
 
     try:
         close_btn.focus_set()
