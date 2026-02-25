@@ -2474,8 +2474,26 @@ class App(TkinterDnD.Tk):
                 except Exception:
                     ps, pe = (None, None)
 
-                rec["period_start"] = ps
-                rec["period_end"] = pe
+                if hasattr(ps, "to_pydatetime"):
+                    try:
+                        ps = ps.to_pydatetime()
+                    except Exception:
+                        pass
+                if hasattr(pe, "to_pydatetime"):
+                    try:
+                        pe = pe.to_pydatetime()
+                    except Exception:
+                        pass
+
+                if isinstance(ps, (date, datetime)):
+                    rec["period_start"] = ps
+                elif rec.get("period_start") is None:
+                    rec["period_start"] = None
+
+                if isinstance(pe, (date, datetime)):
+                    rec["period_end"] = pe
+                elif rec.get("period_end") is None:
+                    rec["period_end"] = None
 
                 if bank == "Lloyds":
                     try:
