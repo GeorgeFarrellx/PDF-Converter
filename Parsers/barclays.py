@@ -80,6 +80,9 @@ TRUNCATE_AFTER_PHRASES = [
     "u interest paid",
     "interest paid",
     "end balance",
+    "money out",
+    "money in",
+    "start balance",
 ]
 
 # Boilerplate / footer lines to skip as transaction continuation
@@ -342,7 +345,7 @@ def _truncate_after_summary_phrases(s: str) -> str:
     cut = None
     for ph in TRUNCATE_AFTER_PHRASES:
         idx = low.find(ph)
-        if idx != -1:
+        if idx > 0:
             cut = idx if cut is None else min(cut, idx)
     if cut is not None:
         return s[:cut].strip()
@@ -678,7 +681,16 @@ def extract_transactions(pdf_path: str) -> list[dict]:
             block_lines = []
             return
 
-        raw = " ".join(ln.strip() for ln in block_lines if ln.strip())
+        cleaned_lines = []
+        for ln in block_lines:
+            stripped = ln.strip()
+            if not stripped:
+                continue
+            truncated = _truncate_after_summary_phrases(stripped)
+            if truncated:
+                cleaned_lines.append(truncated)
+
+        raw = " ".join(cleaned_lines)
         raw = " ".join(raw.split()).strip()
 
         block_lines = []
@@ -785,6 +797,11 @@ def extract_transactions(pdf_path: str) -> list[dict]:
                 # New transaction starts with a date
                 m = DATE_RE.match(line)
                 if m:
+                    remainder = line[m.end() :].strip()
+                    if not remainder and current_dt is not None and block_lines:
+                        block_lines.append(line)
+                        continue
+
                     # flush previous
                     flush_block()
 
@@ -802,10 +819,8 @@ def extract_transactions(pdf_path: str) -> list[dict]:
                         current_dt = None
                         continue
 
-                    remainder = line[m.end() :].strip()
                     # Ignore non-transaction balance rows (statement footer)
                     if remainder.lower().startswith("start balance"):
-                        current_dt = None
                         block_lines = []
                         continue
                     if remainder.lower().startswith("balance carried forward"):
