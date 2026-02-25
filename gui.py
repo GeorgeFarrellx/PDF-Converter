@@ -508,6 +508,40 @@ def show_reconciliation_popup(
         lbl.bind("<Control-Button-1>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         return lbl
 
+    def _tbl_merged_row(
+        parent,
+        text,
+        row,
+        colspan,
+        tbl_id=None,
+        data_row_idx=-1,
+        data_col_idx=0,
+        bg="#fff4ce",
+    ):
+        lbl = tk.Label(
+            parent,
+            text=text,
+            bd=1,
+            relief="solid",
+            bg=bg,
+            fg="#000000",
+            anchor="center",
+            justify="center",
+            font=cell_font,
+            padx=3,
+            pady=1,
+        )
+        lbl._orig_bg = bg
+        lbl._tbl_id = tbl_id
+        lbl._tbl_row = data_row_idx
+        lbl._tbl_col = data_col_idx
+        lbl.grid(row=row, column=0, columnspan=colspan, sticky="nsew")
+        lbl.bind("<Button-1>", lambda e, w=lbl, t=text: _select_cell(w, t), add="+")
+        lbl.bind("<Button-2>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
+        lbl.bind("<Button-3>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
+        lbl.bind("<Control-Button-1>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
+        return lbl
+
     audit_body = _make_card(content, "Audit Summary")
 
     audit_tbl = ttk.Frame(audit_body)
@@ -788,7 +822,8 @@ def show_reconciliation_popup(
         _tbl_cell(cont_tbl, title, 0, c, header=True, tbl_id="cont", data_row_idx=-1, data_col_idx=c)
 
     file_link_width_chars = 28
-    for row_idx, link in enumerate(sorted_links, start=1):
+    ui_row = 1
+    for link in sorted_links:
         prev_pdf = str(link.get("prev_pdf") or "")
         next_pdf = str(link.get("next_pdf") or "")
         prev_end = link.get("prev_end")
@@ -833,9 +868,9 @@ def show_reconciliation_popup(
 
         cont_row = row_values + [status_text]
         table_data["cont"]["rows"].append(cont_row)
-        data_row_idx = row_idx - 1
+        data_row_idx = len(table_data["cont"]["rows"]) - 1
         for c, value in enumerate(row_values):
-            _tbl_cell(cont_tbl, value, row_idx, c, anchor="w", tbl_id="cont", data_row_idx=data_row_idx, data_col_idx=c)
+            _tbl_cell(cont_tbl, value, ui_row, c, anchor="w", tbl_id="cont", data_row_idx=data_row_idx, data_col_idx=c)
 
         if status_style == "SumPass.TLabel":
             status_fg = pass_green
@@ -846,7 +881,7 @@ def show_reconciliation_popup(
         _tbl_cell(
             cont_tbl,
             status_text,
-            row_idx,
+            ui_row,
             6,
             fg=status_fg,
             anchor="w",
@@ -854,6 +889,24 @@ def show_reconciliation_popup(
             data_row_idx=data_row_idx,
             data_col_idx=6,
         )
+        ui_row += 1
+
+        mf = link.get("missing_from")
+        mt = link.get("missing_to")
+        if mf is not None and mt is not None and hasattr(mf, "strftime") and hasattr(mt, "strftime"):
+            gap_text = f"Suspected missing statement(s): {mf.strftime('%d/%m/%Y')} - {mt.strftime('%d/%m/%Y')}"
+            table_data["cont"]["rows"].append([gap_text, "", "", "", "", "", ""])
+            gap_data_row_idx = len(table_data["cont"]["rows"]) - 1
+            _tbl_merged_row(
+                cont_tbl,
+                gap_text,
+                ui_row,
+                colspan=7,
+                tbl_id="cont",
+                data_row_idx=gap_data_row_idx,
+                data_col_idx=0,
+            )
+            ui_row += 1
 
     bw_body = _make_card(content, "Balance Walk")
 
