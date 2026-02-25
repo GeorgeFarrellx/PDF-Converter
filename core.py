@@ -2470,6 +2470,16 @@ def compute_statement_continuity(recon_results: list[dict]) -> list[dict]:
         next_date_min = _safe_date(b.get("date_min"))
         a_period_end = _safe_date(a.get("period_end"))
         b_period_start = _safe_date(b.get("period_start"))
+        a_ps = _safe_date(a.get("period_start"))
+        a_pe = _safe_date(a.get("period_end"))
+        b_ps = _safe_date(b.get("period_start"))
+        b_pe = _safe_date(b.get("period_end"))
+        periods_ok = (
+            isinstance(a_ps, date)
+            and isinstance(a_pe, date)
+            and isinstance(b_ps, date)
+            and isinstance(b_pe, date)
+        )
         prev_txn_max = _safe_date(a.get("date_max"))
         next_txn_min = _safe_date(b.get("date_min"))
 
@@ -2519,6 +2529,11 @@ def compute_statement_continuity(recon_results: list[dict]) -> list[dict]:
         }
 
         if prev_end is None or next_start is None:
+            if not periods_ok:
+                link["status"] = "NOT CHECKED (missing statement period dates)"
+                link["display_status"] = link["status"]
+                link["period_dates_missing_prev"] = not (isinstance(a_ps, date) and isinstance(a_pe, date))
+                link["period_dates_missing_next"] = not (isinstance(b_ps, date) and isinstance(b_pe, date))
             links.append(link)
             continue
 
@@ -2528,6 +2543,12 @@ def compute_statement_continuity(recon_results: list[dict]) -> list[dict]:
             link["status"] = "OK" if abs(diff) <= 0.01 else "Mismatch"
         except Exception:
             link["status"] = "Not checked"
+
+        if not periods_ok:
+            link["status"] = "NOT CHECKED (missing statement period dates)"
+            link["display_status"] = link["status"]
+            link["period_dates_missing_prev"] = not (isinstance(a_ps, date) and isinstance(a_pe, date))
+            link["period_dates_missing_next"] = not (isinstance(b_ps, date) and isinstance(b_pe, date))
 
         # Overlap-aware continuity resolution (produce a de-dupe plan)
         link["applied_overlap_resolution"] = False
@@ -2540,7 +2561,7 @@ def compute_statement_continuity(recon_results: list[dict]) -> list[dict]:
         link["overlap_log_fields"] = []
 
         # Only attempt overlap resolution when first-pass mismatches AND both A/B have period_start/period_end.
-        if link.get("status") == "Mismatch":
+        if periods_ok and link.get("status") == "Mismatch":
             a_txns = a.get("transactions") or a.get("txns")
             b_txns = b.get("transactions") or b.get("txns")
 
