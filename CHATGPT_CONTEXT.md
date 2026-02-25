@@ -146,6 +146,8 @@ Rules:
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/VERSION.txt
 - `core.py`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/core.py
+- `ExcelTemplate.xlsx`  
+  https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/ExcelTemplate.xlsx
 - `Global Categorisation Rules.csv`  
   https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/Global%20Categorisation%20Rules.csv
 - `gitignore`  
@@ -185,6 +187,7 @@ Rules:
 
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/main.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/core.py
+https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/ExcelTemplate.xlsx
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/gui.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/launcher.py
 https://raw.githubusercontent.com/GeorgeFarrellx/PDF-Converter/refs/heads/main/VERSION.txt
