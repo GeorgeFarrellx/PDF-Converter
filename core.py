@@ -2468,19 +2468,30 @@ def compute_statement_continuity(recon_results: list[dict]) -> list[dict]:
 
         prev_date_max = _safe_date(a.get("date_max"))
         next_date_min = _safe_date(b.get("date_min"))
+        a_period_end = _safe_date(a.get("period_end"))
+        b_period_start = _safe_date(b.get("period_start"))
+        prev_txn_max = _safe_date(a.get("date_max"))
+        next_txn_min = _safe_date(b.get("date_min"))
+
+        if isinstance(a_period_end, date) and isinstance(b_period_start, date):
+            prev_end_for_gap = a_period_end
+            next_start_for_gap = b_period_start
+            gap_basis = "period"
+        else:
+            prev_end_for_gap = prev_txn_max
+            next_start_for_gap = next_txn_min
+            gap_basis = "transactions"
 
         missing_from = None
         missing_to = None
-        try:
-            if isinstance(prev_date_max, date) and isinstance(next_date_min, date):
-                _mf = prev_date_max + timedelta(days=1)
-                _mt = next_date_min - timedelta(days=1)
-                if _mf <= _mt:
+        if isinstance(prev_end_for_gap, date) and isinstance(next_start_for_gap, date):
+            _mf = prev_end_for_gap + timedelta(days=1)
+            _mt = next_start_for_gap - timedelta(days=1)
+            if _mf <= _mt:
+                gap_days = (_mt - _mf).days + 1
+                if not (gap_basis == "transactions" and gap_days <= 1):
                     missing_from = _mf
                     missing_to = _mt
-        except Exception:
-            missing_from = None
-            missing_to = None
 
         chain_log = chain_link_logs.get((a_idx, b_idx)) or {}
 
@@ -2980,6 +2991,33 @@ def _run_self_tests() -> None:
     ]
     links_bad = compute_statement_continuity(rr_bad)
     assert links_bad and links_bad[0]["status"] in ("Mismatch", "Not checked"), links_bad
+
+    # Missing detection should prefer statement periods over txn-date gaps.
+    rr_period_gap = [
+        {
+            "pdf": "P1.pdf",
+            "start_balance": 10.0,
+            "end_balance": 20.0,
+            "continuity_start_balance": 10.0,
+            "period_start": date(2024, 10, 20),
+            "period_end": date(2024, 11, 19),
+            "date_min": date(2024, 10, 20),
+            "date_max": date(2024, 11, 18),
+        },
+        {
+            "pdf": "P2.pdf",
+            "start_balance": 20.0,
+            "end_balance": 30.0,
+            "continuity_start_balance": 20.0,
+            "period_start": date(2024, 11, 20),
+            "period_end": date(2024, 12, 19),
+            "date_min": date(2024, 11, 21),
+            "date_max": date(2024, 12, 19),
+        },
+    ]
+    links_period_gap = compute_statement_continuity(rr_period_gap)
+    assert links_period_gap and links_period_gap[0]["missing_from"] is None, links_period_gap
+    assert links_period_gap and links_period_gap[0]["missing_to"] is None, links_period_gap
 
     # Money parsing: 0.00 is valid; "£0.00" should not be treated as missing
     rr_zero = [
