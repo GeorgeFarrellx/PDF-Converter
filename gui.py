@@ -73,6 +73,7 @@ def show_reconciliation_popup(
     audit_results: list[dict] | None = None,
     pre_save: bool = False,
     open_log_folder_callback=None,
+    client_name: str = "",
 ):
     continuity_results = continuity_results or []
     audit_results = audit_results or []
@@ -246,6 +247,12 @@ def show_reconciliation_popup(
         lbl.grid(row=row, column=col, sticky="nsew")
         return lbl
 
+    cn = str(client_name or "").strip()
+    if cn:
+        txt.insert("end", f"Client: {cn}\n", "section")
+    else:
+        txt.insert("end", "Client: (unknown)\n", "section")
+
     if coverage_period:
         if any_warn:
             line = (
@@ -254,7 +261,15 @@ def show_reconciliation_popup(
             )
         else:
             line = f"The bank statements cover the period from {coverage_period}."
-        txt.insert("end", line + "\n\n", "info")
+    else:
+        if any_warn:
+            line = (
+                "The bank statements cover the period: (unknown) "
+                "(however, some checks could not be completed or warnings were detected — see below)."
+            )
+        else:
+            line = "The bank statements cover the period: (unknown)."
+    txt.insert("end", line + "\n\n", "info")
 
     txt.insert("end", "Audit Summary:\n", "section")
     audit_tbl = ttk.Frame(txt)
@@ -764,6 +779,8 @@ class App(TkinterDnD.Tk):
             or "(Not saved yet)"
         )
 
+        client_name = (data.get("client_name") or (self.last_excel_data or {}).get("client_name") or "")
+
         show_reconciliation_popup(
             self,
             output_path,
@@ -773,6 +790,7 @@ class App(TkinterDnD.Tk):
             audit_results=data.get("audit_results") or [],
             pre_save=(output_path == "(Not saved yet)"),
             open_log_folder_callback=self.open_log_folder,
+            client_name=client_name,
         )
 
     def _show_checks_text_popup(self, txt: str):
@@ -2242,6 +2260,7 @@ class App(TkinterDnD.Tk):
                     audit_results=audit_results,
                     pre_save=True,
                     open_log_folder_callback=self.open_log_folder,
+                    client_name=client_name,
                 )
 
                 messagebox.showwarning(
@@ -2692,6 +2711,7 @@ class App(TkinterDnD.Tk):
                 audit_results=audit_results,
                 pre_save=True,
                 open_log_folder_callback=self.open_log_folder,
+                client_name=client_name,
             )
 
             output_path = filedialog.asksaveasfilename(
