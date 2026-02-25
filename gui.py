@@ -2048,9 +2048,9 @@ class App(TkinterDnD.Tk):
         self.set_status("Removed selected item(s).")
 
     def _prompt_duplicate_action(self, message_text: str) -> bool:
-        dialog = tk.Toplevel(self.root)
+        dialog = tk.Toplevel(self)
         dialog.title("Duplicate statements detected")
-        dialog.transient(self.root)
+        dialog.transient(self)
         dialog.resizable(True, True)
         dialog.minsize(700, 380)
 
@@ -2088,7 +2088,7 @@ class App(TkinterDnD.Tk):
 
         dialog.grab_set()
         dialog.focus_set()
-        self.root.wait_window(dialog)
+        self.wait_window(dialog)
         return bool(result["remove"])
 
     def on_drop(self, event):
