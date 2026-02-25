@@ -2047,6 +2047,50 @@ class App(TkinterDnD.Tk):
 
         self.set_status("Removed selected item(s).")
 
+    def _prompt_duplicate_action(self, message_text: str) -> bool:
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Duplicate statements detected")
+        dialog.transient(self.root)
+        dialog.resizable(True, True)
+        dialog.minsize(700, 380)
+
+        result = {"remove": False}
+
+        def _abort():
+            result["remove"] = False
+            dialog.destroy()
+
+        def _remove_and_continue():
+            result["remove"] = True
+            dialog.destroy()
+
+        dialog.protocol("WM_DELETE_WINDOW", _abort)
+
+        body = ttk.Frame(dialog, padding=12)
+        body.pack(fill="both", expand=True)
+
+        text_frame = ttk.Frame(body)
+        text_frame.pack(fill="both", expand=True)
+
+        msg_text = tk.Text(text_frame, wrap="word", height=16)
+        msg_text.pack(side="left", fill="both", expand=True)
+        y_scroll = ttk.Scrollbar(text_frame, orient="vertical", command=msg_text.yview)
+        y_scroll.pack(side="right", fill="y")
+        msg_text.configure(yscrollcommand=y_scroll.set)
+        msg_text.insert("1.0", message_text)
+        msg_text.configure(state="disabled")
+
+        btn_row = ttk.Frame(body)
+        btn_row.pack(fill="x", pady=(10, 0))
+
+        ttk.Button(btn_row, text="Remove duplicates and continue", command=_remove_and_continue).pack(side="left")
+        ttk.Button(btn_row, text="OK", command=_abort).pack(side="left", padx=(8, 0))
+
+        dialog.grab_set()
+        dialog.focus_set()
+        self.root.wait_window(dialog)
+        return bool(result["remove"])
+
     def on_drop(self, event):
         files = parse_dnd_event_files(event.data)
         self.add_files(files)
@@ -2464,6 +2508,7 @@ class App(TkinterDnD.Tk):
                     rec["fingerprint"] = compute_statement_fingerprint(txns)
                 except Exception:
                     rec["fingerprint"] = None
+                rec["pdf_path"] = pdf_path
 
                 recon_results.append(rec)
                 audit_results.append(audit)
@@ -2561,10 +2606,74 @@ class App(TkinterDnD.Tk):
                 except Exception:
                     pass
 
-                messagebox.showerror("Duplicate statements detected", "\n".join(msg_lines).strip())
+                should_remove_duplicates = self._prompt_duplicate_action("\n".join(msg_lines).strip())
+                if not should_remove_duplicates:
+                    self.set_status("Error: duplicate statements detected.")
+                    return
 
-                self.set_status("Error: duplicate statements detected.")
-                return
+                original_selected_files = list(self.selected_files or [])
+
+                def _resolve_pdf_path(_rec, _selected_files, _used_paths=None):
+                    _used_paths = _used_paths or set()
+                    path = _rec.get("pdf_path")
+                    if path:
+                        return path
+                    name = os.path.basename(str(_rec.get("pdf") or ""))
+                    if not name:
+                        return ""
+                    matches = [p for p in (_selected_files or []) if os.path.basename(p) == name]
+                    if not matches:
+                        return ""
+                    for m in matches:
+                        if m not in _used_paths:
+                            return m
+                    return matches[0]
+
+                removed_pdf_paths: set[str] = set()
+                kept_pdf_paths: set[str] = set()
+                for grp in duplicate_groups:
+                    if not grp:
+                        continue
+                    assigned_group_paths: set[str] = set()
+                    keep_path = _resolve_pdf_path(grp[0], original_selected_files, assigned_group_paths)
+                    if keep_path:
+                        kept_pdf_paths.add(keep_path)
+                        assigned_group_paths.add(keep_path)
+
+                    for dup_rec in grp[1:]:
+                        dup_path = _resolve_pdf_path(dup_rec, original_selected_files, assigned_group_paths)
+                        if dup_path:
+                            removed_pdf_paths.add(dup_path)
+                            assigned_group_paths.add(dup_path)
+
+                removed_pdf_paths = removed_pdf_paths - kept_pdf_paths
+
+                self.selected_files = [p for p in self.selected_files if p not in removed_pdf_paths]
+
+                for removed_path in removed_pdf_paths:
+                    per_pdf_txns.pop(removed_path, None)
+
+                filtered_pairs = []
+                for rec, audit in zip(recon_results, audit_results):
+                    rec_path = _resolve_pdf_path(rec, original_selected_files)
+                    if rec_path and rec_path in removed_pdf_paths:
+                        continue
+                    filtered_pairs.append((rec, audit))
+                recon_results = [pair[0] for pair in filtered_pairs]
+                audit_results = [pair[1] for pair in filtered_pairs]
+
+                all_transactions = []
+                for p in self.selected_files:
+                    all_transactions.extend(per_pdf_txns.get(p) or [])
+
+                self.drop_box.delete(0, "end")
+                if not self.selected_files:
+                    self.drop_box.insert("end", "Drop PDFs here, or click 'Browse PDFs'.")
+                else:
+                    for p in self.selected_files:
+                        self.drop_box.insert("end", os.path.basename(p))
+
+                self.set_status("Duplicates removed. Continuing...")
 
             if not all_transactions:
                 log_text = "\n".join(run_log_lines).rstrip() + "\n"
