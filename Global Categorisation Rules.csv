@@ -342,3 +342,4 @@
 1055,Personal,contains,PADDYPOWE,DEBIT,,TRUE,Gambling
 1056,Loan Repayment,contains,HSBC PLC LOANS,DEBIT,,TRUE,Loan Repayment
 1057,Credit Card,contains,B/CARD PLAT VISA,DEBIT,,TRUE,Credit Card Repayment
+1058,Motor Expenses,contains,HALFORDS,DEBIT,,TRUE,Car parts/maintenance
