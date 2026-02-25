@@ -281,11 +281,20 @@ def _looks_like_header(line: str) -> bool:
     low = (line or "").strip().lower()
     if not low:
         return False
-    if low.startswith("date ") and "description" in low and "balance" in low:
-        return True
-    if low.startswith("at a glance"):
-        return True
-    return False
+    return low.startswith("date ") and "description" in low and "balance" in low
+
+
+def _looks_like_statement_table_header(line: str) -> bool:
+    low = (line or "").strip().lower()
+    if not low:
+        return False
+    return (
+        low.startswith("date")
+        and "description" in low
+        and "money out" in low
+        and "money in" in low
+        and "balance" in low
+    )
 
 
 def _looks_like_total_or_summary(line: str) -> bool:
@@ -726,14 +735,34 @@ def extract_transactions(pdf_path: str) -> list[dict]:
             lines = [ln.rstrip() for ln in text.splitlines()]
 
             in_table = False
+            in_at_a_glance = False
 
             for ln in lines:
                 line = (ln or "").strip()
                 if not line:
                     continue
 
+                low = line.lower()
+
+                if "at a glance" in low:
+                    in_at_a_glance = True
+                    continue
+
+                if _looks_like_statement_table_header(line):
+                    in_table = True
+                    in_at_a_glance = False
+                    continue
+
+                if low.startswith("balance brought forward"):
+                    in_table = True
+                    in_at_a_glance = False
+                    continue
+
                 if _looks_like_header(line):
                     in_table = True
+                    continue
+
+                if in_at_a_glance and not in_table:
                     continue
 
                 if _looks_like_total_or_summary(line):
