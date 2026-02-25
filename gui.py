@@ -220,6 +220,32 @@ def show_reconciliation_popup(
     txt.tag_configure("mono", font=("Consolas", 10))
     txt.tag_configure("na", foreground="#666666")
 
+    base_bg = txt.cget("bg")
+    header_font = ("Segoe UI", 10, "bold")
+    cell_font = ("Segoe UI", 10)
+    symbol_font = ("Segoe UI", 11, "bold")
+    pass_green = "#0b6e0b"
+    fail_red = "#b00020"
+    na_grey = "#666666"
+
+    def _tbl_cell(parent, text, row, col, header=False, fg=None, anchor="w", width=None, font=None, justify="left"):
+        lbl = tk.Label(
+            parent,
+            text=text,
+            bd=1,
+            relief="solid",
+            bg=base_bg,
+            fg=(fg if fg is not None else "#000000"),
+            anchor=anchor,
+            width=width,
+            justify=justify,
+            font=(font or (header_font if header else cell_font)),
+            padx=4,
+            pady=2,
+        )
+        lbl.grid(row=row, column=col, sticky="nsew")
+        return lbl
+
     if coverage_period:
         if any_warn:
             line = (
@@ -237,22 +263,22 @@ def show_reconciliation_popup(
 
     headers = ["File", "Reconciliation", "Continuity", "Balance Walk", "Row Shape"]
     for c, title in enumerate(headers):
-        ttk.Label(audit_tbl, text=title, style="SumHdr.TLabel").grid(row=0, column=c, padx=3, pady=1, sticky="w")
+        _tbl_cell(audit_tbl, title, 0, c, header=True)
 
     for row_idx, r in enumerate(recon_results, start=1):
         status = str(r.get("status") or "").strip()
         if status == "OK":
             recon_symbol = PASS_SYMBOL
-            recon_style = "SumPass.TLabel"
+            recon_fg = pass_green
         elif status == "Mismatch":
             recon_symbol = FAIL_SYMBOL
-            recon_style = "SumFail.TLabel"
+            recon_fg = fail_red
         elif status in ("Statement balances not found", "Not supported by parser") or "NOT CHECKED" in status.upper():
             recon_symbol = NA_SYMBOL
-            recon_style = "SumNA.TLabel"
+            recon_fg = na_grey
         else:
             recon_symbol = FAIL_SYMBOL
-            recon_style = "SumFail.TLabel"
+            recon_fg = fail_red
 
         pdf = str(r.get("pdf") or "")
         if len(pdf) > file_display_width_chars:
@@ -263,57 +289,53 @@ def show_reconciliation_popup(
         link_oks = pdf_to_link_oks.get(pdf, [])
         if not link_oks:
             continuity_symbol = NA_SYMBOL
-            continuity_style = "SumNA.TLabel"
+            continuity_fg = na_grey
         elif all(link_oks):
             continuity_symbol = PASS_SYMBOL
-            continuity_style = "SumPass.TLabel"
+            continuity_fg = pass_green
         else:
             continuity_symbol = FAIL_SYMBOL
-            continuity_style = "SumFail.TLabel"
+            continuity_fg = fail_red
 
         a = audit_by_pdf.get(pdf, {})
 
         bw_status = str(a.get("balance_walk_status") or "").strip()
         if not bw_status or bw_status.upper() == "NOT CHECKED":
             bw_symbol = NA_SYMBOL
-            bw_style = "SumNA.TLabel"
+            bw_fg = na_grey
         elif bw_status == "OK":
             bw_symbol = PASS_SYMBOL
-            bw_style = "SumPass.TLabel"
+            bw_fg = pass_green
         else:
             bw_symbol = FAIL_SYMBOL
-            bw_style = "SumFail.TLabel"
+            bw_fg = fail_red
 
         rs_status = str(a.get("row_shape_status") or "").strip()
         if not rs_status or rs_status.upper() == "NOT CHECKED":
             rs_symbol = NA_SYMBOL
-            rs_style = "SumNA.TLabel"
+            rs_fg = na_grey
         elif rs_status == "OK":
             rs_symbol = PASS_SYMBOL
-            rs_style = "SumPass.TLabel"
+            rs_fg = pass_green
         else:
             rs_symbol = FAIL_SYMBOL
-            rs_style = "SumFail.TLabel"
+            rs_fg = fail_red
 
-        ttk.Label(
+        _tbl_cell(audit_tbl, pdf_disp, row_idx, 0, width=file_display_width_chars, anchor="w", justify="left")
+        _tbl_cell(audit_tbl, recon_symbol, row_idx, 1, fg=recon_fg, anchor="center", width=12, font=symbol_font, justify="center")
+        _tbl_cell(
             audit_tbl,
-            text=pdf_disp,
-            style="SumFile.TLabel",
-            width=file_display_width_chars,
-            anchor="w",
-        ).grid(row=row_idx, column=0, padx=3, pady=1, sticky="w")
-        ttk.Label(audit_tbl, text=recon_symbol, style=recon_style, width=12, anchor="center").grid(
-            row=row_idx, column=1, padx=3, pady=1
+            continuity_symbol,
+            row_idx,
+            2,
+            fg=continuity_fg,
+            anchor="center",
+            width=12,
+            font=symbol_font,
+            justify="center",
         )
-        ttk.Label(audit_tbl, text=continuity_symbol, style=continuity_style, width=12, anchor="center").grid(
-            row=row_idx, column=2, padx=3, pady=1
-        )
-        ttk.Label(audit_tbl, text=bw_symbol, style=bw_style, width=12, anchor="center").grid(
-            row=row_idx, column=3, padx=3, pady=1
-        )
-        ttk.Label(audit_tbl, text=rs_symbol, style=rs_style, width=12, anchor="center").grid(
-            row=row_idx, column=4, padx=3, pady=1
-        )
+        _tbl_cell(audit_tbl, bw_symbol, row_idx, 3, fg=bw_fg, anchor="center", width=12, font=symbol_font, justify="center")
+        _tbl_cell(audit_tbl, rs_symbol, row_idx, 4, fg=rs_fg, anchor="center", width=12, font=symbol_font, justify="center")
 
     txt.insert("end", "Reconciliation:\n", "section")
     recon_tbl = ttk.Frame(txt)
@@ -333,9 +355,7 @@ def show_reconciliation_popup(
     ]
     for c, title in enumerate(recon_headers):
         header_anchor = "w" if c == 0 else "center"
-        ttk.Label(recon_tbl, text=title, style="SumHdr.TLabel", anchor=header_anchor).grid(
-            row=0, column=c, padx=3, pady=1, sticky="w"
-        )
+        _tbl_cell(recon_tbl, title, 0, c, header=True, anchor=header_anchor, justify="left" if c == 0 else "center")
 
     recon_file_width_chars = 32
     for row_idx, r in enumerate(recon_results, start=1):
@@ -413,14 +433,83 @@ def show_reconciliation_popup(
 
         for c, value in enumerate(row_values):
             anchor = "w" if c == 0 else "center"
-            ttk.Label(
+            _tbl_cell(
                 recon_tbl,
-                text=value,
-                style="SumFile.TLabel",
+                value,
+                row_idx,
+                c,
                 width=recon_file_width_chars if c == 0 else None,
                 anchor=anchor,
                 justify="left" if c == 0 else "center",
-            ).grid(row=row_idx, column=c, padx=3, pady=1, sticky="w")
+            )
+
+    txt.insert("end", "Balance Walk:\n", "section")
+    bw_tbl = ttk.Frame(txt)
+    txt.window_create("end", window=bw_tbl)
+    txt.insert("end", "\n\n")
+
+    bw_headers = ["File", "Status", "Summary"]
+    for c, title in enumerate(bw_headers):
+        _tbl_cell(bw_tbl, title, 0, c, header=True, anchor="w")
+
+    for row_idx, r in enumerate(recon_results, start=1):
+        pdf = str(r.get("pdf") or "")
+        if len(pdf) > recon_file_width_chars:
+            pdf_disp = pdf[: recon_file_width_chars - 1] + "…"
+        else:
+            pdf_disp = pdf
+
+        a = audit_by_pdf.get(pdf, {})
+        bw_status = str(a.get("balance_walk_status") or "NOT CHECKED").strip()
+        bw_summary = str(a.get("balance_walk_summary") or "").strip()
+
+        if not bw_status or bw_status.upper() == "NOT CHECKED":
+            bw_status_text = "NOT CHECKED"
+            bw_status_fg = na_grey
+        elif bw_status == "OK":
+            bw_status_text = bw_status
+            bw_status_fg = pass_green
+        else:
+            bw_status_text = bw_status
+            bw_status_fg = fail_red
+
+        _tbl_cell(bw_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
+        _tbl_cell(bw_tbl, bw_status_text, row_idx, 1, fg=bw_status_fg, anchor="w")
+        _tbl_cell(bw_tbl, bw_summary, row_idx, 2, anchor="w")
+
+    txt.insert("end", "Row Shape Sanity:\n", "section")
+    rs_tbl = ttk.Frame(txt)
+    txt.window_create("end", window=rs_tbl)
+    txt.insert("end", "\n\n")
+
+    rs_headers = ["File", "Status", "Summary"]
+    for c, title in enumerate(rs_headers):
+        _tbl_cell(rs_tbl, title, 0, c, header=True, anchor="w")
+
+    for row_idx, r in enumerate(recon_results, start=1):
+        pdf = str(r.get("pdf") or "")
+        if len(pdf) > recon_file_width_chars:
+            pdf_disp = pdf[: recon_file_width_chars - 1] + "…"
+        else:
+            pdf_disp = pdf
+
+        a = audit_by_pdf.get(pdf, {})
+        rs_status = str(a.get("row_shape_status") or "NOT CHECKED").strip()
+        rs_summary = str(a.get("row_shape_summary") or "").strip()
+
+        if not rs_status or rs_status.upper() == "NOT CHECKED":
+            rs_status_text = "NOT CHECKED"
+            rs_status_fg = na_grey
+        elif rs_status == "OK":
+            rs_status_text = rs_status
+            rs_status_fg = pass_green
+        else:
+            rs_status_text = rs_status
+            rs_status_fg = fail_red
+
+        _tbl_cell(rs_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
+        _tbl_cell(rs_tbl, rs_status_text, row_idx, 1, fg=rs_status_fg, anchor="w")
+        _tbl_cell(rs_tbl, rs_summary, row_idx, 2, anchor="w")
 
     txt.insert("end", "Continuity:\n", "section")
     cont_tbl = ttk.Frame(txt)
@@ -437,7 +526,7 @@ def show_reconciliation_popup(
         "Status",
     ]
     for c, title in enumerate(cont_headers):
-        ttk.Label(cont_tbl, text=title, style="SumHdr.TLabel").grid(row=0, column=c, padx=4, pady=2, sticky="w")
+        _tbl_cell(cont_tbl, title, 0, c, header=True)
 
     file_link_width_chars = 28
     for row_idx, link in enumerate(sorted_links, start=1):
@@ -484,9 +573,15 @@ def show_reconciliation_popup(
         ]
 
         for c, value in enumerate(row_values):
-            ttk.Label(cont_tbl, text=value, style="SumFile.TLabel").grid(row=row_idx, column=c, padx=4, pady=2, sticky="w")
+            _tbl_cell(cont_tbl, value, row_idx, c, anchor="w")
 
-        ttk.Label(cont_tbl, text=status_text, style=status_style).grid(row=row_idx, column=6, padx=4, pady=2, sticky="w")
+        if status_style == "SumPass.TLabel":
+            status_fg = pass_green
+        elif status_style == "SumFail.TLabel":
+            status_fg = fail_red
+        else:
+            status_fg = na_grey
+        _tbl_cell(cont_tbl, status_text, row_idx, 6, fg=status_fg, anchor="w")
 
     txt.insert("end", "\n")
 
