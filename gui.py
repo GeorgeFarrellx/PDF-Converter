@@ -163,15 +163,61 @@ def show_reconciliation_popup(
     ttk.Label(path_row, text="Output:").pack(side="left")
     ttk.Label(path_row, text=output_path, foreground="#333").pack(side="left", padx=(6, 0))
 
+    PASS_SYMBOL = "✓"
+    FAIL_SYMBOL = "✗"
+    NA_SYMBOL = "—"
+
+    if coverage_period:
+        if any_warn:
+            period_line = (
+                f"The bank statements cover the period from {coverage_period} "
+                "(however, some checks could not be completed or warnings were detected — see below)."
+            )
+        else:
+            period_line = f"The bank statements cover the period from {coverage_period}."
+    else:
+        if any_warn:
+            period_line = (
+                "The bank statements cover the period: (unknown) "
+                "(however, some checks could not be completed or warnings were detected — see below)."
+            )
+        else:
+            period_line = "The bank statements cover the period: (unknown)."
+
+    cn = str(client_name or "").strip()
+    name_text = cn if cn else "(unknown)"
+
+    info_bar = ttk.Frame(outer)
+    info_bar.pack(fill="x", pady=(8, 6))
+
+    info_left = ttk.Frame(info_bar)
+    info_left.pack(side="left", fill="x", expand=True)
+    tk.Label(info_left, text=name_text, bg="#ffffff", font=("Segoe UI", 12, "bold"), anchor="w").pack(fill="x")
+    tk.Label(
+        info_left,
+        text=period_line,
+        bg="#ffffff",
+        fg="#333",
+        font=("Segoe UI", 10),
+        anchor="w",
+        justify="left",
+        wraplength=900,
+    ).pack(fill="x", pady=(2, 0))
+
+    legend = ttk.Frame(info_bar)
+    legend.pack(side="right", padx=(12, 0))
+    tk.Label(legend, text=PASS_SYMBOL, fg="#0b6e0b", bg="#ffffff", font=("Segoe UI", 10, "bold")).pack(side="left")
+    tk.Label(legend, text=" Pass   ", fg="#333", bg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+    tk.Label(legend, text=FAIL_SYMBOL, fg="#b00020", bg="#ffffff", font=("Segoe UI", 10, "bold")).pack(side="left")
+    tk.Label(legend, text=" Fail   ", fg="#333", bg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+    tk.Label(legend, text=NA_SYMBOL, fg="#666666", bg="#ffffff", font=("Segoe UI", 10, "bold")).pack(side="left")
+    tk.Label(legend, text=" Not checked", fg="#333", bg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
+
     audit_by_pdf = {
         str(a.get("pdf") or ""): a
         for a in (audit_results or [])
         if isinstance(a, dict)
     }
-
-    PASS_SYMBOL = "✓"
-    FAIL_SYMBOL = "✗"
-    NA_SYMBOL = "—"
 
     style = ttk.Style(win)
     style.configure("SumHdr.TLabel", font=("Segoe UI", 10, "bold"))
@@ -284,15 +330,20 @@ def show_reconciliation_popup(
 
     selected_bg = "#cce8ff"
     base_bg = "#ffffff"
+    header_bg = "#eef2f7"
+    row_bg_even = "#ffffff"
+    row_bg_odd = "#f7f9fc"
     win._selected_cell_text = ""
     win._selected_cell_widget = None
+    table_data = {}
 
     def _select_cell(widget, value: str):
         try:
             prev = getattr(win, "_selected_cell_widget", None)
             if prev is not None and prev.winfo_exists():
                 try:
-                    prev.configure(bg=base_bg)
+                    prev_bg = getattr(prev, "_orig_bg", base_bg)
+                    prev.configure(bg=prev_bg)
                 except Exception:
                     pass
             try:
@@ -301,6 +352,22 @@ def show_reconciliation_popup(
                 pass
             win._selected_cell_widget = widget
             win._selected_cell_text = str(value or "")
+            try:
+                win.focus_set()
+            except Exception:
+                pass
+            try:
+                canvas.focus_set()
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    def _copy_tsv(text: str):
+        try:
+            win.clipboard_clear()
+            win.clipboard_append(text)
+            win.update_idletasks()
         except Exception:
             pass
 
@@ -309,12 +376,37 @@ def show_reconciliation_popup(
             val = str(getattr(win, "_selected_cell_text", "") or "")
             if not val:
                 return "break"
-            win.clipboard_clear()
-            win.clipboard_append(val)
-            win.update_idletasks()
+            _copy_tsv(val)
         except Exception:
             pass
         return "break"
+
+    def _cell_tsv(value: str) -> str:
+        return str(value or "")
+    def _copy_row_for(tbl_id, row_idx):
+        try:
+            if row_idx < 0 or tbl_id not in table_data:
+                return
+            headers = table_data[tbl_id]["headers"]
+            row = table_data[tbl_id]["rows"][row_idx]
+            tsv = "\t".join(map(_cell_tsv, headers)) + "\n" + "\t".join(map(_cell_tsv, row))
+            _copy_tsv(tsv)
+        except Exception:
+            pass
+
+    def _copy_table_for(tbl_id):
+        try:
+            if tbl_id not in table_data:
+                return
+            headers = table_data[tbl_id]["headers"]
+            rows = table_data[tbl_id]["rows"]
+            lines = ["\t".join(map(_cell_tsv, headers))]
+            for r in rows:
+                lines.append("\t".join(map(_cell_tsv, r)))
+            _copy_tsv("\n".join(lines))
+        except Exception:
+            pass
+
 
     win.bind("<Control-c>", _copy_selected_cell, add="+")
     win.bind("<Control-C>", _copy_selected_cell, add="+")
@@ -322,10 +414,15 @@ def show_reconciliation_popup(
     win.bind("<Command-C>", _copy_selected_cell, add="+")
 
     cell_menu = tk.Menu(win, tearoff=0)
-    cell_menu.add_command(label="Copy", command=_copy_selected_cell)
 
     def _popup_cell_menu(event, widget, value):
         _select_cell(widget, value)
+        cell_menu.delete(0, "end")
+        tbl_id = getattr(widget, "_tbl_id", None)
+        row_idx = getattr(widget, "_tbl_row", -1)
+        cell_menu.add_command(label="Copy Cell", command=_copy_selected_cell)
+        cell_menu.add_command(label="Copy Row", command=lambda t=tbl_id, r=row_idx: _copy_row_for(t, r))
+        cell_menu.add_command(label="Copy Table", command=lambda t=tbl_id: _copy_table_for(t))
         try:
             cell_menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -341,13 +438,28 @@ def show_reconciliation_popup(
     fail_red = "#b00020"
     na_grey = "#666666"
 
-    def _tbl_cell(parent, text, row, col, header=False, fg=None, anchor="w", width=None, font=None, justify="left"):
+    def _tbl_cell(
+        parent,
+        text,
+        row,
+        col,
+        header=False,
+        fg=None,
+        anchor="w",
+        width=None,
+        font=None,
+        justify="left",
+        tbl_id=None,
+        data_row_idx=-1,
+        data_col_idx=-1,
+    ):
+        chosen_bg = header_bg if header else (row_bg_odd if (row % 2 == 1) else row_bg_even)
         lbl = tk.Label(
             parent,
             text=text,
             bd=1,
             relief="solid",
-            bg=base_bg,
+            bg=chosen_bg,
             fg=(fg if fg is not None else "#000000"),
             anchor=anchor,
             width=width,
@@ -356,50 +468,17 @@ def show_reconciliation_popup(
             padx=4,
             pady=2,
         )
+        lbl._orig_bg = chosen_bg
+        lbl._tbl_id = tbl_id
+        lbl._tbl_row = data_row_idx
+        lbl._tbl_col = data_col_idx
         lbl.grid(row=row, column=col, sticky="nsew")
         _bind_mousewheel(lbl)
         lbl.bind("<Button-1>", lambda e, w=lbl, t=text: _select_cell(w, t), add="+")
+        lbl.bind("<Button-2>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         lbl.bind("<Button-3>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
+        lbl.bind("<Control-Button-1>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         return lbl
-
-    cn = str(client_name or "").strip()
-    name_text = cn if cn else "(unknown)"
-    name_lbl = tk.Label(content, text=name_text, bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
-    name_lbl.pack(fill="x")
-    _bind_mousewheel(name_lbl)
-    name_lbl.bind("<Button-1>", lambda e, w=name_lbl, t=name_text: _select_cell(w, t), add="+")
-    name_lbl.bind("<Button-3>", lambda e, w=name_lbl, t=name_text: _popup_cell_menu(e, w, t), add="+")
-
-    if coverage_period:
-        if any_warn:
-            line = (
-                f"The bank statements cover the period from {coverage_period} "
-                "(however, some checks could not be completed or warnings were detected — see below)."
-            )
-        else:
-            line = f"The bank statements cover the period from {coverage_period}."
-    else:
-        if any_warn:
-            line = (
-                "The bank statements cover the period: (unknown) "
-                "(however, some checks could not be completed or warnings were detected — see below)."
-            )
-        else:
-            line = "The bank statements cover the period: (unknown)."
-    period_lbl = tk.Label(
-        content,
-        text=line,
-        bg=base_bg,
-        fg="#333",
-        font=("Segoe UI", 10),
-        anchor="w",
-        wraplength=1100,
-        justify="left",
-    )
-    period_lbl.pack(fill="x", pady=(4, 10))
-    _bind_mousewheel(period_lbl)
-    period_lbl.bind("<Button-1>", lambda e, w=period_lbl, t=line: _select_cell(w, t), add="+")
-    period_lbl.bind("<Button-3>", lambda e, w=period_lbl, t=line: _popup_cell_menu(e, w, t), add="+")
 
     audit_hdr = tk.Label(content, text="Audit Summary:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     audit_hdr.pack(fill="x")
@@ -412,8 +491,9 @@ def show_reconciliation_popup(
     audit_tbl.pack(fill="x", pady=(4, 14))
 
     headers = ["File", "Reconciliation", "Continuity", "Balance Walk", "Row Shape"]
+    table_data["audit"] = {"headers": headers, "rows": []}
     for c, title in enumerate(headers):
-        _tbl_cell(audit_tbl, title, 0, c, header=True)
+        _tbl_cell(audit_tbl, title, 0, c, header=True, tbl_id="audit", data_row_idx=-1, data_col_idx=c)
 
     for row_idx, r in enumerate(recon_results, start=1):
         status = str(r.get("status") or "").strip()
@@ -471,8 +551,35 @@ def show_reconciliation_popup(
             rs_symbol = FAIL_SYMBOL
             rs_fg = fail_red
 
-        _tbl_cell(audit_tbl, pdf_disp, row_idx, 0, width=file_display_width_chars, anchor="w", justify="left")
-        _tbl_cell(audit_tbl, recon_symbol, row_idx, 1, fg=recon_fg, anchor="center", width=12, font=symbol_font, justify="center")
+        audit_row = [pdf_disp, recon_symbol, continuity_symbol, bw_symbol, rs_symbol]
+        table_data["audit"]["rows"].append(audit_row)
+        data_row_idx = row_idx - 1
+        _tbl_cell(
+            audit_tbl,
+            pdf_disp,
+            row_idx,
+            0,
+            width=file_display_width_chars,
+            anchor="w",
+            justify="left",
+            tbl_id="audit",
+            data_row_idx=data_row_idx,
+            data_col_idx=0,
+        )
+        _tbl_cell(
+            audit_tbl,
+            recon_symbol,
+            row_idx,
+            1,
+            fg=recon_fg,
+            anchor="center",
+            width=12,
+            font=symbol_font,
+            justify="center",
+            tbl_id="audit",
+            data_row_idx=data_row_idx,
+            data_col_idx=1,
+        )
         _tbl_cell(
             audit_tbl,
             continuity_symbol,
@@ -483,9 +590,38 @@ def show_reconciliation_popup(
             width=12,
             font=symbol_font,
             justify="center",
+            tbl_id="audit",
+            data_row_idx=data_row_idx,
+            data_col_idx=2,
         )
-        _tbl_cell(audit_tbl, bw_symbol, row_idx, 3, fg=bw_fg, anchor="center", width=12, font=symbol_font, justify="center")
-        _tbl_cell(audit_tbl, rs_symbol, row_idx, 4, fg=rs_fg, anchor="center", width=12, font=symbol_font, justify="center")
+        _tbl_cell(
+            audit_tbl,
+            bw_symbol,
+            row_idx,
+            3,
+            fg=bw_fg,
+            anchor="center",
+            width=12,
+            font=symbol_font,
+            justify="center",
+            tbl_id="audit",
+            data_row_idx=data_row_idx,
+            data_col_idx=3,
+        )
+        _tbl_cell(
+            audit_tbl,
+            rs_symbol,
+            row_idx,
+            4,
+            fg=rs_fg,
+            anchor="center",
+            width=12,
+            font=symbol_font,
+            justify="center",
+            tbl_id="audit",
+            data_row_idx=data_row_idx,
+            data_col_idx=4,
+        )
 
     recon_hdr = tk.Label(content, text="Reconciliation:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     recon_hdr.pack(fill="x")
@@ -508,9 +644,21 @@ def show_reconciliation_popup(
         "Statement End",
         "Difference",
     ]
+    table_data["recon"] = {"headers": recon_headers, "rows": []}
     for c, title in enumerate(recon_headers):
         header_anchor = "w" if c == 0 else "center"
-        _tbl_cell(recon_tbl, title, 0, c, header=True, anchor=header_anchor, justify="left" if c == 0 else "center")
+        _tbl_cell(
+            recon_tbl,
+            title,
+            0,
+            c,
+            header=True,
+            anchor=header_anchor,
+            justify="left" if c == 0 else "center",
+            tbl_id="recon",
+            data_row_idx=-1,
+            data_col_idx=c,
+        )
 
     recon_file_width_chars = 32
     for row_idx, r in enumerate(recon_results, start=1):
@@ -586,6 +734,8 @@ def show_reconciliation_popup(
             _fmt_money_or_na(difference),
         ]
 
+        table_data["recon"]["rows"].append(row_values)
+        data_row_idx = row_idx - 1
         for c, value in enumerate(row_values):
             anchor = "w" if c == 0 else "center"
             _tbl_cell(
@@ -596,6 +746,9 @@ def show_reconciliation_popup(
                 width=recon_file_width_chars if c == 0 else None,
                 anchor=anchor,
                 justify="left" if c == 0 else "center",
+                tbl_id="recon",
+                data_row_idx=data_row_idx,
+                data_col_idx=c,
             )
 
     cont_hdr = tk.Label(content, text="Continuity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
@@ -617,8 +770,9 @@ def show_reconciliation_popup(
         "File 2 Start Balance",
         "Status",
     ]
+    table_data["cont"] = {"headers": cont_headers, "rows": []}
     for c, title in enumerate(cont_headers):
-        _tbl_cell(cont_tbl, title, 0, c, header=True)
+        _tbl_cell(cont_tbl, title, 0, c, header=True, tbl_id="cont", data_row_idx=-1, data_col_idx=c)
 
     file_link_width_chars = 28
     for row_idx, link in enumerate(sorted_links, start=1):
@@ -664,8 +818,11 @@ def show_reconciliation_popup(
             _fmt_money(next_start) if next_start is not None else "N/A",
         ]
 
+        cont_row = row_values + [status_text]
+        table_data["cont"]["rows"].append(cont_row)
+        data_row_idx = row_idx - 1
         for c, value in enumerate(row_values):
-            _tbl_cell(cont_tbl, value, row_idx, c, anchor="w")
+            _tbl_cell(cont_tbl, value, row_idx, c, anchor="w", tbl_id="cont", data_row_idx=data_row_idx, data_col_idx=c)
 
         if status_style == "SumPass.TLabel":
             status_fg = pass_green
@@ -673,7 +830,17 @@ def show_reconciliation_popup(
             status_fg = fail_red
         else:
             status_fg = na_grey
-        _tbl_cell(cont_tbl, status_text, row_idx, 6, fg=status_fg, anchor="w")
+        _tbl_cell(
+            cont_tbl,
+            status_text,
+            row_idx,
+            6,
+            fg=status_fg,
+            anchor="w",
+            tbl_id="cont",
+            data_row_idx=data_row_idx,
+            data_col_idx=6,
+        )
 
     bw_hdr = tk.Label(content, text="Balance Walk:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     bw_hdr.pack(fill="x")
@@ -686,8 +853,9 @@ def show_reconciliation_popup(
     bw_tbl.pack(fill="x", pady=(4, 14))
 
     bw_headers = ["File", "Status", "Summary"]
+    table_data["bw"] = {"headers": bw_headers, "rows": []}
     for c, title in enumerate(bw_headers):
-        _tbl_cell(bw_tbl, title, 0, c, header=True, anchor="w")
+        _tbl_cell(bw_tbl, title, 0, c, header=True, anchor="w", tbl_id="bw", data_row_idx=-1, data_col_idx=c)
 
     for row_idx, r in enumerate(recon_results, start=1):
         pdf = str(r.get("pdf") or "")
@@ -710,9 +878,12 @@ def show_reconciliation_popup(
             bw_status_text = bw_status
             bw_status_fg = fail_red
 
-        _tbl_cell(bw_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
-        _tbl_cell(bw_tbl, bw_status_text, row_idx, 1, fg=bw_status_fg, anchor="w")
-        _tbl_cell(bw_tbl, bw_summary, row_idx, 2, anchor="w")
+        bw_row = [pdf_disp, bw_status_text, bw_summary]
+        table_data["bw"]["rows"].append(bw_row)
+        data_row_idx = row_idx - 1
+        _tbl_cell(bw_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w", tbl_id="bw", data_row_idx=data_row_idx, data_col_idx=0)
+        _tbl_cell(bw_tbl, bw_status_text, row_idx, 1, fg=bw_status_fg, anchor="w", tbl_id="bw", data_row_idx=data_row_idx, data_col_idx=1)
+        _tbl_cell(bw_tbl, bw_summary, row_idx, 2, anchor="w", tbl_id="bw", data_row_idx=data_row_idx, data_col_idx=2)
 
     rs_hdr = tk.Label(content, text="Row Shape Sanity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     rs_hdr.pack(fill="x")
@@ -725,8 +896,9 @@ def show_reconciliation_popup(
     rs_tbl.pack(fill="x", pady=(4, 14))
 
     rs_headers = ["File", "Status", "Summary"]
+    table_data["rs"] = {"headers": rs_headers, "rows": []}
     for c, title in enumerate(rs_headers):
-        _tbl_cell(rs_tbl, title, 0, c, header=True, anchor="w")
+        _tbl_cell(rs_tbl, title, 0, c, header=True, anchor="w", tbl_id="rs", data_row_idx=-1, data_col_idx=c)
 
     for row_idx, r in enumerate(recon_results, start=1):
         pdf = str(r.get("pdf") or "")
@@ -749,9 +921,12 @@ def show_reconciliation_popup(
             rs_status_text = rs_status
             rs_status_fg = fail_red
 
-        _tbl_cell(rs_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
-        _tbl_cell(rs_tbl, rs_status_text, row_idx, 1, fg=rs_status_fg, anchor="w")
-        _tbl_cell(rs_tbl, rs_summary, row_idx, 2, anchor="w")
+        rs_row = [pdf_disp, rs_status_text, rs_summary]
+        table_data["rs"]["rows"].append(rs_row)
+        data_row_idx = row_idx - 1
+        _tbl_cell(rs_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w", tbl_id="rs", data_row_idx=data_row_idx, data_col_idx=0)
+        _tbl_cell(rs_tbl, rs_status_text, row_idx, 1, fg=rs_status_fg, anchor="w", tbl_id="rs", data_row_idx=data_row_idx, data_col_idx=1)
+        _tbl_cell(rs_tbl, rs_summary, row_idx, 2, anchor="w", tbl_id="rs", data_row_idx=data_row_idx, data_col_idx=2)
 
     btn_row = ttk.Frame(win)
     btn_row.pack(fill="x", pady=(8, 10))
