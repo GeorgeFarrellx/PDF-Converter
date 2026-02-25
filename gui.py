@@ -214,6 +214,50 @@ def show_reconciliation_popup(
     txt.pack(side="left", fill="both", expand=True)
     yscroll.config(command=txt.yview)
 
+    def _scroll_units(units: int):
+        try:
+            txt.yview_scroll(int(units), "units")
+        except Exception:
+            pass
+
+    def _on_mousewheel(event):
+        # Windows/macOS
+        try:
+            delta = int(event.delta)
+        except Exception:
+            delta = 0
+        if delta == 0:
+            return
+        # Normalize to +/- 1 unit per notch (Windows typical delta=120)
+        if abs(delta) >= 120:
+            units = -1 * int(delta / 120)
+        else:
+            units = -1 if delta > 0 else 1
+        _scroll_units(units)
+        return "break"
+
+    def _on_mousewheel_linux(event):
+        # Linux uses Button-4/5
+        try:
+            if getattr(event, "num", None) == 4:
+                _scroll_units(-1)
+                return "break"
+            if getattr(event, "num", None) == 5:
+                _scroll_units(1)
+                return "break"
+        except Exception:
+            pass
+
+    def _bind_mousewheel(widget):
+        try:
+            widget.bind("<MouseWheel>", _on_mousewheel, add="+")
+            widget.bind("<Button-4>", _on_mousewheel_linux, add="+")
+            widget.bind("<Button-5>", _on_mousewheel_linux, add="+")
+        except Exception:
+            pass
+
+    _bind_mousewheel(txt)
+
     txt.tag_configure("section", font=("Segoe UI", 10, "bold"))
     txt.tag_configure("ok", foreground="#0b6e0b")
     txt.tag_configure("bad", foreground="#b00020")
@@ -246,6 +290,7 @@ def show_reconciliation_popup(
             pady=2,
         )
         lbl.grid(row=row, column=col, sticky="nsew")
+        _bind_mousewheel(lbl)
         return lbl
 
     cn = str(client_name or "").strip()
@@ -274,6 +319,7 @@ def show_reconciliation_popup(
 
     txt.insert("end", "Audit Summary:\n", "section")
     audit_tbl = ttk.Frame(txt)
+    _bind_mousewheel(audit_tbl)
     txt.window_create("end", window=audit_tbl)
     txt.insert("end", "\n\n")
 
@@ -355,6 +401,7 @@ def show_reconciliation_popup(
 
     txt.insert("end", "Reconciliation:\n", "section")
     recon_tbl = ttk.Frame(txt)
+    _bind_mousewheel(recon_tbl)
     txt.window_create("end", window=recon_tbl)
     txt.insert("end", "\n\n")
 
@@ -461,6 +508,7 @@ def show_reconciliation_popup(
 
     txt.insert("end", "Continuity:\n", "section")
     cont_tbl = ttk.Frame(txt)
+    _bind_mousewheel(cont_tbl)
     txt.window_create("end", window=cont_tbl)
     txt.insert("end", "\n\n")
 
@@ -533,6 +581,7 @@ def show_reconciliation_popup(
 
     txt.insert("end", "Balance Walk:\n", "section")
     bw_tbl = ttk.Frame(txt)
+    _bind_mousewheel(bw_tbl)
     txt.window_create("end", window=bw_tbl)
     txt.insert("end", "\n\n")
 
@@ -567,6 +616,7 @@ def show_reconciliation_popup(
 
     txt.insert("end", "Row Shape Sanity:\n", "section")
     rs_tbl = ttk.Frame(txt)
+    _bind_mousewheel(rs_tbl)
     txt.window_create("end", window=rs_tbl)
     txt.insert("end", "\n\n")
 
@@ -600,8 +650,43 @@ def show_reconciliation_popup(
         _tbl_cell(rs_tbl, rs_summary, row_idx, 2, anchor="w")
 
     txt.insert("end", "\n")
+    txt.configure(insertwidth=0)
+    txt.bind("<Button-1>", lambda e: (txt.focus_set(), None), add="+")
 
-    txt.configure(state="disabled")
+    def _block_if_edit(event):
+        # Allow navigation keys
+        nav = {"Left", "Right", "Up", "Down", "Home", "End", "Prior", "Next"}
+        if event.keysym in nav:
+            return None
+
+        # Allow Ctrl/Cmd shortcuts for copy/select-all only
+        try:
+            ks = (event.keysym or "").lower()
+        except Exception:
+            ks = ""
+        try:
+            st = int(event.state)
+        except Exception:
+            st = 0
+
+        # Tk state bitmasks: Control is commonly 0x4, Mod1 (Alt/Command on mac) commonly 0x8
+        ctrl = bool(st & 0x4)
+        mod1 = bool(st & 0x8)
+        if (ctrl or mod1) and ks in ("c", "a"):
+            return None
+
+        # Block any printable character input
+        if event.char and event.char.strip() != "":
+            return "break"
+        return None
+
+    txt.bind("<Key>", _block_if_edit, add="+")
+    txt.bind("<<Paste>>", lambda e: "break", add="+")
+    txt.bind("<<Cut>>", lambda e: "break", add="+")
+    txt.bind("<<Clear>>", lambda e: "break", add="+")
+    txt.bind("<BackSpace>", lambda e: "break", add="+")
+    txt.bind("<Delete>", lambda e: "break", add="+")
+    txt.bind("<Return>", lambda e: "break", add="+")
 
     btn_row = ttk.Frame(win)
     btn_row.pack(fill="x", pady=(8, 10))
