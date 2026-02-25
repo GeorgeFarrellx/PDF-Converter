@@ -136,8 +136,6 @@ def show_reconciliation_popup(
     }
 
     win = tk.Toplevel(parent)
-    win.transient(parent)
-    win.grab_set()
     base_bg = "#ffffff"
     header_bg = "#eef2f7"
     win.configure(bg=base_bg)
@@ -145,9 +143,18 @@ def show_reconciliation_popup(
     win.title("Audit Checks (Warnings)" if any_warn else "Audit Checks")
     win.geometry("1200x560")
     win.minsize(1100, 560)
+    win.resizable(True, True)
+    win.lift()
+    try:
+        win.focus_set()
+    except Exception:
+        try:
+            win.focus_force()
+        except Exception:
+            pass
 
     outer = tk.Frame(win, bg=base_bg)
-    outer.pack(fill="both", expand=True, padx=14, pady=14)
+    outer.pack(fill="both", expand=True, padx=10, pady=10)
 
     icon = "✖" if any_warn else "✔"
     icon_color = "#b00020" if any_warn else "#0b6e0b"
@@ -250,7 +257,7 @@ def show_reconciliation_popup(
     row_bg_even = "#ffffff"
     row_bg_odd = "#f7f9fc"
     scroll_host = tk.Frame(outer, bg=base_bg)
-    scroll_host.pack(fill="both", expand=True, pady=(8, 0))
+    scroll_host.pack(fill="both", expand=True, pady=(6, 0))
     ysb = ttk.Scrollbar(scroll_host, orient="vertical")
     ysb.pack(side="right", fill="y")
     canvas = tk.Canvas(scroll_host, highlightthickness=0, background=base_bg)
@@ -277,66 +284,82 @@ def show_reconciliation_popup(
 
     canvas.bind("<Configure>", _sync_width)
 
-    def _make_wheel_binder(target_canvas):
-        def _canvas_scroll_units(units: int):
-            try:
-                target_canvas.yview_scroll(int(units), "units")
-            except Exception:
-                pass
+    def _event_in_this_popup(event) -> bool:
+        try:
+            w = event.widget
+            return (w is not None) and (w.winfo_toplevel() == win)
+        except Exception:
+            return False
 
-        def _on_mousewheel(event):
-            try:
-                delta = int(event.delta)
-            except Exception:
-                delta = 0
-            if delta == 0:
-                return
-            if sys.platform == "darwin":
-                units = -1 if delta > 0 else 1
-            else:
-                units = -1 * int(delta / 120) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
-            _canvas_scroll_units(units)
+    def _scroll_units(units: int):
+        try:
+            canvas.yview_scroll(int(units), "units")
+        except Exception:
+            pass
+
+    def _on_mousewheel_global(event):
+        if not _event_in_this_popup(event):
+            return
+        try:
+            delta = int(event.delta)
+        except Exception:
+            delta = 0
+        if delta == 0:
             return "break"
+        if sys.platform == "darwin":
+            units = -1 if delta > 0 else 1
+        else:
+            step = int(delta / 80) if abs(delta) >= 80 else (1 if delta > 0 else -1)
+            units = -step
+        _scroll_units(units)
+        return "break"
 
-        def _on_mousewheel_linux(event):
-            try:
-                if getattr(event, "num", None) == 4:
-                    _canvas_scroll_units(-1)
-                    return "break"
-                if getattr(event, "num", None) == 5:
-                    _canvas_scroll_units(1)
-                    return "break"
-            except Exception:
-                pass
+    def _on_mousewheel_linux_global(event):
+        if not _event_in_this_popup(event):
+            return
+        try:
+            if getattr(event, "num", None) == 4:
+                _scroll_units(-1)
+                return "break"
+            if getattr(event, "num", None) == 5:
+                _scroll_units(1)
+                return "break"
+        except Exception:
+            pass
+        return "break"
 
-        def _bind(widget):
-            try:
-                widget.bind("<MouseWheel>", _on_mousewheel, add="+")
-                widget.bind("<Button-4>", _on_mousewheel_linux, add="+")
-                widget.bind("<Button-5>", _on_mousewheel_linux, add="+")
-            except Exception:
-                pass
+    win.bind_all("<MouseWheel>", _on_mousewheel_global, add="+")
+    win.bind_all("<Button-4>", _on_mousewheel_linux_global, add="+")
+    win.bind_all("<Button-5>", _on_mousewheel_linux_global, add="+")
 
-        return _bind
+    def _cleanup_binds():
+        try:
+            win.unbind_all("<MouseWheel>")
+        except Exception:
+            pass
+        try:
+            win.unbind_all("<Button-4>")
+        except Exception:
+            pass
+        try:
+            win.unbind_all("<Button-5>")
+        except Exception:
+            pass
 
-    bind_overview = _make_wheel_binder(canvas)
-    bind_recon = bind_overview
-    bind_cont = bind_overview
-    bind_bw = bind_overview
-    bind_rs = bind_overview
-
-    bind_overview(canvas)
+    def _close():
+        _cleanup_binds()
+        win.destroy()
 
     card_border = "#d0d7de"
 
     def _make_card(parent, title: str):
         card = tk.Frame(parent, bg=base_bg, highlightbackground=card_border, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 12))
+        card.pack(fill="x", pady=(0, 10))
         hdr = tk.Frame(card, bg=header_bg)
         hdr.pack(fill="x")
         tk.Label(hdr, text=title, bg=header_bg, fg="#111", font=("Segoe UI", 10, "bold"), anchor="w", padx=8, pady=6).pack(fill="x")
         body = tk.Frame(card, bg=base_bg)
-        body.pack(fill="x", padx=8, pady=8)
+        body.pack(fill="x", padx=8, pady=6)
         return body
     win._selected_cell_text = ""
     win._selected_cell_widget = None
@@ -471,24 +494,14 @@ def show_reconciliation_popup(
             width=width,
             justify=justify,
             font=(font or (header_font if header else cell_font)),
-            padx=4,
-            pady=2,
+            padx=3,
+            pady=1,
         )
         lbl._orig_bg = chosen_bg
         lbl._tbl_id = tbl_id
         lbl._tbl_row = data_row_idx
         lbl._tbl_col = data_col_idx
         lbl.grid(row=row, column=col, sticky="nsew")
-        if not callable(bind_wheel):
-            bind_wheel = {
-                "audit": bind_overview,
-                "recon": bind_recon,
-                "cont": bind_cont,
-                "bw": bind_bw,
-                "rs": bind_rs,
-            }.get(tbl_id)
-        if callable(bind_wheel):
-            bind_wheel(lbl)
         lbl.bind("<Button-1>", lambda e, w=lbl, t=text: _select_cell(w, t), add="+")
         lbl.bind("<Button-2>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         lbl.bind("<Button-3>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
@@ -498,7 +511,6 @@ def show_reconciliation_popup(
     audit_body = _make_card(content, "Audit Summary")
 
     audit_tbl = ttk.Frame(audit_body)
-    bind_overview(audit_tbl)
     audit_tbl.pack(fill="x")
 
     headers = ["File", "Reconciliation", "Continuity", "Balance Walk", "Row Shape"]
@@ -637,7 +649,6 @@ def show_reconciliation_popup(
     recon_body = _make_card(content, "Reconciliation")
 
     recon_tbl = ttk.Frame(recon_body)
-    bind_recon(recon_tbl)
     recon_tbl.pack(fill="x")
 
     recon_headers = [
@@ -761,7 +772,6 @@ def show_reconciliation_popup(
     cont_body = _make_card(content, "Continuity")
 
     cont_tbl = ttk.Frame(cont_body)
-    bind_cont(cont_tbl)
     cont_tbl.pack(fill="x")
 
     cont_headers = [
@@ -848,7 +858,6 @@ def show_reconciliation_popup(
     bw_body = _make_card(content, "Balance Walk")
 
     bw_tbl = ttk.Frame(bw_body)
-    bind_bw(bw_tbl)
     bw_tbl.pack(fill="x")
 
     bw_headers = ["File", "Status", "Summary"]
@@ -887,7 +896,6 @@ def show_reconciliation_popup(
     rs_body = _make_card(content, "Row Shape Sanity")
 
     rs_tbl = ttk.Frame(rs_body)
-    bind_rs(rs_tbl)
     rs_tbl.pack(fill="x")
 
     rs_headers = ["File", "Status", "Summary"]
@@ -929,15 +937,17 @@ def show_reconciliation_popup(
     if any_warn and callable(open_log_folder_callback):
         ttk.Button(btn_row, text="Open Log", command=open_log_folder_callback).pack(side="left", padx=(0, 8))
 
-    close_btn = ttk.Button(btn_row, text="Close", command=win.destroy)
+    close_btn = ttk.Button(btn_row, text="Close", command=_close)
     close_btn.pack(side="left")
 
     try:
         close_btn.focus_set()
-        win.bind("<Return>", lambda e: win.destroy())
-        win.bind("<Escape>", lambda e: win.destroy())
+        win.bind("<Return>", lambda e: _close())
+        win.bind("<Escape>", lambda e: _close())
     except Exception:
         pass
+
+    win.protocol("WM_DELETE_WINDOW", _close)
 
     parent.wait_window(win)
     return True
