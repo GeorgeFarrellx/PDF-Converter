@@ -152,6 +152,24 @@ def _parse_statement_period(text: str) -> Optional[tuple[_dt.date, _dt.date]]:
         flags=re.I,
     )
     if not m:
+        m = re.search(
+            r"\b(\d{2})\s+([A-Za-z]+)\s+(\d{4})\s+to\s+(\d{2})\s+([A-Za-z]+)\s+(\d{4})\b",
+            text,
+            flags=re.I,
+        )
+    if not m:
+        m = re.search(
+            r"\b(\d{1,2})/(\d{1,2})/(\d{4})\s*(?:to|[-–—])\s*(\d{1,2})/(\d{1,2})/(\d{4})\b",
+            text,
+            flags=re.I,
+        )
+        if m:
+            d1, m1, y1, d2, m2, y2 = m.groups()
+            try:
+                return _dt.date(int(y1), int(m1), int(d1)), _dt.date(int(y2), int(m2), int(d2))
+            except Exception:
+                return None
+    if not m:
         return None
 
     d1, mon1, y1, d2, mon2, y2 = m.groups()
