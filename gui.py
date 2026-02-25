@@ -252,87 +252,129 @@ def show_reconciliation_popup(
         ),
     )
 
-    scroll_host = ttk.Frame(outer)
-    scroll_host.pack(fill="both", expand=True, pady=(8, 0))
-
-    yscroll = ttk.Scrollbar(scroll_host, orient="vertical")
-    yscroll.pack(side="right", fill="y")
-
-    canvas = tk.Canvas(scroll_host, highlightthickness=0)
-    canvas.pack(side="left", fill="both", expand=True)
-    canvas.configure(yscrollcommand=yscroll.set)
-    yscroll.configure(command=canvas.yview)
-
-    canvas.configure(background="#ffffff")
-
-    content = ttk.Frame(canvas)
-    window_id = canvas.create_window((0, 0), window=content, anchor="nw")
-
-    def _update_scrollregion(event=None):
-        try:
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        except Exception:
-            pass
-
-    content.bind("<Configure>", _update_scrollregion)
-
-    def _sync_width(event=None):
-        try:
-            canvas.itemconfigure(window_id, width=canvas.winfo_width())
-        except Exception:
-            pass
-
-    canvas.bind("<Configure>", _sync_width)
-
-    def _canvas_scroll_units(units: int):
-        try:
-            canvas.yview_scroll(int(units), "units")
-        except Exception:
-            pass
-
-    def _on_mousewheel(event):
-        # Windows/macOS
-        try:
-            delta = int(event.delta)
-        except Exception:
-            delta = 0
-        if delta == 0:
-            return
-        if sys.platform == "darwin":
-            units = -1 if delta > 0 else 1
-        else:
-            units = -1 * int(delta / 120) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
-        _canvas_scroll_units(units)
-        return "break"
-
-    def _on_mousewheel_linux(event):
-        # Linux uses Button-4/5
-        try:
-            if getattr(event, "num", None) == 4:
-                _canvas_scroll_units(-1)
-                return "break"
-            if getattr(event, "num", None) == 5:
-                _canvas_scroll_units(1)
-                return "break"
-        except Exception:
-            pass
-
-    def _bind_mousewheel(widget):
-        try:
-            widget.bind("<MouseWheel>", _on_mousewheel, add="+")
-            widget.bind("<Button-4>", _on_mousewheel_linux, add="+")
-            widget.bind("<Button-5>", _on_mousewheel_linux, add="+")
-        except Exception:
-            pass
-
-    _bind_mousewheel(canvas)
-    _bind_mousewheel(content)
-
     selected_bg = "#cce8ff"
     base_bg = "#ffffff"
     header_bg = "#eef2f7"
     row_bg_even = "#ffffff"
     row_bg_odd = "#f7f9fc"
+
+    notebook = ttk.Notebook(outer)
+    notebook.pack(fill="both", expand=True, pady=(8, 0))
+
+    tab_overview = ttk.Frame(notebook)
+    tab_recon = ttk.Frame(notebook)
+    tab_cont = ttk.Frame(notebook)
+    tab_bw = ttk.Frame(notebook)
+    tab_rs = ttk.Frame(notebook)
+
+    notebook.add(tab_overview, text="Overview")
+    notebook.add(tab_recon, text="Reconciliation")
+    notebook.add(tab_cont, text="Continuity")
+    notebook.add(tab_bw, text="Balance Walk")
+    notebook.add(tab_rs, text="Row Shape")
+
+    def _make_tab_scroll_area(parent, enable_hscroll=False):
+        host = ttk.Frame(parent)
+        host.pack(fill="both", expand=True)
+        ysb = ttk.Scrollbar(host, orient="vertical")
+        ysb.pack(side="right", fill="y")
+
+        if enable_hscroll:
+            xsb = ttk.Scrollbar(host, orient="horizontal")
+            xsb.pack(side="bottom", fill="x")
+        else:
+            xsb = None
+
+        cnv = tk.Canvas(host, highlightthickness=0, background=base_bg)
+        cnv.pack(side="left", fill="both", expand=True)
+        cnv.configure(yscrollcommand=ysb.set)
+        ysb.configure(command=cnv.yview)
+
+        if xsb is not None:
+            cnv.configure(xscrollcommand=xsb.set)
+            xsb.configure(command=cnv.xview)
+
+        inner = ttk.Frame(cnv)
+        win_id = cnv.create_window((0, 0), window=inner, anchor="nw")
+
+        def _update_scrollregion(event=None):
+            try:
+                cnv.configure(scrollregion=cnv.bbox("all"))
+            except Exception:
+                pass
+
+        inner.bind("<Configure>", _update_scrollregion)
+
+        if not enable_hscroll:
+            def _sync_width(event=None):
+                try:
+                    cnv.itemconfigure(win_id, width=cnv.winfo_width())
+                except Exception:
+                    pass
+
+            cnv.bind("<Configure>", _sync_width)
+
+        return cnv, inner
+
+    canvas_overview, content_overview = _make_tab_scroll_area(tab_overview)
+    canvas_recon, content_recon = _make_tab_scroll_area(tab_recon, enable_hscroll=True)
+    canvas_cont, content_cont = _make_tab_scroll_area(tab_cont)
+    canvas_bw, content_bw = _make_tab_scroll_area(tab_bw)
+    canvas_rs, content_rs = _make_tab_scroll_area(tab_rs)
+
+    def _make_wheel_binder(target_canvas):
+        def _canvas_scroll_units(units: int):
+            try:
+                target_canvas.yview_scroll(int(units), "units")
+            except Exception:
+                pass
+
+        def _on_mousewheel(event):
+            try:
+                delta = int(event.delta)
+            except Exception:
+                delta = 0
+            if delta == 0:
+                return
+            if sys.platform == "darwin":
+                units = -1 if delta > 0 else 1
+            else:
+                units = -1 * int(delta / 120) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
+            _canvas_scroll_units(units)
+            return "break"
+
+        def _on_mousewheel_linux(event):
+            try:
+                if getattr(event, "num", None) == 4:
+                    _canvas_scroll_units(-1)
+                    return "break"
+                if getattr(event, "num", None) == 5:
+                    _canvas_scroll_units(1)
+                    return "break"
+            except Exception:
+                pass
+
+        def _bind(widget):
+            try:
+                widget.bind("<MouseWheel>", _on_mousewheel, add="+")
+                widget.bind("<Button-4>", _on_mousewheel_linux, add="+")
+                widget.bind("<Button-5>", _on_mousewheel_linux, add="+")
+            except Exception:
+                pass
+
+        return _bind
+
+    bind_overview = _make_wheel_binder(canvas_overview)
+    bind_recon = _make_wheel_binder(canvas_recon)
+    bind_cont = _make_wheel_binder(canvas_cont)
+    bind_bw = _make_wheel_binder(canvas_bw)
+    bind_rs = _make_wheel_binder(canvas_rs)
+
+    bind_overview(canvas_overview)
+    bind_recon(canvas_recon)
+    bind_cont(canvas_cont)
+    bind_bw(canvas_bw)
+    bind_rs(canvas_rs)
     win._selected_cell_text = ""
     win._selected_cell_widget = None
     table_data = {}
@@ -357,7 +399,7 @@ def show_reconciliation_popup(
             except Exception:
                 pass
             try:
-                canvas.focus_set()
+                widget.focus_set()
             except Exception:
                 pass
         except Exception:
@@ -452,6 +494,7 @@ def show_reconciliation_popup(
         tbl_id=None,
         data_row_idx=-1,
         data_col_idx=-1,
+        bind_wheel=None,
     ):
         chosen_bg = header_bg if header else (row_bg_odd if (row % 2 == 1) else row_bg_even)
         lbl = tk.Label(
@@ -473,21 +516,30 @@ def show_reconciliation_popup(
         lbl._tbl_row = data_row_idx
         lbl._tbl_col = data_col_idx
         lbl.grid(row=row, column=col, sticky="nsew")
-        _bind_mousewheel(lbl)
+        if not callable(bind_wheel):
+            bind_wheel = {
+                "audit": bind_overview,
+                "recon": bind_recon,
+                "cont": bind_cont,
+                "bw": bind_bw,
+                "rs": bind_rs,
+            }.get(tbl_id)
+        if callable(bind_wheel):
+            bind_wheel(lbl)
         lbl.bind("<Button-1>", lambda e, w=lbl, t=text: _select_cell(w, t), add="+")
         lbl.bind("<Button-2>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         lbl.bind("<Button-3>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         lbl.bind("<Control-Button-1>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         return lbl
 
-    audit_hdr = tk.Label(content, text="Audit Summary:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    audit_hdr = tk.Label(content_overview, text="Audit Summary:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     audit_hdr.pack(fill="x")
-    _bind_mousewheel(audit_hdr)
+    bind_overview(audit_hdr)
     audit_hdr.bind("<Button-1>", lambda e, w=audit_hdr, t="Audit Summary:": _select_cell(w, t), add="+")
     audit_hdr.bind("<Button-3>", lambda e, w=audit_hdr, t="Audit Summary:": _popup_cell_menu(e, w, t), add="+")
 
-    audit_tbl = ttk.Frame(content)
-    _bind_mousewheel(audit_tbl)
+    audit_tbl = ttk.Frame(content_overview)
+    bind_overview(audit_tbl)
     audit_tbl.pack(fill="x", pady=(4, 14))
 
     headers = ["File", "Reconciliation", "Continuity", "Balance Walk", "Row Shape"]
@@ -623,14 +675,14 @@ def show_reconciliation_popup(
             data_col_idx=4,
         )
 
-    recon_hdr = tk.Label(content, text="Reconciliation:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    recon_hdr = tk.Label(content_recon, text="Reconciliation:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     recon_hdr.pack(fill="x")
-    _bind_mousewheel(recon_hdr)
+    bind_recon(recon_hdr)
     recon_hdr.bind("<Button-1>", lambda e, w=recon_hdr, t="Reconciliation:": _select_cell(w, t), add="+")
     recon_hdr.bind("<Button-3>", lambda e, w=recon_hdr, t="Reconciliation:": _popup_cell_menu(e, w, t), add="+")
 
-    recon_tbl = ttk.Frame(content)
-    _bind_mousewheel(recon_tbl)
+    recon_tbl = ttk.Frame(content_recon)
+    bind_recon(recon_tbl)
     recon_tbl.pack(fill="x", pady=(4, 14))
 
     recon_headers = [
@@ -751,14 +803,14 @@ def show_reconciliation_popup(
                 data_col_idx=c,
             )
 
-    cont_hdr = tk.Label(content, text="Continuity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    cont_hdr = tk.Label(content_cont, text="Continuity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     cont_hdr.pack(fill="x")
-    _bind_mousewheel(cont_hdr)
+    bind_cont(cont_hdr)
     cont_hdr.bind("<Button-1>", lambda e, w=cont_hdr, t="Continuity:": _select_cell(w, t), add="+")
     cont_hdr.bind("<Button-3>", lambda e, w=cont_hdr, t="Continuity:": _popup_cell_menu(e, w, t), add="+")
 
-    cont_tbl = ttk.Frame(content)
-    _bind_mousewheel(cont_tbl)
+    cont_tbl = ttk.Frame(content_cont)
+    bind_cont(cont_tbl)
     cont_tbl.pack(fill="x", pady=(4, 14))
 
     cont_headers = [
@@ -842,14 +894,14 @@ def show_reconciliation_popup(
             data_col_idx=6,
         )
 
-    bw_hdr = tk.Label(content, text="Balance Walk:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    bw_hdr = tk.Label(content_bw, text="Balance Walk:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     bw_hdr.pack(fill="x")
-    _bind_mousewheel(bw_hdr)
+    bind_bw(bw_hdr)
     bw_hdr.bind("<Button-1>", lambda e, w=bw_hdr, t="Balance Walk:": _select_cell(w, t), add="+")
     bw_hdr.bind("<Button-3>", lambda e, w=bw_hdr, t="Balance Walk:": _popup_cell_menu(e, w, t), add="+")
 
-    bw_tbl = ttk.Frame(content)
-    _bind_mousewheel(bw_tbl)
+    bw_tbl = ttk.Frame(content_bw)
+    bind_bw(bw_tbl)
     bw_tbl.pack(fill="x", pady=(4, 14))
 
     bw_headers = ["File", "Status", "Summary"]
@@ -885,14 +937,14 @@ def show_reconciliation_popup(
         _tbl_cell(bw_tbl, bw_status_text, row_idx, 1, fg=bw_status_fg, anchor="w", tbl_id="bw", data_row_idx=data_row_idx, data_col_idx=1)
         _tbl_cell(bw_tbl, bw_summary, row_idx, 2, anchor="w", tbl_id="bw", data_row_idx=data_row_idx, data_col_idx=2)
 
-    rs_hdr = tk.Label(content, text="Row Shape Sanity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    rs_hdr = tk.Label(content_rs, text="Row Shape Sanity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
     rs_hdr.pack(fill="x")
-    _bind_mousewheel(rs_hdr)
+    bind_rs(rs_hdr)
     rs_hdr.bind("<Button-1>", lambda e, w=rs_hdr, t="Row Shape Sanity:": _select_cell(w, t), add="+")
     rs_hdr.bind("<Button-3>", lambda e, w=rs_hdr, t="Row Shape Sanity:": _popup_cell_menu(e, w, t), add="+")
 
-    rs_tbl = ttk.Frame(content)
-    _bind_mousewheel(rs_tbl)
+    rs_tbl = ttk.Frame(content_rs)
+    bind_rs(rs_tbl)
     rs_tbl.pack(fill="x", pady=(4, 14))
 
     rs_headers = ["File", "Status", "Summary"]
