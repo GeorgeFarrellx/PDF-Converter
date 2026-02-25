@@ -182,6 +182,26 @@ def show_reconciliation_popup(
     FAIL_SYMBOL = "✗"
     NA_SYMBOL = "—"
 
+    style = ttk.Style(win)
+    style.configure("SumHdr.TLabel", font=("Segoe UI", 10, "bold"))
+    style.configure("SumFile.TLabel", font=("Segoe UI", 10))
+    style.configure("SumPass.TLabel", foreground="#0b6e0b", font=("Segoe UI", 11, "bold"))
+    style.configure("SumFail.TLabel", foreground="#b00020", font=("Segoe UI", 11, "bold"))
+    style.configure("SumNA.TLabel", foreground="#666666", font=("Segoe UI", 11, "bold"))
+
+    pdf_to_link_oks: dict[str, list[bool]] = {}
+    for link in (continuity_results or []):
+        if not isinstance(link, dict):
+            continue
+        st = str(link.get("display_status") or link.get("status") or "").strip().upper()
+        link_ok = st.startswith("OK")
+        prev_pdf = str(link.get("prev_pdf") or "")
+        next_pdf = str(link.get("next_pdf") or "")
+        if prev_pdf:
+            pdf_to_link_oks.setdefault(prev_pdf, []).append(link_ok)
+        if next_pdf:
+            pdf_to_link_oks.setdefault(next_pdf, []).append(link_ok)
+
     if coverage_period:
         if any_warn:
             line = (
@@ -192,69 +212,92 @@ def show_reconciliation_popup(
             line = f"The bank statements cover the period from {coverage_period}."
         txt.insert("end", line + "\n\n", "info")
 
-    file_w = min(max(12, max((len(str(r.get("pdf") or "")) for r in recon_results), default=12)), 40)
+    file_display_width_chars = 42
 
-    header = (
-        f"{'File'.ljust(file_w)} | {'Reconciliation':^14} | {'Balance Walk':^12} | {'Row Shape':^9}\n"
-    )
     txt.insert("end", "Audit summary:\n", "section")
-    txt.insert("end", header, ("mono",))
-    txt.insert("end", "-" * (len(header.rstrip("\n"))) + "\n", ("mono",))
+    tbl = ttk.Frame(txt)
+    txt.window_create("end", window=tbl)
+    txt.insert("end", "\n\n", "info")
 
-    for r in recon_results:
+    headers = ["File", "Reconciliation", "Continuity", "Balance Walk", "Row Shape"]
+    for c, title in enumerate(headers):
+        ttk.Label(tbl, text=title, style="SumHdr.TLabel").grid(row=0, column=c, padx=3, pady=1, sticky="w")
+
+    for row_idx, r in enumerate(recon_results, start=1):
         status = str(r.get("status") or "").strip()
         if status == "OK":
             recon_symbol = PASS_SYMBOL
-            recon_tag = "ok"
+            recon_style = "SumPass.TLabel"
         elif status == "Mismatch":
             recon_symbol = FAIL_SYMBOL
-            recon_tag = "bad"
+            recon_style = "SumFail.TLabel"
         elif status in ("Statement balances not found", "Not supported by parser") or "NOT CHECKED" in status.upper():
             recon_symbol = NA_SYMBOL
-            recon_tag = "na"
+            recon_style = "SumNA.TLabel"
         else:
             recon_symbol = FAIL_SYMBOL
-            recon_tag = "bad"
+            recon_style = "SumFail.TLabel"
 
         pdf = str(r.get("pdf") or "")
-        if file_w >= 2 and len(pdf) > file_w:
-            pdf_disp = pdf[: file_w - 1] + "…"
+        if len(pdf) > file_display_width_chars:
+            pdf_disp = pdf[: file_display_width_chars - 1] + "…"
         else:
             pdf_disp = pdf
+
+        link_oks = pdf_to_link_oks.get(pdf, [])
+        if not link_oks:
+            continuity_symbol = NA_SYMBOL
+            continuity_style = "SumNA.TLabel"
+        elif all(link_oks):
+            continuity_symbol = PASS_SYMBOL
+            continuity_style = "SumPass.TLabel"
+        else:
+            continuity_symbol = FAIL_SYMBOL
+            continuity_style = "SumFail.TLabel"
 
         a = audit_by_pdf.get(pdf, {})
 
         bw_status = str(a.get("balance_walk_status") or "").strip()
         if not bw_status or bw_status.upper() == "NOT CHECKED":
             bw_symbol = NA_SYMBOL
-            bw_tag = "na"
+            bw_style = "SumNA.TLabel"
         elif bw_status == "OK":
             bw_symbol = PASS_SYMBOL
-            bw_tag = "ok"
+            bw_style = "SumPass.TLabel"
         else:
             bw_symbol = FAIL_SYMBOL
-            bw_tag = "bad"
+            bw_style = "SumFail.TLabel"
 
         rs_status = str(a.get("row_shape_status") or "").strip()
         if not rs_status or rs_status.upper() == "NOT CHECKED":
             rs_symbol = NA_SYMBOL
-            rs_tag = "na"
+            rs_style = "SumNA.TLabel"
         elif rs_status == "OK":
             rs_symbol = PASS_SYMBOL
-            rs_tag = "ok"
+            rs_style = "SumPass.TLabel"
         else:
             rs_symbol = FAIL_SYMBOL
-            rs_tag = "bad"
+            rs_style = "SumFail.TLabel"
 
-        txt.insert("end", f"{pdf_disp.ljust(file_w)} | ", ("mono",))
-        txt.insert("end", f"{recon_symbol:^14}", ("mono", recon_tag))
-        txt.insert("end", " | ", ("mono",))
-        txt.insert("end", f"{bw_symbol:^12}", ("mono", bw_tag))
-        txt.insert("end", " | ", ("mono",))
-        txt.insert("end", f"{rs_symbol:^9}", ("mono", rs_tag))
-        txt.insert("end", "\n", ("mono",))
-
-    txt.insert("end", "\n")
+        ttk.Label(
+            tbl,
+            text=pdf_disp,
+            style="SumFile.TLabel",
+            width=file_display_width_chars,
+            anchor="w",
+        ).grid(row=row_idx, column=0, padx=3, pady=1, sticky="w")
+        ttk.Label(tbl, text=recon_symbol, style=recon_style, width=12, anchor="center").grid(
+            row=row_idx, column=1, padx=3, pady=1
+        )
+        ttk.Label(tbl, text=continuity_symbol, style=continuity_style, width=12, anchor="center").grid(
+            row=row_idx, column=2, padx=3, pady=1
+        )
+        ttk.Label(tbl, text=bw_symbol, style=bw_style, width=12, anchor="center").grid(
+            row=row_idx, column=3, padx=3, pady=1
+        )
+        ttk.Label(tbl, text=rs_symbol, style=rs_style, width=12, anchor="center").grid(
+            row=row_idx, column=4, padx=3, pady=1
+        )
 
     txt.insert("end", "Reconciliation check:\n", "section")
     for r in recon_results:
