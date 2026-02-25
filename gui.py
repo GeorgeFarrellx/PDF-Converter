@@ -315,6 +315,113 @@ def show_reconciliation_popup(
             row=row_idx, column=4, padx=3, pady=1
         )
 
+    txt.insert("end", "Reconciliation:\n", "section")
+    recon_tbl = ttk.Frame(txt)
+    txt.window_create("end", window=recon_tbl)
+    txt.insert("end", "\n\n")
+
+    recon_headers = [
+        "File",
+        "Credits",
+        "Debits",
+        "Total Txns",
+        "Starting Balance",
+        "Net Movement",
+        "Calculated End",
+        "Statement End",
+        "Difference",
+    ]
+    for c, title in enumerate(recon_headers):
+        header_anchor = "w" if c == 0 else "center"
+        ttk.Label(recon_tbl, text=title, style="SumHdr.TLabel", anchor=header_anchor).grid(
+            row=0, column=c, padx=3, pady=1, sticky="w"
+        )
+
+    recon_file_width_chars = 32
+    for row_idx, r in enumerate(recon_results, start=1):
+        pdf = str(r.get("pdf") or "")
+        if len(pdf) > recon_file_width_chars:
+            pdf_disp = pdf[: recon_file_width_chars - 1] + "…"
+        else:
+            pdf_disp = pdf
+
+        transactions = r.get("transactions")
+        if isinstance(transactions, list):
+            txn_count = len(transactions)
+        else:
+            txn_count = 0
+            for count_key in ("txn_count", "transaction_count"):
+                count_val = r.get(count_key)
+                if count_val is None:
+                    continue
+                try:
+                    txn_count = int(count_val)
+                    break
+                except Exception:
+                    continue
+
+        credit_count = 0
+        credit_total = 0.0
+        debit_count = 0
+        debit_total_abs = 0.0
+        net_total = None
+
+        if isinstance(transactions, list):
+            for txn in transactions:
+                if not isinstance(txn, dict):
+                    continue
+                amount = _safe_amount(txn.get("Amount"))
+                if amount is None:
+                    continue
+                net_total = (net_total or 0.0) + amount
+                if amount > 0:
+                    credit_count += 1
+                    credit_total += amount
+                elif amount < 0:
+                    debit_count += 1
+                    debit_total_abs += abs(amount)
+        else:
+            net_from_result = _safe_amount(r.get("sum_amounts"))
+            if net_from_result is not None:
+                net_total = net_from_result
+
+        start_balance = _safe_amount(r.get("start_balance"))
+        end_balance = _safe_amount(r.get("end_balance"))
+        difference = _safe_amount(r.get("difference"))
+        expected_end = _safe_amount(r.get("expected_end"))
+
+        if expected_end is not None:
+            calculated_end = expected_end
+        elif start_balance is not None and net_total is not None:
+            calculated_end = start_balance + net_total
+        else:
+            calculated_end = None
+
+        credits_cell = f"{credit_count}\n{_fmt_money_or_na(credit_total)}"
+        debits_cell = f"{debit_count}\n{_fmt_money_or_na(debit_total_abs)}"
+        row_values = [
+            pdf_disp,
+            credits_cell,
+            debits_cell,
+            txn_count,
+            _fmt_money_or_na(start_balance),
+            _fmt_money_or_na(net_total),
+            _fmt_money_or_na(calculated_end),
+            _fmt_money_or_na(end_balance),
+            _fmt_money_or_na(difference),
+        ]
+
+        for c, value in enumerate(row_values):
+            anchor = "w" if c == 0 else "center"
+            ttk.Label(
+                recon_tbl,
+                text=value,
+                style="SumFile.TLabel",
+                width=recon_file_width_chars if c == 0 else None,
+                anchor=anchor,
+                justify="left" if c == 0 else "center",
+            ).grid(row=row_idx, column=c, padx=3, pady=1, sticky="w")
+
     txt.insert("end", "Continuity:\n", "section")
     cont_tbl = ttk.Frame(txt)
     txt.window_create("end", window=cont_tbl)
@@ -380,95 +487,6 @@ def show_reconciliation_popup(
             ttk.Label(cont_tbl, text=value, style="SumFile.TLabel").grid(row=row_idx, column=c, padx=4, pady=2, sticky="w")
 
         ttk.Label(cont_tbl, text=status_text, style=status_style).grid(row=row_idx, column=6, padx=4, pady=2, sticky="w")
-
-    txt.insert("end", "Reconciliation check:\n", "section")
-    for r in recon_results:
-        status = (r.get("status") or "").strip()
-        pdf = r.get("pdf") or ""
-
-        transactions = r.get("transactions")
-        if isinstance(transactions, list):
-            txn_count = len(transactions)
-        else:
-            txn_count = 0
-            for count_key in ("txn_count", "transaction_count"):
-                count_val = r.get(count_key)
-                if count_val is None:
-                    continue
-                try:
-                    txn_count = int(count_val)
-                    break
-                except Exception:
-                    continue
-
-        credit_count = 0
-        credit_total = 0.0
-        debit_count = 0
-        debit_total_abs = 0.0
-        net_total = None
-
-        if isinstance(transactions, list):
-            for txn in transactions:
-                if not isinstance(txn, dict):
-                    continue
-                amount = _safe_amount(txn.get("Amount"))
-                if amount is None:
-                    continue
-                net_total = (net_total or 0.0) + amount
-                if amount > 0:
-                    credit_count += 1
-                    credit_total += amount
-                elif amount < 0:
-                    debit_count += 1
-                    debit_total_abs += abs(amount)
-        else:
-            net_from_result = _safe_amount(r.get("sum_amounts"))
-            if net_from_result is not None:
-                net_total = net_from_result
-
-        start_balance = _safe_amount(r.get("start_balance"))
-        end_balance = _safe_amount(r.get("end_balance"))
-        difference = _safe_amount(r.get("difference"))
-        expected_end = _safe_amount(r.get("expected_end"))
-
-        if expected_end is not None:
-            calculated_end = expected_end
-        elif start_balance is not None and net_total is not None:
-            calculated_end = start_balance + net_total
-        else:
-            calculated_end = None
-
-        if status == "OK":
-            msg = f"OK: {pdf}"
-            tag = "ok"
-        elif status == "Mismatch":
-            msg = f"MISMATCH: {pdf}"
-            tag = "bad"
-        elif status == "Statement balances not found":
-            msg = f"NOT CHECKED: {pdf} (statement balances not found)"
-            tag = "warn"
-        elif status == "Not supported by parser":
-            msg = f"NOT CHECKED: {pdf} (balances not supported by parser)"
-            tag = "warn"
-        else:
-            msg = f"NOT CHECKED: {pdf} ({status or 'not checked'})"
-            tag = "warn"
-
-        lines = [
-            msg,
-            f"  Credits: {credit_count} | Total: {_fmt_money_or_na(credit_total)}",
-            f"  Debits:  {debit_count} | Total: {_fmt_money_or_na(debit_total_abs)}",
-            f"  Total transactions: {txn_count}",
-            f"  Starting balance: {_fmt_money_or_na(start_balance)}",
-            f"  Net movement: {_fmt_money_or_na(net_total)}",
-            f"  Calculated ending balance: {_fmt_money_or_na(calculated_end)}",
-            f"  Statement ending balance: {_fmt_money_or_na(end_balance)}",
-        ]
-
-        if difference is not None:
-            lines.append(f"  Difference: {_fmt_money_or_na(difference)}")
-
-        txt.insert("end", "\n".join(lines) + "\n\n", tag)
 
     txt.insert("end", "\n")
 
