@@ -167,17 +167,6 @@ def show_reconciliation_popup(
         if isinstance(a, dict)
     }
 
-    txt = tk.Text(outer, height=22, wrap="word")
-    txt.pack(fill="both", expand=True, pady=(8, 0))
-
-    txt.tag_configure("section", font=("Segoe UI", 10, "bold"))
-    txt.tag_configure("ok", foreground="#0b6e0b")
-    txt.tag_configure("bad", foreground="#b00020")
-    txt.tag_configure("warn", foreground="#8a6d3b")
-    txt.tag_configure("info", foreground="#333")
-    txt.tag_configure("mono", font=("Consolas", 10))
-    txt.tag_configure("na", foreground="#666666")
-
     PASS_SYMBOL = "✓"
     FAIL_SYMBOL = "✗"
     NA_SYMBOL = "—"
@@ -202,22 +191,13 @@ def show_reconciliation_popup(
         if next_pdf:
             pdf_to_link_oks.setdefault(next_pdf, []).append(link_ok)
 
-    if coverage_period:
-        if any_warn:
-            line = (
-                f"The bank statements cover the period from {coverage_period} "
-                "(however, some checks could not be completed or warnings were detected — see below)."
-            )
-        else:
-            line = f"The bank statements cover the period from {coverage_period}."
-        txt.insert("end", line + "\n\n", "info")
-
     file_display_width_chars = 42
 
-    txt.insert("end", "Audit summary:\n", "section")
-    tbl = ttk.Frame(txt)
-    txt.window_create("end", window=tbl)
-    txt.insert("end", "\n\n", "info")
+    summary_box = ttk.Labelframe(outer, text="Audit Summary", padding=10)
+    summary_box.pack(fill="x", pady=(8, 0))
+
+    tbl = ttk.Frame(summary_box)
+    tbl.pack(fill="x")
 
     headers = ["File", "Reconciliation", "Continuity", "Balance Walk", "Row Shape"]
     for c, title in enumerate(headers):
@@ -298,6 +278,99 @@ def show_reconciliation_popup(
         ttk.Label(tbl, text=rs_symbol, style=rs_style, width=12, anchor="center").grid(
             row=row_idx, column=4, padx=3, pady=1
         )
+
+    cont_box = ttk.Labelframe(outer, text="Continuity", padding=10)
+    cont_box.pack(fill="x", pady=(8, 0))
+
+    cont_tbl = ttk.Frame(cont_box)
+    cont_tbl.pack(fill="x")
+
+    cont_headers = [
+        "File 1",
+        "File 2",
+        "Period 1",
+        "Period 2",
+        "File 1 End Balance",
+        "File 2 Start Balance",
+        "Status",
+    ]
+    for c, title in enumerate(cont_headers):
+        ttk.Label(cont_tbl, text=title, style="SumHdr.TLabel").grid(row=0, column=c, padx=4, pady=2, sticky="w")
+
+    pdf_index = {str(r.get("pdf") or ""): idx for idx, r in enumerate(recon_results)}
+    sorted_links = sorted(
+        [link for link in continuity_results if isinstance(link, dict)],
+        key=lambda l: (
+            pdf_index.get(str(l.get("prev_pdf") or ""), 9999),
+            pdf_index.get(str(l.get("next_pdf") or ""), 9999),
+            str(l.get("prev_pdf") or ""),
+            str(l.get("next_pdf") or ""),
+        ),
+    )
+
+    for row_idx, link in enumerate(sorted_links, start=1):
+        prev_pdf = str(link.get("prev_pdf") or "")
+        next_pdf = str(link.get("next_pdf") or "")
+        prev_end = link.get("prev_end")
+        next_start = link.get("next_start")
+        st = str(link.get("display_status") or link.get("status") or "").strip()
+        st_upper = st.upper()
+
+        if prev_end is None or next_start is None:
+            status_text = "Not checked"
+            status_style = "SumNA.TLabel"
+        elif st_upper.startswith("OK"):
+            status_text = "Match"
+            status_style = "SumPass.TLabel"
+        elif st_upper.startswith("MISMATCH"):
+            status_text = "Mismatch"
+            status_style = "SumFail.TLabel"
+        else:
+            status_text = st or "Not checked"
+            if status_text == "Not checked":
+                status_style = "SumNA.TLabel"
+            else:
+                status_style = "SumNA.TLabel"
+
+        row_values = [
+            prev_pdf,
+            next_pdf,
+            period_by_pdf.get(prev_pdf, ""),
+            period_by_pdf.get(next_pdf, ""),
+            _fmt_money(prev_end) if prev_end is not None else "N/A",
+            _fmt_money(next_start) if next_start is not None else "N/A",
+        ]
+
+        for c, value in enumerate(row_values):
+            ttk.Label(cont_tbl, text=value, style="SumFile.TLabel").grid(row=row_idx, column=c, padx=4, pady=2, sticky="w")
+
+        ttk.Label(cont_tbl, text=status_text, style=status_style).grid(row=row_idx, column=6, padx=4, pady=2, sticky="w")
+
+    text_frame = ttk.Frame(outer)
+    text_frame.pack(fill="both", expand=True, pady=(8, 0))
+    yscroll = ttk.Scrollbar(text_frame, orient="vertical")
+    yscroll.pack(side="right", fill="y")
+    txt = tk.Text(text_frame, height=22, wrap="word", yscrollcommand=yscroll.set)
+    txt.pack(side="left", fill="both", expand=True)
+    yscroll.config(command=txt.yview)
+
+    txt.tag_configure("section", font=("Segoe UI", 10, "bold"))
+    txt.tag_configure("ok", foreground="#0b6e0b")
+    txt.tag_configure("bad", foreground="#b00020")
+    txt.tag_configure("warn", foreground="#8a6d3b")
+    txt.tag_configure("info", foreground="#333")
+    txt.tag_configure("mono", font=("Consolas", 10))
+    txt.tag_configure("na", foreground="#666666")
+
+    if coverage_period:
+        if any_warn:
+            line = (
+                f"The bank statements cover the period from {coverage_period} "
+                "(however, some checks could not be completed or warnings were detected — see below)."
+            )
+        else:
+            line = f"The bank statements cover the period from {coverage_period}."
+        txt.insert("end", line + "\n\n", "info")
 
     txt.insert("end", "Reconciliation check:\n", "section")
     for r in recon_results:
