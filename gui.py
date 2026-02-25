@@ -161,91 +161,11 @@ def show_reconciliation_popup(
     ttk.Label(path_row, text="Output:").pack(side="left")
     ttk.Label(path_row, text=output_path, foreground="#333").pack(side="left", padx=(6, 0))
 
-    if coverage_period:
-        if any_warn:
-            line = (
-                f"The bank statements cover the period from {coverage_period} "
-                "(however, some checks could not be completed or warnings were detected — see below)."
-            )
-        else:
-            line = f"The bank statements cover the period from {coverage_period}."
-        ttk.Label(outer, text=line, foreground="#333").pack(anchor="w", pady=(10, 0))
-
-    summary_box = ttk.Labelframe(outer, text="Audit Summary", padding=10)
-    summary_box.pack(fill="x", pady=(8, 0))
-
-    grid = ttk.Frame(summary_box)
-    grid.pack(fill="x")
-    grid.columnconfigure(0, weight=1)
-
-    PASS_SYMBOL = "✓"
-    FAIL_SYMBOL = "✗"
-    NA_SYMBOL = "—"
-
-    style = ttk.Style()
-    style.configure("AuditHdr.TLabel", font=("Segoe UI", 10, "bold"))
-    style.configure("AuditPass.TLabel", foreground="#0b6e0b", font=("Segoe UI", 11, "bold"))
-    style.configure("AuditFail.TLabel", foreground="#b00020", font=("Segoe UI", 11, "bold"))
-    style.configure("AuditNA.TLabel", foreground="#666666", font=("Segoe UI", 11, "bold"))
-    style.configure("AuditFile.TLabel", font=("Segoe UI", 10))
-
-    ttk.Label(grid, text="File", style="AuditHdr.TLabel", anchor="w").grid(row=0, column=0, sticky="ew", padx=6, pady=3)
-    ttk.Label(grid, text="Reconciliation", style="AuditHdr.TLabel", anchor="center").grid(row=0, column=1, sticky="ew", padx=6, pady=3)
-    ttk.Label(grid, text="Balance Walk", style="AuditHdr.TLabel", anchor="center").grid(row=0, column=2, sticky="ew", padx=6, pady=3)
-    ttk.Label(grid, text="Row Shape", style="AuditHdr.TLabel", anchor="center").grid(row=0, column=3, sticky="ew", padx=6, pady=3)
-
     audit_by_pdf = {
         str(a.get("pdf") or ""): a
         for a in (audit_results or [])
         if isinstance(a, dict)
     }
-
-    for row_index, r in enumerate(recon_results, start=1):
-        status = str(r.get("status") or "").strip()
-        if status == "OK":
-            recon_symbol = PASS_SYMBOL
-            recon_style = "AuditPass.TLabel"
-        elif status == "Mismatch":
-            recon_symbol = FAIL_SYMBOL
-            recon_style = "AuditFail.TLabel"
-        elif status in ("Statement balances not found", "Not supported by parser") or "NOT CHECKED" in status.upper():
-            recon_symbol = NA_SYMBOL
-            recon_style = "AuditNA.TLabel"
-        else:
-            recon_symbol = FAIL_SYMBOL
-            recon_style = "AuditFail.TLabel"
-
-        pdf = str(r.get("pdf") or "")
-        a = audit_by_pdf.get(pdf, {})
-
-        bw_status = str(a.get("balance_walk_status") or "").strip()
-        if not bw_status or bw_status.upper() == "NOT CHECKED":
-            bw_symbol = NA_SYMBOL
-            bw_style = "AuditNA.TLabel"
-        elif bw_status == "OK":
-            bw_symbol = PASS_SYMBOL
-            bw_style = "AuditPass.TLabel"
-        else:
-            bw_symbol = FAIL_SYMBOL
-            bw_style = "AuditFail.TLabel"
-
-        rs_status = str(a.get("row_shape_status") or "").strip()
-        if not rs_status or rs_status.upper() == "NOT CHECKED":
-            rs_symbol = NA_SYMBOL
-            rs_style = "AuditNA.TLabel"
-        elif rs_status == "OK":
-            rs_symbol = PASS_SYMBOL
-            rs_style = "AuditPass.TLabel"
-        else:
-            rs_symbol = FAIL_SYMBOL
-            rs_style = "AuditFail.TLabel"
-
-        ttk.Label(grid, text=pdf, style="AuditFile.TLabel", anchor="w").grid(row=row_index, column=0, sticky="ew", padx=6, pady=3)
-        ttk.Label(grid, text=recon_symbol, style=recon_style, anchor="center").grid(row=row_index, column=1, sticky="ew", padx=6, pady=3)
-        ttk.Label(grid, text=bw_symbol, style=bw_style, anchor="center").grid(row=row_index, column=2, sticky="ew", padx=6, pady=3)
-        ttk.Label(grid, text=rs_symbol, style=rs_style, anchor="center").grid(row=row_index, column=3, sticky="ew", padx=6, pady=3)
-
-    ttk.Separator(outer).pack(fill="x", pady=(8, 0))
 
     txt = tk.Text(outer, height=22, wrap="word")
     txt.pack(fill="both", expand=True, pady=(8, 0))
@@ -255,6 +175,86 @@ def show_reconciliation_popup(
     txt.tag_configure("bad", foreground="#b00020")
     txt.tag_configure("warn", foreground="#8a6d3b")
     txt.tag_configure("info", foreground="#333")
+    txt.tag_configure("mono", font=("Consolas", 10))
+    txt.tag_configure("na", foreground="#666666")
+
+    PASS_SYMBOL = "✓"
+    FAIL_SYMBOL = "✗"
+    NA_SYMBOL = "—"
+
+    if coverage_period:
+        if any_warn:
+            line = (
+                f"The bank statements cover the period from {coverage_period} "
+                "(however, some checks could not be completed or warnings were detected — see below)."
+            )
+        else:
+            line = f"The bank statements cover the period from {coverage_period}."
+        txt.insert("end", line + "\n\n", "info")
+
+    file_w = min(max(12, max((len(str(r.get("pdf") or "")) for r in recon_results), default=12)), 40)
+
+    header = (
+        f"{'File'.ljust(file_w)} | {'Reconciliation':^14} | {'Balance Walk':^12} | {'Row Shape':^9}\n"
+    )
+    txt.insert("end", "Audit summary:\n", "section")
+    txt.insert("end", header, ("mono",))
+    txt.insert("end", "-" * (len(header.rstrip("\n"))) + "\n", ("mono",))
+
+    for r in recon_results:
+        status = str(r.get("status") or "").strip()
+        if status == "OK":
+            recon_symbol = PASS_SYMBOL
+            recon_tag = "ok"
+        elif status == "Mismatch":
+            recon_symbol = FAIL_SYMBOL
+            recon_tag = "bad"
+        elif status in ("Statement balances not found", "Not supported by parser") or "NOT CHECKED" in status.upper():
+            recon_symbol = NA_SYMBOL
+            recon_tag = "na"
+        else:
+            recon_symbol = FAIL_SYMBOL
+            recon_tag = "bad"
+
+        pdf = str(r.get("pdf") or "")
+        if file_w >= 2 and len(pdf) > file_w:
+            pdf_disp = pdf[: file_w - 1] + "…"
+        else:
+            pdf_disp = pdf
+
+        a = audit_by_pdf.get(pdf, {})
+
+        bw_status = str(a.get("balance_walk_status") or "").strip()
+        if not bw_status or bw_status.upper() == "NOT CHECKED":
+            bw_symbol = NA_SYMBOL
+            bw_tag = "na"
+        elif bw_status == "OK":
+            bw_symbol = PASS_SYMBOL
+            bw_tag = "ok"
+        else:
+            bw_symbol = FAIL_SYMBOL
+            bw_tag = "bad"
+
+        rs_status = str(a.get("row_shape_status") or "").strip()
+        if not rs_status or rs_status.upper() == "NOT CHECKED":
+            rs_symbol = NA_SYMBOL
+            rs_tag = "na"
+        elif rs_status == "OK":
+            rs_symbol = PASS_SYMBOL
+            rs_tag = "ok"
+        else:
+            rs_symbol = FAIL_SYMBOL
+            rs_tag = "bad"
+
+        txt.insert("end", f"{pdf_disp.ljust(file_w)} | ", ("mono",))
+        txt.insert("end", f"{recon_symbol:^14}", ("mono", recon_tag))
+        txt.insert("end", " | ", ("mono",))
+        txt.insert("end", f"{bw_symbol:^12}", ("mono", bw_tag))
+        txt.insert("end", " | ", ("mono",))
+        txt.insert("end", f"{rs_symbol:^9}", ("mono", rs_tag))
+        txt.insert("end", "\n", ("mono",))
+
+    txt.insert("end", "\n")
 
     txt.insert("end", "Reconciliation check:\n", "section")
     for r in recon_results:
