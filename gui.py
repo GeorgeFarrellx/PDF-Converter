@@ -206,17 +206,41 @@ def show_reconciliation_popup(
         ),
     )
 
-    text_frame = ttk.Frame(outer)
-    text_frame.pack(fill="both", expand=True, pady=(8, 0))
-    yscroll = ttk.Scrollbar(text_frame, orient="vertical")
-    yscroll.pack(side="right", fill="y")
-    txt = tk.Text(text_frame, height=22, wrap="word", yscrollcommand=yscroll.set)
-    txt.pack(side="left", fill="both", expand=True)
-    yscroll.config(command=txt.yview)
+    scroll_host = ttk.Frame(outer)
+    scroll_host.pack(fill="both", expand=True, pady=(8, 0))
 
-    def _scroll_units(units: int):
+    yscroll = ttk.Scrollbar(scroll_host, orient="vertical")
+    yscroll.pack(side="right", fill="y")
+
+    canvas = tk.Canvas(scroll_host, highlightthickness=0)
+    canvas.pack(side="left", fill="both", expand=True)
+    canvas.configure(yscrollcommand=yscroll.set)
+    yscroll.configure(command=canvas.yview)
+
+    canvas.configure(background="#ffffff")
+
+    content = ttk.Frame(canvas)
+    window_id = canvas.create_window((0, 0), window=content, anchor="nw")
+
+    def _update_scrollregion(event=None):
         try:
-            txt.yview_scroll(int(units), "units")
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        except Exception:
+            pass
+
+    content.bind("<Configure>", _update_scrollregion)
+
+    def _sync_width(event=None):
+        try:
+            canvas.itemconfigure(window_id, width=canvas.winfo_width())
+        except Exception:
+            pass
+
+    canvas.bind("<Configure>", _sync_width)
+
+    def _canvas_scroll_units(units: int):
+        try:
+            canvas.yview_scroll(int(units), "units")
         except Exception:
             pass
 
@@ -228,22 +252,21 @@ def show_reconciliation_popup(
             delta = 0
         if delta == 0:
             return
-        # Normalize to +/- 1 unit per notch (Windows typical delta=120)
-        if abs(delta) >= 120:
-            units = -1 * int(delta / 120)
-        else:
+        if sys.platform == "darwin":
             units = -1 if delta > 0 else 1
-        _scroll_units(units)
+        else:
+            units = -1 * int(delta / 120) if abs(delta) >= 120 else (-1 if delta > 0 else 1)
+        _canvas_scroll_units(units)
         return "break"
 
     def _on_mousewheel_linux(event):
         # Linux uses Button-4/5
         try:
             if getattr(event, "num", None) == 4:
-                _scroll_units(-1)
+                _canvas_scroll_units(-1)
                 return "break"
             if getattr(event, "num", None) == 5:
-                _scroll_units(1)
+                _canvas_scroll_units(1)
                 return "break"
         except Exception:
             pass
@@ -256,17 +279,61 @@ def show_reconciliation_popup(
         except Exception:
             pass
 
-    _bind_mousewheel(txt)
+    _bind_mousewheel(canvas)
+    _bind_mousewheel(content)
 
-    txt.tag_configure("section", font=("Segoe UI", 10, "bold"))
-    txt.tag_configure("ok", foreground="#0b6e0b")
-    txt.tag_configure("bad", foreground="#b00020")
-    txt.tag_configure("warn", foreground="#8a6d3b")
-    txt.tag_configure("info", foreground="#333")
-    txt.tag_configure("mono", font=("Consolas", 10))
-    txt.tag_configure("na", foreground="#666666")
+    selected_bg = "#cce8ff"
+    base_bg = "#ffffff"
+    win._selected_cell_text = ""
+    win._selected_cell_widget = None
 
-    base_bg = txt.cget("bg")
+    def _select_cell(widget, value: str):
+        try:
+            prev = getattr(win, "_selected_cell_widget", None)
+            if prev is not None and prev.winfo_exists():
+                try:
+                    prev.configure(bg=base_bg)
+                except Exception:
+                    pass
+            try:
+                widget.configure(bg=selected_bg)
+            except Exception:
+                pass
+            win._selected_cell_widget = widget
+            win._selected_cell_text = str(value or "")
+        except Exception:
+            pass
+
+    def _copy_selected_cell(event=None):
+        try:
+            val = str(getattr(win, "_selected_cell_text", "") or "")
+            if not val:
+                return "break"
+            win.clipboard_clear()
+            win.clipboard_append(val)
+            win.update_idletasks()
+        except Exception:
+            pass
+        return "break"
+
+    win.bind("<Control-c>", _copy_selected_cell, add="+")
+    win.bind("<Control-C>", _copy_selected_cell, add="+")
+    win.bind("<Command-c>", _copy_selected_cell, add="+")
+    win.bind("<Command-C>", _copy_selected_cell, add="+")
+
+    cell_menu = tk.Menu(win, tearoff=0)
+    cell_menu.add_command(label="Copy", command=_copy_selected_cell)
+
+    def _popup_cell_menu(event, widget, value):
+        _select_cell(widget, value)
+        try:
+            cell_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            try:
+                cell_menu.grab_release()
+            except Exception:
+                pass
+
     header_font = ("Segoe UI", 10, "bold")
     cell_font = ("Segoe UI", 10)
     symbol_font = ("Segoe UI", 11, "bold")
@@ -291,13 +358,17 @@ def show_reconciliation_popup(
         )
         lbl.grid(row=row, column=col, sticky="nsew")
         _bind_mousewheel(lbl)
+        lbl.bind("<Button-1>", lambda e, w=lbl, t=text: _select_cell(w, t), add="+")
+        lbl.bind("<Button-3>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         return lbl
 
     cn = str(client_name or "").strip()
-    if cn:
-        txt.insert("end", f"{cn}\n", "section")
-    else:
-        txt.insert("end", "(unknown)\n", "section")
+    name_text = cn if cn else "(unknown)"
+    name_lbl = tk.Label(content, text=name_text, bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    name_lbl.pack(fill="x")
+    _bind_mousewheel(name_lbl)
+    name_lbl.bind("<Button-1>", lambda e, w=name_lbl, t=name_text: _select_cell(w, t), add="+")
+    name_lbl.bind("<Button-3>", lambda e, w=name_lbl, t=name_text: _popup_cell_menu(e, w, t), add="+")
 
     if coverage_period:
         if any_warn:
@@ -315,13 +386,30 @@ def show_reconciliation_popup(
             )
         else:
             line = "The bank statements cover the period: (unknown)."
-    txt.insert("end", line + "\n\n", "info")
+    period_lbl = tk.Label(
+        content,
+        text=line,
+        bg=base_bg,
+        fg="#333",
+        font=("Segoe UI", 10),
+        anchor="w",
+        wraplength=1100,
+        justify="left",
+    )
+    period_lbl.pack(fill="x", pady=(4, 10))
+    _bind_mousewheel(period_lbl)
+    period_lbl.bind("<Button-1>", lambda e, w=period_lbl, t=line: _select_cell(w, t), add="+")
+    period_lbl.bind("<Button-3>", lambda e, w=period_lbl, t=line: _popup_cell_menu(e, w, t), add="+")
 
-    txt.insert("end", "Audit Summary:\n", "section")
-    audit_tbl = ttk.Frame(txt)
+    audit_hdr = tk.Label(content, text="Audit Summary:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    audit_hdr.pack(fill="x")
+    _bind_mousewheel(audit_hdr)
+    audit_hdr.bind("<Button-1>", lambda e, w=audit_hdr, t="Audit Summary:": _select_cell(w, t), add="+")
+    audit_hdr.bind("<Button-3>", lambda e, w=audit_hdr, t="Audit Summary:": _popup_cell_menu(e, w, t), add="+")
+
+    audit_tbl = ttk.Frame(content)
     _bind_mousewheel(audit_tbl)
-    txt.window_create("end", window=audit_tbl)
-    txt.insert("end", "\n\n")
+    audit_tbl.pack(fill="x", pady=(4, 14))
 
     headers = ["File", "Reconciliation", "Continuity", "Balance Walk", "Row Shape"]
     for c, title in enumerate(headers):
@@ -399,11 +487,15 @@ def show_reconciliation_popup(
         _tbl_cell(audit_tbl, bw_symbol, row_idx, 3, fg=bw_fg, anchor="center", width=12, font=symbol_font, justify="center")
         _tbl_cell(audit_tbl, rs_symbol, row_idx, 4, fg=rs_fg, anchor="center", width=12, font=symbol_font, justify="center")
 
-    txt.insert("end", "Reconciliation:\n", "section")
-    recon_tbl = ttk.Frame(txt)
+    recon_hdr = tk.Label(content, text="Reconciliation:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    recon_hdr.pack(fill="x")
+    _bind_mousewheel(recon_hdr)
+    recon_hdr.bind("<Button-1>", lambda e, w=recon_hdr, t="Reconciliation:": _select_cell(w, t), add="+")
+    recon_hdr.bind("<Button-3>", lambda e, w=recon_hdr, t="Reconciliation:": _popup_cell_menu(e, w, t), add="+")
+
+    recon_tbl = ttk.Frame(content)
     _bind_mousewheel(recon_tbl)
-    txt.window_create("end", window=recon_tbl)
-    txt.insert("end", "\n\n")
+    recon_tbl.pack(fill="x", pady=(4, 14))
 
     recon_headers = [
         "File",
@@ -506,11 +598,15 @@ def show_reconciliation_popup(
                 justify="left" if c == 0 else "center",
             )
 
-    txt.insert("end", "Continuity:\n", "section")
-    cont_tbl = ttk.Frame(txt)
+    cont_hdr = tk.Label(content, text="Continuity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    cont_hdr.pack(fill="x")
+    _bind_mousewheel(cont_hdr)
+    cont_hdr.bind("<Button-1>", lambda e, w=cont_hdr, t="Continuity:": _select_cell(w, t), add="+")
+    cont_hdr.bind("<Button-3>", lambda e, w=cont_hdr, t="Continuity:": _popup_cell_menu(e, w, t), add="+")
+
+    cont_tbl = ttk.Frame(content)
     _bind_mousewheel(cont_tbl)
-    txt.window_create("end", window=cont_tbl)
-    txt.insert("end", "\n\n")
+    cont_tbl.pack(fill="x", pady=(4, 14))
 
     cont_headers = [
         "File 1",
@@ -579,11 +675,15 @@ def show_reconciliation_popup(
             status_fg = na_grey
         _tbl_cell(cont_tbl, status_text, row_idx, 6, fg=status_fg, anchor="w")
 
-    txt.insert("end", "Balance Walk:\n", "section")
-    bw_tbl = ttk.Frame(txt)
+    bw_hdr = tk.Label(content, text="Balance Walk:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    bw_hdr.pack(fill="x")
+    _bind_mousewheel(bw_hdr)
+    bw_hdr.bind("<Button-1>", lambda e, w=bw_hdr, t="Balance Walk:": _select_cell(w, t), add="+")
+    bw_hdr.bind("<Button-3>", lambda e, w=bw_hdr, t="Balance Walk:": _popup_cell_menu(e, w, t), add="+")
+
+    bw_tbl = ttk.Frame(content)
     _bind_mousewheel(bw_tbl)
-    txt.window_create("end", window=bw_tbl)
-    txt.insert("end", "\n\n")
+    bw_tbl.pack(fill="x", pady=(4, 14))
 
     bw_headers = ["File", "Status", "Summary"]
     for c, title in enumerate(bw_headers):
@@ -614,11 +714,15 @@ def show_reconciliation_popup(
         _tbl_cell(bw_tbl, bw_status_text, row_idx, 1, fg=bw_status_fg, anchor="w")
         _tbl_cell(bw_tbl, bw_summary, row_idx, 2, anchor="w")
 
-    txt.insert("end", "Row Shape Sanity:\n", "section")
-    rs_tbl = ttk.Frame(txt)
+    rs_hdr = tk.Label(content, text="Row Shape Sanity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
+    rs_hdr.pack(fill="x")
+    _bind_mousewheel(rs_hdr)
+    rs_hdr.bind("<Button-1>", lambda e, w=rs_hdr, t="Row Shape Sanity:": _select_cell(w, t), add="+")
+    rs_hdr.bind("<Button-3>", lambda e, w=rs_hdr, t="Row Shape Sanity:": _popup_cell_menu(e, w, t), add="+")
+
+    rs_tbl = ttk.Frame(content)
     _bind_mousewheel(rs_tbl)
-    txt.window_create("end", window=rs_tbl)
-    txt.insert("end", "\n\n")
+    rs_tbl.pack(fill="x", pady=(4, 14))
 
     rs_headers = ["File", "Status", "Summary"]
     for c, title in enumerate(rs_headers):
@@ -648,45 +752,6 @@ def show_reconciliation_popup(
         _tbl_cell(rs_tbl, pdf_disp, row_idx, 0, width=recon_file_width_chars, anchor="w")
         _tbl_cell(rs_tbl, rs_status_text, row_idx, 1, fg=rs_status_fg, anchor="w")
         _tbl_cell(rs_tbl, rs_summary, row_idx, 2, anchor="w")
-
-    txt.insert("end", "\n")
-    txt.configure(insertwidth=0)
-    txt.bind("<Button-1>", lambda e: (txt.focus_set(), None), add="+")
-
-    def _block_if_edit(event):
-        # Allow navigation keys
-        nav = {"Left", "Right", "Up", "Down", "Home", "End", "Prior", "Next"}
-        if event.keysym in nav:
-            return None
-
-        # Allow Ctrl/Cmd shortcuts for copy/select-all only
-        try:
-            ks = (event.keysym or "").lower()
-        except Exception:
-            ks = ""
-        try:
-            st = int(event.state)
-        except Exception:
-            st = 0
-
-        # Tk state bitmasks: Control is commonly 0x4, Mod1 (Alt/Command on mac) commonly 0x8
-        ctrl = bool(st & 0x4)
-        mod1 = bool(st & 0x8)
-        if (ctrl or mod1) and ks in ("c", "a"):
-            return None
-
-        # Block any printable character input
-        if event.char and event.char.strip() != "":
-            return "break"
-        return None
-
-    txt.bind("<Key>", _block_if_edit, add="+")
-    txt.bind("<<Paste>>", lambda e: "break", add="+")
-    txt.bind("<<Cut>>", lambda e: "break", add="+")
-    txt.bind("<<Clear>>", lambda e: "break", add="+")
-    txt.bind("<BackSpace>", lambda e: "break", add="+")
-    txt.bind("<Delete>", lambda e: "break", add="+")
-    txt.bind("<Return>", lambda e: "break", add="+")
 
     btn_row = ttk.Frame(win)
     btn_row.pack(fill="x", pady=(8, 10))
