@@ -349,3 +349,5 @@
 1062,Groceries,regex,MARKS\s*&\s*SPENCER\s*PLC,DEBIT,,TRUE,Marks & Spencer PLC variant
 1063,Food & Drink,regex,(?i)RESTAURAN,DEBIT,,TRUE,Restaurants (matches "Restauran/Restaurant")
 1064,Personal,regex,(?i)SMYTHS\\s*TOYS,DEBIT,,TRUE,Smyths Toys
+1065,Personal,contains,TENPIN,DEBIT,,TRUE,Tenpin (bowling)
+1066,Food & Drink,contains,BAR AND GR,DEBIT,,TRUE,Bar and grill/restaurant
