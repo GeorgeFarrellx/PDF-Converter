@@ -138,30 +138,33 @@ def show_reconciliation_popup(
     win = tk.Toplevel(parent)
     win.transient(parent)
     win.grab_set()
+    base_bg = "#ffffff"
+    header_bg = "#eef2f7"
+    win.configure(bg=base_bg)
 
     win.title("Audit Checks (Warnings)" if any_warn else "Audit Checks")
     win.geometry("1200x560")
     win.minsize(1100, 560)
 
-    outer = ttk.Frame(win, padding=14)
-    outer.pack(fill="both", expand=True)
+    outer = tk.Frame(win, bg=base_bg)
+    outer.pack(fill="both", expand=True, padx=14, pady=14)
 
     icon = "✖" if any_warn else "✔"
     icon_color = "#b00020" if any_warn else "#0b6e0b"
 
-    head = ttk.Frame(outer)
+    head = tk.Frame(outer, bg=base_bg)
     head.pack(fill="x")
 
-    ttk.Label(head, text=icon, foreground=icon_color, font=("Segoe UI", 18, "bold")).pack(side="left")
+    tk.Label(head, text=icon, fg=icon_color, bg=base_bg, font=("Segoe UI", 18, "bold")).pack(side="left")
 
     title_text = "Audit Checks completed with warnings" if any_warn else "Audit Checks"
-    ttk.Label(head, text=title_text, font=("Segoe UI", 13, "bold")).pack(side="left", padx=(10, 0))
+    tk.Label(head, text=title_text, bg=base_bg, font=("Segoe UI", 13, "bold")).pack(side="left", padx=(10, 0))
 
-    path_row = ttk.Frame(outer)
+    path_row = tk.Frame(outer, bg=base_bg)
     path_row.pack(fill="x", pady=(10, 0))
 
-    ttk.Label(path_row, text="Output:").pack(side="left")
-    ttk.Label(path_row, text=output_path, foreground="#333").pack(side="left", padx=(6, 0))
+    tk.Label(path_row, text="Output:", bg=base_bg).pack(side="left")
+    tk.Label(path_row, text=output_path, fg="#333", bg=base_bg).pack(side="left", padx=(6, 0))
 
     PASS_SYMBOL = "✓"
     FAIL_SYMBOL = "✗"
@@ -187,31 +190,22 @@ def show_reconciliation_popup(
     cn = str(client_name or "").strip()
     name_text = cn if cn else "(unknown)"
 
-    info_bar = ttk.Frame(outer)
+    info_bar = tk.Frame(outer, bg=base_bg)
     info_bar.pack(fill="x", pady=(8, 6))
 
-    info_left = ttk.Frame(info_bar)
+    info_left = tk.Frame(info_bar, bg=base_bg)
     info_left.pack(side="left", fill="x", expand=True)
-    tk.Label(info_left, text=name_text, bg="#ffffff", font=("Segoe UI", 12, "bold"), anchor="w").pack(fill="x")
+    tk.Label(info_left, text=name_text, bg=base_bg, font=("Segoe UI", 12, "bold"), anchor="w").pack(fill="x")
     tk.Label(
         info_left,
         text=period_line,
-        bg="#ffffff",
+        bg=base_bg,
         fg="#333",
         font=("Segoe UI", 10),
         anchor="w",
         justify="left",
-        wraplength=900,
+        wraplength=980,
     ).pack(fill="x", pady=(2, 0))
-
-    legend = ttk.Frame(info_bar)
-    legend.pack(side="right", padx=(12, 0))
-    tk.Label(legend, text=PASS_SYMBOL, fg="#0b6e0b", bg="#ffffff", font=("Segoe UI", 10, "bold")).pack(side="left")
-    tk.Label(legend, text=" Pass   ", fg="#333", bg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
-    tk.Label(legend, text=FAIL_SYMBOL, fg="#b00020", bg="#ffffff", font=("Segoe UI", 10, "bold")).pack(side="left")
-    tk.Label(legend, text=" Fail   ", fg="#333", bg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
-    tk.Label(legend, text=NA_SYMBOL, fg="#666666", bg="#ffffff", font=("Segoe UI", 10, "bold")).pack(side="left")
-    tk.Label(legend, text=" Not checked", fg="#333", bg="#ffffff", font=("Segoe UI", 9)).pack(side="left")
 
     audit_by_pdf = {
         str(a.get("pdf") or ""): a
@@ -253,74 +247,35 @@ def show_reconciliation_popup(
     )
 
     selected_bg = "#cce8ff"
-    base_bg = "#ffffff"
-    header_bg = "#eef2f7"
     row_bg_even = "#ffffff"
     row_bg_odd = "#f7f9fc"
+    scroll_host = tk.Frame(outer, bg=base_bg)
+    scroll_host.pack(fill="both", expand=True, pady=(8, 0))
+    ysb = ttk.Scrollbar(scroll_host, orient="vertical")
+    ysb.pack(side="right", fill="y")
+    canvas = tk.Canvas(scroll_host, highlightthickness=0, background=base_bg)
+    canvas.pack(side="left", fill="both", expand=True)
+    canvas.configure(background=base_bg, yscrollcommand=ysb.set)
+    ysb.configure(command=canvas.yview)
 
-    notebook = ttk.Notebook(outer)
-    notebook.pack(fill="both", expand=True, pady=(8, 0))
+    content = tk.Frame(canvas, bg=base_bg)
+    content_win_id = canvas.create_window((0, 0), window=content, anchor="nw")
 
-    tab_overview = ttk.Frame(notebook)
-    tab_recon = ttk.Frame(notebook)
-    tab_cont = ttk.Frame(notebook)
-    tab_bw = ttk.Frame(notebook)
-    tab_rs = ttk.Frame(notebook)
+    def _update_scrollregion(event=None):
+        try:
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        except Exception:
+            pass
 
-    notebook.add(tab_overview, text="Overview")
-    notebook.add(tab_recon, text="Reconciliation")
-    notebook.add(tab_cont, text="Continuity")
-    notebook.add(tab_bw, text="Balance Walk")
-    notebook.add(tab_rs, text="Row Shape")
+    content.bind("<Configure>", _update_scrollregion)
 
-    def _make_tab_scroll_area(parent, enable_hscroll=False):
-        host = ttk.Frame(parent)
-        host.pack(fill="both", expand=True)
-        ysb = ttk.Scrollbar(host, orient="vertical")
-        ysb.pack(side="right", fill="y")
+    def _sync_width(event=None):
+        try:
+            canvas.itemconfigure(content_win_id, width=canvas.winfo_width())
+        except Exception:
+            pass
 
-        if enable_hscroll:
-            xsb = ttk.Scrollbar(host, orient="horizontal")
-            xsb.pack(side="bottom", fill="x")
-        else:
-            xsb = None
-
-        cnv = tk.Canvas(host, highlightthickness=0, background=base_bg)
-        cnv.pack(side="left", fill="both", expand=True)
-        cnv.configure(yscrollcommand=ysb.set)
-        ysb.configure(command=cnv.yview)
-
-        if xsb is not None:
-            cnv.configure(xscrollcommand=xsb.set)
-            xsb.configure(command=cnv.xview)
-
-        inner = ttk.Frame(cnv)
-        win_id = cnv.create_window((0, 0), window=inner, anchor="nw")
-
-        def _update_scrollregion(event=None):
-            try:
-                cnv.configure(scrollregion=cnv.bbox("all"))
-            except Exception:
-                pass
-
-        inner.bind("<Configure>", _update_scrollregion)
-
-        if not enable_hscroll:
-            def _sync_width(event=None):
-                try:
-                    cnv.itemconfigure(win_id, width=cnv.winfo_width())
-                except Exception:
-                    pass
-
-            cnv.bind("<Configure>", _sync_width)
-
-        return cnv, inner
-
-    canvas_overview, content_overview = _make_tab_scroll_area(tab_overview)
-    canvas_recon, content_recon = _make_tab_scroll_area(tab_recon, enable_hscroll=True)
-    canvas_cont, content_cont = _make_tab_scroll_area(tab_cont)
-    canvas_bw, content_bw = _make_tab_scroll_area(tab_bw)
-    canvas_rs, content_rs = _make_tab_scroll_area(tab_rs)
+    canvas.bind("<Configure>", _sync_width)
 
     def _make_wheel_binder(target_canvas):
         def _canvas_scroll_units(units: int):
@@ -364,17 +319,25 @@ def show_reconciliation_popup(
 
         return _bind
 
-    bind_overview = _make_wheel_binder(canvas_overview)
-    bind_recon = _make_wheel_binder(canvas_recon)
-    bind_cont = _make_wheel_binder(canvas_cont)
-    bind_bw = _make_wheel_binder(canvas_bw)
-    bind_rs = _make_wheel_binder(canvas_rs)
+    bind_overview = _make_wheel_binder(canvas)
+    bind_recon = bind_overview
+    bind_cont = bind_overview
+    bind_bw = bind_overview
+    bind_rs = bind_overview
 
-    bind_overview(canvas_overview)
-    bind_recon(canvas_recon)
-    bind_cont(canvas_cont)
-    bind_bw(canvas_bw)
-    bind_rs(canvas_rs)
+    bind_overview(canvas)
+
+    card_border = "#d0d7de"
+
+    def _make_card(parent, title: str):
+        card = tk.Frame(parent, bg=base_bg, highlightbackground=card_border, highlightthickness=1)
+        card.pack(fill="x", pady=(0, 12))
+        hdr = tk.Frame(card, bg=header_bg)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text=title, bg=header_bg, fg="#111", font=("Segoe UI", 10, "bold"), anchor="w", padx=8, pady=6).pack(fill="x")
+        body = tk.Frame(card, bg=base_bg)
+        body.pack(fill="x", padx=8, pady=8)
+        return body
     win._selected_cell_text = ""
     win._selected_cell_widget = None
     table_data = {}
@@ -532,15 +495,11 @@ def show_reconciliation_popup(
         lbl.bind("<Control-Button-1>", lambda e, w=lbl, t=text: _popup_cell_menu(e, w, t), add="+")
         return lbl
 
-    audit_hdr = tk.Label(content_overview, text="Audit Summary:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
-    audit_hdr.pack(fill="x")
-    bind_overview(audit_hdr)
-    audit_hdr.bind("<Button-1>", lambda e, w=audit_hdr, t="Audit Summary:": _select_cell(w, t), add="+")
-    audit_hdr.bind("<Button-3>", lambda e, w=audit_hdr, t="Audit Summary:": _popup_cell_menu(e, w, t), add="+")
+    audit_body = _make_card(content, "Audit Summary")
 
-    audit_tbl = ttk.Frame(content_overview)
+    audit_tbl = ttk.Frame(audit_body)
     bind_overview(audit_tbl)
-    audit_tbl.pack(fill="x", pady=(4, 14))
+    audit_tbl.pack(fill="x")
 
     headers = ["File", "Reconciliation", "Continuity", "Balance Walk", "Row Shape"]
     table_data["audit"] = {"headers": headers, "rows": []}
@@ -675,15 +634,11 @@ def show_reconciliation_popup(
             data_col_idx=4,
         )
 
-    recon_hdr = tk.Label(content_recon, text="Reconciliation:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
-    recon_hdr.pack(fill="x")
-    bind_recon(recon_hdr)
-    recon_hdr.bind("<Button-1>", lambda e, w=recon_hdr, t="Reconciliation:": _select_cell(w, t), add="+")
-    recon_hdr.bind("<Button-3>", lambda e, w=recon_hdr, t="Reconciliation:": _popup_cell_menu(e, w, t), add="+")
+    recon_body = _make_card(content, "Reconciliation")
 
-    recon_tbl = ttk.Frame(content_recon)
+    recon_tbl = ttk.Frame(recon_body)
     bind_recon(recon_tbl)
-    recon_tbl.pack(fill="x", pady=(4, 14))
+    recon_tbl.pack(fill="x")
 
     recon_headers = [
         "File",
@@ -803,15 +758,11 @@ def show_reconciliation_popup(
                 data_col_idx=c,
             )
 
-    cont_hdr = tk.Label(content_cont, text="Continuity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
-    cont_hdr.pack(fill="x")
-    bind_cont(cont_hdr)
-    cont_hdr.bind("<Button-1>", lambda e, w=cont_hdr, t="Continuity:": _select_cell(w, t), add="+")
-    cont_hdr.bind("<Button-3>", lambda e, w=cont_hdr, t="Continuity:": _popup_cell_menu(e, w, t), add="+")
+    cont_body = _make_card(content, "Continuity")
 
-    cont_tbl = ttk.Frame(content_cont)
+    cont_tbl = ttk.Frame(cont_body)
     bind_cont(cont_tbl)
-    cont_tbl.pack(fill="x", pady=(4, 14))
+    cont_tbl.pack(fill="x")
 
     cont_headers = [
         "File 1",
@@ -894,15 +845,11 @@ def show_reconciliation_popup(
             data_col_idx=6,
         )
 
-    bw_hdr = tk.Label(content_bw, text="Balance Walk:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
-    bw_hdr.pack(fill="x")
-    bind_bw(bw_hdr)
-    bw_hdr.bind("<Button-1>", lambda e, w=bw_hdr, t="Balance Walk:": _select_cell(w, t), add="+")
-    bw_hdr.bind("<Button-3>", lambda e, w=bw_hdr, t="Balance Walk:": _popup_cell_menu(e, w, t), add="+")
+    bw_body = _make_card(content, "Balance Walk")
 
-    bw_tbl = ttk.Frame(content_bw)
+    bw_tbl = ttk.Frame(bw_body)
     bind_bw(bw_tbl)
-    bw_tbl.pack(fill="x", pady=(4, 14))
+    bw_tbl.pack(fill="x")
 
     bw_headers = ["File", "Status", "Summary"]
     table_data["bw"] = {"headers": bw_headers, "rows": []}
@@ -937,15 +884,11 @@ def show_reconciliation_popup(
         _tbl_cell(bw_tbl, bw_status_text, row_idx, 1, fg=bw_status_fg, anchor="w", tbl_id="bw", data_row_idx=data_row_idx, data_col_idx=1)
         _tbl_cell(bw_tbl, bw_summary, row_idx, 2, anchor="w", tbl_id="bw", data_row_idx=data_row_idx, data_col_idx=2)
 
-    rs_hdr = tk.Label(content_rs, text="Row Shape Sanity:", bg=base_bg, font=("Segoe UI", 10, "bold"), anchor="w")
-    rs_hdr.pack(fill="x")
-    bind_rs(rs_hdr)
-    rs_hdr.bind("<Button-1>", lambda e, w=rs_hdr, t="Row Shape Sanity:": _select_cell(w, t), add="+")
-    rs_hdr.bind("<Button-3>", lambda e, w=rs_hdr, t="Row Shape Sanity:": _popup_cell_menu(e, w, t), add="+")
+    rs_body = _make_card(content, "Row Shape Sanity")
 
-    rs_tbl = ttk.Frame(content_rs)
+    rs_tbl = ttk.Frame(rs_body)
     bind_rs(rs_tbl)
-    rs_tbl.pack(fill="x", pady=(4, 14))
+    rs_tbl.pack(fill="x")
 
     rs_headers = ["File", "Status", "Summary"]
     table_data["rs"] = {"headers": rs_headers, "rows": []}
