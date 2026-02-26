@@ -2196,29 +2196,51 @@ class App(TkinterDnD.Tk):
             self.set_status("ZIP temp folder fallback: using system temp.")
             return self._zip_temp_base_dir
 
+    def _try_remove_dir_tree(self, path: str) -> None:
+        if not path:
+            return
+        if not os.path.exists(path):
+            return
+
+        try:
+            shutil.rmtree(path)
+            return
+        except Exception:
+            pass
+
+        try:
+            os.rmdir(path)
+            return
+        except Exception:
+            pass
+
+        try:
+            shutil.rmtree(path, ignore_errors=True)
+        except Exception:
+            pass
+
     def _cleanup_removed_zip_files(self, removed_paths: list[str]) -> None:
+        candidate_dirs = set()
         for path in (removed_paths or []):
             temp_dir = self._zip_extracted_file_to_dir.pop(path, "")
-            if not temp_dir:
-                continue
+            if temp_dir:
+                candidate_dirs.add(temp_dir)
             try:
                 if os.path.exists(path):
                     os.remove(path)
             except Exception:
                 pass
 
-            if temp_dir and temp_dir not in self._zip_extracted_file_to_dir.values():
-                try:
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                except Exception:
-                    pass
+        for temp_dir in candidate_dirs:
+            if temp_dir not in self._zip_extracted_file_to_dir.values():
+                self._try_remove_dir_tree(temp_dir)
+
+        if not self._zip_extracted_file_to_dir:
+            self._cleanup_all_zip_temp()
 
     def _cleanup_all_zip_temp(self) -> None:
         if self._zip_temp_base_dir:
-            try:
-                shutil.rmtree(self._zip_temp_base_dir, ignore_errors=True)
-            except Exception:
-                pass
+            self._try_remove_dir_tree(self._zip_temp_base_dir)
         self._zip_extracted_file_to_dir.clear()
         self._zip_temp_base_dir = ""
 
