@@ -1031,6 +1031,7 @@ class App(TkinterDnD.Tk):
 
         self.selected_files: list[str] = []
         self.bank_var = tk.StringVar(value="Select bank...")
+        self._bank_set_by_autodetect = False
         self.output_folder_var = tk.StringVar(value=DEFAULT_OUTPUT_FOLDER)
         self.status_var = tk.StringVar(value="Ready.")
         self.auto_detect_var = tk.BooleanVar(value=True)
@@ -1049,15 +1050,25 @@ class App(TkinterDnD.Tk):
         bank_row = ttk.Frame(root)
         bank_row.pack(fill="x")
 
+        bank_options = list(BANK_OPTIONS)
+        if "Select bank..." in bank_options:
+            bank_options = ["Select bank..."] + sorted(
+                [opt for opt in bank_options if opt != "Select bank..."],
+                key=str.lower,
+            )
+        else:
+            bank_options = sorted(bank_options, key=str.lower)
+
         ttk.Label(bank_row, text="Bank:").pack(side="left")
         self.bank_combo = ttk.Combobox(
             bank_row,
             textvariable=self.bank_var,
-            values=BANK_OPTIONS,
+            values=bank_options,
             state="readonly",
             width=20,
         )
         self.bank_combo.pack(side="left", padx=(8, 16))
+        self.bank_combo.bind("<<ComboboxSelected>>", self._on_bank_selected, add="+")
 
         ttk.Checkbutton(
             bank_row,
@@ -2032,6 +2043,7 @@ class App(TkinterDnD.Tk):
         self.selected_files = []
         self.drop_box.delete(0, "end")
         self.drop_box.insert(0, "Drop PDFs here, or click 'Browse PDFs'.")
+        self._reset_bank_if_autodetected()
         self.set_status("Cleared file list.")
 
     def remove_selected(self):
@@ -2051,6 +2063,7 @@ class App(TkinterDnD.Tk):
         self.drop_box.delete(0, "end")
         if not self.selected_files:
             self.drop_box.insert("end", "Drop PDFs here, or click 'Browse PDFs'.")
+            self._reset_bank_if_autodetected()
         else:
             for p in self.selected_files:
                 self.drop_box.insert("end", os.path.basename(p))
@@ -2105,6 +2118,14 @@ class App(TkinterDnD.Tk):
         files = parse_dnd_event_files(event.data)
         self.add_files(files)
 
+    def _on_bank_selected(self, _event=None):
+        self._bank_set_by_autodetect = False
+
+    def _reset_bank_if_autodetected(self):
+        if not self.selected_files and self._bank_set_by_autodetect:
+            self.bank_var.set("Select bank...")
+            self._bank_set_by_autodetect = False
+
     def add_files(self, files: list[str]):
         pdfs = []
         for f in files:
@@ -2124,7 +2145,9 @@ class App(TkinterDnD.Tk):
         if self.auto_detect_var.get():
             detected = auto_detect_bank_from_pdf(pdfs[0])
             if detected and detected in BANK_OPTIONS:
-                self.bank_var.set(detected)
+                if detected != self.bank_var.get():
+                    self.bank_var.set(detected)
+                    self._bank_set_by_autodetect = True
 
         for p in pdfs:
             if p not in self.selected_files:
