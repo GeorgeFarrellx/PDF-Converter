@@ -1,8 +1,10 @@
 # Version: 2.18
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import traceback
 import zipfile
 from datetime import datetime, timedelta, date
@@ -1039,9 +1041,12 @@ class App(TkinterDnD.Tk):
         self.last_report_data = None
         self.last_excel_data = None
         self.last_saved_output_path = None
+        self._zip_temp_base_dir = ""
+        self._zip_extracted_file_to_dir: dict[str, str] = {}
 
         self._build_ui()
         self._wire_dnd()
+        self.protocol("WM_DELETE_WINDOW", self._on_app_close)
 
     def _build_ui(self):
         root = ttk.Frame(self, padding=12)
@@ -2070,7 +2075,10 @@ class App(TkinterDnD.Tk):
         return report_path, report_text, None
 
     def clear_list(self):
+        removed_paths = list(self.selected_files or [])
         self.selected_files = []
+        self._cleanup_removed_zip_files(removed_paths)
+        self._cleanup_all_zip_temp()
         self.drop_box.delete(0, "end")
         self.drop_box.insert(0, "Drop PDFs here, or click 'Browse'.")
         self._reset_bank_if_autodetected()
@@ -2086,9 +2094,15 @@ class App(TkinterDnD.Tk):
         if len(displayed) == 1 and displayed[0].startswith("Drop PDFs here"):
             return
 
+        removed_paths = []
         for idx in sorted(selected, reverse=True):
             if 0 <= idx < len(self.selected_files):
+                removed_paths.append(self.selected_files[idx])
                 self.selected_files.pop(idx)
+
+        self._cleanup_removed_zip_files(removed_paths)
+        if not self.selected_files:
+            self._cleanup_all_zip_temp()
 
         self.drop_box.delete(0, "end")
         if not self.selected_files:
@@ -2161,12 +2175,60 @@ class App(TkinterDnD.Tk):
             self.bank_var.set("Select bank...")
             self._bank_set_by_autodetect = False
 
+    def _on_app_close(self):
+        self._cleanup_all_zip_temp()
+        self.destroy()
+
+    def _get_zip_temp_base_dir(self) -> str:
+        if self._zip_temp_base_dir:
+            return self._zip_temp_base_dir
+
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        preferred_base = os.path.join(app_dir, "_ZIP_TEMP")
+        try:
+            ensure_folder(preferred_base)
+            self._zip_temp_base_dir = preferred_base
+            return self._zip_temp_base_dir
+        except Exception:
+            fallback_base = os.path.join(tempfile.gettempdir(), "PDF_Converter_ZIP_TEMP")
+            ensure_folder(fallback_base)
+            self._zip_temp_base_dir = fallback_base
+            self.set_status("ZIP temp folder fallback: using system temp.")
+            return self._zip_temp_base_dir
+
+    def _cleanup_removed_zip_files(self, removed_paths: list[str]) -> None:
+        for path in (removed_paths or []):
+            temp_dir = self._zip_extracted_file_to_dir.pop(path, "")
+            if not temp_dir:
+                continue
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                pass
+
+            if temp_dir and temp_dir not in self._zip_extracted_file_to_dir.values():
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except Exception:
+                    pass
+
+    def _cleanup_all_zip_temp(self) -> None:
+        if self._zip_temp_base_dir:
+            try:
+                shutil.rmtree(self._zip_temp_base_dir, ignore_errors=True)
+            except Exception:
+                pass
+        self._zip_extracted_file_to_dir.clear()
+        self._zip_temp_base_dir = ""
+
     def _extract_pdfs_from_zip(self, zip_path: str) -> list[str]:
         extracted_paths: list[str] = []
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         zip_base = os.path.splitext(os.path.basename(zip_path))[0] or "zip_import"
-        target_dir = os.path.join(LOGS_DIR, "ZIP_IMPORTS", f"{sanitize_filename(zip_base) or 'zip_import'}_{ts}")
+        base = self._get_zip_temp_base_dir()
+        target_dir = os.path.join(base, f"{sanitize_filename(zip_base) or 'zip_import'}_{ts}")
         ensure_folder(target_dir)
 
         with zipfile.ZipFile(zip_path) as zf:
@@ -2192,6 +2254,7 @@ class App(TkinterDnD.Tk):
                 with zf.open(info, "r") as src, open(out_path, "wb") as dst:
                     dst.write(src.read())
                 extracted_paths.append(out_path)
+                self._zip_extracted_file_to_dir[out_path] = target_dir
 
         if not extracted_paths:
             messagebox.showwarning("ZIP Import", "No PDF files were found in the selected ZIP.")
@@ -2789,6 +2852,7 @@ class App(TkinterDnD.Tk):
                 removed_pdf_paths = removed_pdf_paths - kept_pdf_paths
 
                 self.selected_files = [p for p in self.selected_files if p not in removed_pdf_paths]
+                self._cleanup_removed_zip_files(list(removed_pdf_paths))
 
                 for removed_path in removed_pdf_paths:
                     per_pdf_txns.pop(removed_path, None)
