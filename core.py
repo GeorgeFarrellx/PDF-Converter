@@ -1229,11 +1229,45 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             )
             rules_table.totalsRowShown = False
             rules_table.tableStyleInfo = rules_style
+            if not rules_sheet_created:
+                end_row = rules_table.ref.split(":")[1]
+                end_row = int("".join(ch for ch in end_row if ch.isdigit()))
+                rules_table.ref = f"A1:H{end_row}"
+                rules_table.tableColumns = [
+                    TableColumn(id=idx, name=header)
+                    for idx, header in enumerate(
+                        [
+                            "Priority",
+                            "Category",
+                            "Match Type",
+                            "Pattern",
+                            "Direction",
+                            "Txn Type Contains",
+                            "Active",
+                            "Notes",
+                        ],
+                        start=1,
+                    )
+                ]
+                for col_idx, header in enumerate(
+                    [
+                        "Priority",
+                        "Category",
+                        "Match Type",
+                        "Pattern",
+                        "Direction",
+                        "Txn Type Contains",
+                        "Active",
+                        "Notes",
+                    ],
+                    start=1,
+                ):
+                    ws_rules.cell(row=1, column=col_idx).value = header
         if rules_sheet_created:
-            ws_rules.append(["Priority", "Category", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
+            ws_rules.append(["Priority", "Category", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
             for _ in range(10):
-                ws_rules.append(["", "", "", "ANY", "", True, ""])
-            rules_table = Table(displayName="ClientRules", ref="A1:G11")
+                ws_rules.append(["", "", "", "", "ANY", "", True, ""])
+            rules_table = Table(displayName="ClientRules", ref="A1:H11")
             rules_style = TableStyleInfo(
                 name="None",
                 showFirstColumn=False,
@@ -1252,32 +1286,51 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws_rules["I3"] = "CREDIT"
             ws_rules["J1"] = True
             ws_rules["J2"] = False
+            ws_rules["K1"] = "CONTAINS"
+            ws_rules["K2"] = "STARTSWITH"
+            ws_rules["K3"] = "EXACT"
+            ws_rules["K4"] = "REGEX"
             ws_rules.column_dimensions["I"].hidden = True
             ws_rules.column_dimensions["J"].hidden = True
+            ws_rules.column_dimensions["K"].hidden = True
 
-            priority_validation = DataValidation(type="whole", allow_blank=True)
-            priority_validation.promptTitle = "Priority"
-            priority_validation.prompt = "Enter a whole number."
-            priority_validation.errorTitle = "Invalid Priority"
-            priority_validation.error = "Priority must be a whole number."
-            ws_rules.add_data_validation(priority_validation)
-            priority_validation.add("A2:A5000")
+        ws_rules["K1"] = "CONTAINS"
+        ws_rules["K2"] = "STARTSWITH"
+        ws_rules["K3"] = "EXACT"
+        ws_rules["K4"] = "REGEX"
+        ws_rules.column_dimensions["K"].hidden = True
 
-            direction_validation = DataValidation(type="list", formula1="=$I$1:$I$3", allow_blank=True)
-            direction_validation.promptTitle = "Direction"
-            direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
-            direction_validation.errorTitle = "Invalid Direction"
-            direction_validation.error = "Select a value from the Direction dropdown."
-            ws_rules.add_data_validation(direction_validation)
-            direction_validation.add("D2:D5000")
+        priority_validation = DataValidation(type="whole", allow_blank=True)
+        priority_validation.promptTitle = "Priority"
+        priority_validation.prompt = "Enter a whole number."
+        priority_validation.errorTitle = "Invalid Priority"
+        priority_validation.error = "Priority must be a whole number."
+        ws_rules.add_data_validation(priority_validation)
+        priority_validation.add("A2:A5000")
 
-            active_validation = DataValidation(type="list", formula1="=$J$1:$J$2", allow_blank=True)
-            active_validation.promptTitle = "Active"
-            active_validation.prompt = "Choose TRUE or FALSE."
-            active_validation.errorTitle = "Invalid Active Value"
-            active_validation.error = "Select TRUE or FALSE from the Active dropdown."
-            ws_rules.add_data_validation(active_validation)
-            active_validation.add("F2:F5000")
+        direction_validation = DataValidation(type="list", formula1="=$I$1:$I$3", allow_blank=True)
+        direction_validation.promptTitle = "Direction"
+        direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
+        direction_validation.errorTitle = "Invalid Direction"
+        direction_validation.error = "Select a value from the Direction dropdown."
+        ws_rules.add_data_validation(direction_validation)
+        direction_validation.add("E2:E5000")
+
+        active_validation = DataValidation(type="list", formula1="=$J$1:$J$2", allow_blank=True)
+        active_validation.promptTitle = "Active"
+        active_validation.prompt = "Choose TRUE or FALSE."
+        active_validation.errorTitle = "Invalid Active Value"
+        active_validation.error = "Select TRUE or FALSE from the Active dropdown."
+        ws_rules.add_data_validation(active_validation)
+        active_validation.add("G2:G5000")
+
+        match_type_validation = DataValidation(type="list", formula1="=$K$1:$K$4", allow_blank=True)
+        match_type_validation.promptTitle = "Match Type"
+        match_type_validation.prompt = "Choose CONTAINS, STARTSWITH, EXACT, or REGEX."
+        match_type_validation.errorTitle = "Invalid Match Type"
+        match_type_validation.error = "Select a value from the Match Type dropdown."
+        ws_rules.add_data_validation(match_type_validation)
+        match_type_validation.add("C2:C5000")
 
         for hdr in (ws_rules.oddHeader, ws_rules.evenHeader, ws_rules.firstHeader):
             hdr.left.text = left_text
@@ -1335,14 +1388,21 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             desc_letter = get_column_letter(desc_col)
             priority_rng = "'Custom Rules'!$A$2:$A$5000"
             category_rng = "'Custom Rules'!$B$2:$B$5000"
-            pattern_rng = "'Custom Rules'!$C$2:$C$5000"
-            active_rng = "'Custom Rules'!$F$2:$F$5000"
+            matchtype_rng = "'Custom Rules'!$C$2:$C$5000"
+            pattern_rng = "'Custom Rules'!$D$2:$D$5000"
+            active_rng = "'Custom Rules'!$G$2:$G$5000"
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
+                match_expr = (
+                    f"(({matchtype_rng}=\"REGEX\")*IFERROR(REGEXTEST({desc_ref},{pattern_rng}),FALSE))"
+                    f"+(({matchtype_rng}=\"STARTSWITH\")*(LEFT(LOWER({desc_ref}),LEN(LOWER({pattern_rng})))=LOWER({pattern_rng})))"
+                    f"+(({matchtype_rng}=\"EXACT\")*(LOWER({desc_ref})=LOWER({pattern_rng})))"
+                    f"+((({matchtype_rng}=\"CONTAINS\")+({matchtype_rng}=\"\"))*ISNUMBER(SEARCH({pattern_rng},{desc_ref})))"
+                )
                 cond_expr = (
                     f"(({active_rng}=TRUE)+({active_rng}=\"\"))"
                     f"*({pattern_rng}<>\"\")"
-                    f"*ISNUMBER(SEARCH({pattern_rng},{desc_ref}))"
+                    f"*(({match_expr})>0)"
                 )
                 custom_formula = (
                     f"=IFERROR(INDEX({category_rng},"
