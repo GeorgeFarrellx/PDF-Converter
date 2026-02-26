@@ -1086,6 +1086,7 @@ class App(TkinterDnD.Tk):
         btn_row.pack(fill="x", pady=(10, 0))
 
         ttk.Button(btn_row, text="Browse PDFs", command=self.browse_pdfs).pack(side="left")
+        ttk.Button(btn_row, text="Browse ZIP", command=self.browse_zip).pack(side="left", padx=8)
         ttk.Button(btn_row, text="Remove Selected", command=self.remove_selected).pack(side="left", padx=8)
         ttk.Button(btn_row, text="Clear List", command=self.clear_list).pack(side="left", padx=8)
 
@@ -1161,6 +1162,15 @@ class App(TkinterDnD.Tk):
         if not filepaths:
             return
         self.add_files(list(filepaths))
+
+    def browse_zip(self):
+        zip_path = filedialog.askopenfilename(
+            title="Select ZIP file",
+            filetypes=[("ZIP files", "*.zip")],
+        )
+        if not zip_path:
+            return
+        self.add_zip(zip_path)
 
     def browse_output_folder(self):
         folder = filedialog.askdirectory(title="Select output folder")
@@ -2116,7 +2126,12 @@ class App(TkinterDnD.Tk):
 
     def on_drop(self, event):
         files = parse_dnd_event_files(event.data)
-        self.add_files(files)
+        zip_paths = [p for p in files if p.lower().endswith(".zip")]
+        other_paths = [p for p in files if p not in zip_paths]
+
+        for zip_path in zip_paths:
+            self.add_zip(zip_path)
+        self.add_files(other_paths)
 
     def _on_bank_selected(self, _event=None):
         self._bank_set_by_autodetect = False
@@ -2125,6 +2140,60 @@ class App(TkinterDnD.Tk):
         if not self.selected_files and self._bank_set_by_autodetect:
             self.bank_var.set("Select bank...")
             self._bank_set_by_autodetect = False
+
+    def _extract_pdfs_from_zip(self, zip_path: str) -> list[str]:
+        extracted_paths: list[str] = []
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_base = os.path.splitext(os.path.basename(zip_path))[0] or "zip_import"
+        target_dir = os.path.join(LOGS_DIR, "ZIP_IMPORTS", f"{sanitize_filename(zip_base) or 'zip_import'}_{ts}")
+        ensure_folder(target_dir)
+
+        with zipfile.ZipFile(zip_path) as zf:
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+
+                member_name = str(info.filename or "")
+                lower_name = member_name.lower()
+                if not lower_name.endswith(".pdf"):
+                    continue
+                if ".." in member_name.replace("\\", "/").split("/"):
+                    continue
+                if os.path.isabs(member_name) or member_name.startswith("/") or member_name.startswith("\\"):
+                    continue
+
+                base_name = os.path.basename(member_name)
+                safe_name = sanitize_filename(base_name) or "statement.pdf"
+                if not safe_name.lower().endswith(".pdf"):
+                    safe_name = f"{safe_name}.pdf"
+
+                out_path = make_unique_path(os.path.join(target_dir, safe_name))
+                with zf.open(info, "r") as src, open(out_path, "wb") as dst:
+                    dst.write(src.read())
+                extracted_paths.append(out_path)
+
+        if not extracted_paths:
+            messagebox.showwarning("ZIP Import", "No PDF files were found in the selected ZIP.")
+
+        return extracted_paths
+
+    def add_zip(self, zip_path: str) -> None:
+        zip_path = (zip_path or "").strip()
+        if not zip_path:
+            return
+        if not os.path.exists(zip_path):
+            self.set_status("ZIP file not found.")
+            return
+
+        try:
+            extracted_paths = self._extract_pdfs_from_zip(zip_path)
+        except Exception as e:
+            messagebox.showerror("ZIP Import", f"Failed to import ZIP: {e}")
+            return
+
+        if extracted_paths:
+            self.add_files(extracted_paths)
 
     def add_files(self, files: list[str]):
         pdfs = []
