@@ -1121,6 +1121,9 @@ class App(TkinterDnD.Tk):
         self.save_again_btn = ttk.Button(post_row, text="Save Output", command=self.save_last_output)
         self.save_again_btn.pack(side="left", padx=10)
 
+        self.clear_logs_btn = ttk.Button(post_row, text="Clear Logs", command=self.clear_logs_folder)
+        self.clear_logs_btn.pack(side="left", padx=10)
+
     def _wire_dnd(self):
         self.drop_box.drop_target_register(DND_FILES)
         self.drop_box.dnd_bind("<<Drop>>", self.on_drop)
@@ -1336,6 +1339,51 @@ class App(TkinterDnD.Tk):
                 subprocess.run(["xdg-open", log_path], check=False)
         except Exception as e:
             messagebox.showerror("Open log folder", f"Could not open log folder:\n{e}")
+
+    def clear_logs_folder(self):
+        confirmed = messagebox.askyesno(
+            "Clear Logs",
+            "This will permanently delete all files in the Logs folder, including support bundle ZIPs, crash logs, and recon logs. Continue?",
+        )
+        if not confirmed:
+            return
+
+        try:
+            ensure_folder(LOGS_DIR)
+        except Exception as e:
+            messagebox.showerror("Clear Logs", f"Cannot access Logs folder:\n{e}")
+            return
+
+        deleted_files = 0
+        deleted_dirs = 0
+        failed_items = []
+
+        for name in os.listdir(LOGS_DIR):
+            if name == ".gitkeep":
+                continue
+            path = os.path.join(LOGS_DIR, name)
+            try:
+                if os.path.isdir(path):
+                    shutil.rmtree(path, ignore_errors=False)
+                    deleted_dirs += 1
+                else:
+                    os.remove(path)
+                    deleted_files += 1
+            except Exception:
+                failed_items.append(name)
+
+        summary = f"Deleted {deleted_files} file(s) and {deleted_dirs} folder(s)."
+        if failed_items:
+            preview = "\n".join(failed_items[:10])
+            remaining = len(failed_items) - min(10, len(failed_items))
+            if remaining > 0:
+                preview += f"\n...and {remaining} more"
+            summary += f"\n\nFailed to delete {len(failed_items)} item(s):\n{preview}"
+            self.set_status("Logs cleared with some failures.")
+        else:
+            self.set_status("Logs cleared.")
+
+        messagebox.showinfo("Clear Logs", summary)
 
     def create_support_bundle_zip(self):
         if not self.last_report_data:
