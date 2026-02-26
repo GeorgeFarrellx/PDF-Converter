@@ -1080,13 +1080,12 @@ class App(TkinterDnD.Tk):
 
         self.drop_box = tk.Listbox(root, height=10)
         self.drop_box.pack(fill="both", expand=False)
-        self.drop_box.insert("end", "Drop PDFs here, or click 'Browse PDFs'.")
+        self.drop_box.insert("end", "Drop PDFs here, or click 'Browse'.")
 
         btn_row = ttk.Frame(root)
         btn_row.pack(fill="x", pady=(10, 0))
 
-        ttk.Button(btn_row, text="Browse PDFs", command=self.browse_pdfs).pack(side="left")
-        ttk.Button(btn_row, text="Browse ZIP", command=self.browse_zip).pack(side="left", padx=8)
+        ttk.Button(btn_row, text="Browse", command=self.browse_pdfs).pack(side="left")
         ttk.Button(btn_row, text="Remove Selected", command=self.remove_selected).pack(side="left", padx=8)
         ttk.Button(btn_row, text="Clear List", command=self.clear_list).pack(side="left", padx=8)
 
@@ -1156,12 +1155,33 @@ class App(TkinterDnD.Tk):
 
     def browse_pdfs(self):
         filepaths = filedialog.askopenfilenames(
-            title="Select PDF bank statements",
-            filetypes=[("PDF files", "*.pdf")],
+            title="Select PDF statements or a ZIP",
+            filetypes=[
+                ("PDF and ZIP files", "*.pdf *.zip"),
+                ("PDF files", "*.pdf"),
+                ("ZIP files", "*.zip"),
+            ],
         )
         if not filepaths:
             return
-        self.add_files(list(filepaths))
+
+        selected_paths = list(filepaths)
+        zip_paths = [p for p in selected_paths if p.lower().endswith(".zip")]
+        pdf_paths = [p for p in selected_paths if p.lower().endswith(".pdf")]
+
+        extracted_pdfs: list[str] = []
+        for zip_path in zip_paths:
+            try:
+                extracted_pdfs.extend(self._extract_pdfs_from_zip(zip_path))
+            except Exception as e:
+                messagebox.showerror("ZIP Import", f"Failed to import ZIP: {e}")
+
+        all_pdfs = pdf_paths + extracted_pdfs
+        if not all_pdfs:
+            messagebox.showwarning("No files", "No PDF files were selected or found in ZIP file(s).")
+            return
+
+        self.add_files(all_pdfs)
 
     def browse_zip(self):
         zip_path = filedialog.askopenfilename(
@@ -2052,7 +2072,7 @@ class App(TkinterDnD.Tk):
     def clear_list(self):
         self.selected_files = []
         self.drop_box.delete(0, "end")
-        self.drop_box.insert(0, "Drop PDFs here, or click 'Browse PDFs'.")
+        self.drop_box.insert(0, "Drop PDFs here, or click 'Browse'.")
         self._reset_bank_if_autodetected()
         self.set_status("Cleared file list.")
 
@@ -2072,7 +2092,7 @@ class App(TkinterDnD.Tk):
 
         self.drop_box.delete(0, "end")
         if not self.selected_files:
-            self.drop_box.insert("end", "Drop PDFs here, or click 'Browse PDFs'.")
+            self.drop_box.insert("end", "Drop PDFs here, or click 'Browse'.")
             self._reset_bank_if_autodetected()
         else:
             for p in self.selected_files:
@@ -2788,7 +2808,7 @@ class App(TkinterDnD.Tk):
 
                 self.drop_box.delete(0, "end")
                 if not self.selected_files:
-                    self.drop_box.insert("end", "Drop PDFs here, or click 'Browse PDFs'.")
+                    self.drop_box.insert("end", "Drop PDFs here, or click 'Browse'.")
                 else:
                     for p in self.selected_files:
                         self.drop_box.insert("end", os.path.basename(p))
