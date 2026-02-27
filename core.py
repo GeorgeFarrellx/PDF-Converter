@@ -1508,9 +1508,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 vat_custom_ref = f"{vat_custom_letter}{r}"
                 vat_global_ref = f"{vat_global_letter}{r}"
                 vat_final_formula = (
-                    f'=IF({manual_ref}<>"",IF({vat_manual_ref}<>"",{vat_manual_ref},0),'
+                    f'=IF({vat_manual_ref}<>"",{vat_manual_ref},'
+                    f'IF({manual_ref}<>"",0,'
                     f'IF({custom_ref}<>"",IF({vat_custom_ref}<>"",{vat_custom_ref},0),'
-                    f'IF({global_ref}<>"",IF({vat_global_ref}<>"",{vat_global_ref},0),0)))'
+                    f'IF({global_ref}<>"",IF({vat_global_ref}<>"",{vat_global_ref},0),0))))'
                 )
                 if sep != ",":
                     vat_final_formula = vat_final_formula.replace(",", sep)
