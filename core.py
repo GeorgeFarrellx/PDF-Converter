@@ -1394,7 +1394,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
                 match_expr = (
-                    f"(({matchtype_rng}=\"REGEX\")*IFERROR(MAP({pattern_rng},LAMBDA(p,IFERROR(REGEXTEST({desc_ref},p),FALSE))),FALSE))"
+                    f"(({matchtype_rng}=\"REGEX\")*IFERROR(_xlfn.MAP({pattern_rng},_xlfn.LAMBDA(p,IFERROR(_xlfn.REGEXTEST({desc_ref},p),FALSE))),FALSE))"
                     f"+(({matchtype_rng}=\"STARTSWITH\")*(LEFT(LOWER({desc_ref}),LEN(LOWER({pattern_rng})))=LOWER({pattern_rng})))"
                     f"+(({matchtype_rng}=\"EXACT\")*(LOWER({desc_ref})=LOWER({pattern_rng})))"
                     f"+((({matchtype_rng}=\"CONTAINS\")+({matchtype_rng}=\"\"))*ISNUMBER(SEARCH({pattern_rng},{desc_ref})))"
