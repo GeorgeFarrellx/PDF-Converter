@@ -1289,7 +1289,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws_rules["K1"] = "CONTAINS"
             ws_rules["K2"] = "STARTSWITH"
             ws_rules["K3"] = "EXACT"
-            ws_rules["K4"] = "REGEX"
             ws_rules.column_dimensions["I"].hidden = True
             ws_rules.column_dimensions["J"].hidden = True
             ws_rules.column_dimensions["K"].hidden = True
@@ -1297,7 +1296,6 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules["K1"] = "CONTAINS"
         ws_rules["K2"] = "STARTSWITH"
         ws_rules["K3"] = "EXACT"
-        ws_rules["K4"] = "REGEX"
         ws_rules.column_dimensions["K"].hidden = True
 
         priority_validation = DataValidation(type="whole", allow_blank=True)
@@ -1324,9 +1322,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(active_validation)
         active_validation.add("G2:G5000")
 
-        match_type_validation = DataValidation(type="list", formula1="=$K$1:$K$4", allow_blank=True)
+        match_type_validation = DataValidation(type="list", formula1="=$K$1:$K$3", allow_blank=True)
         match_type_validation.promptTitle = "Match Type"
-        match_type_validation.prompt = "Choose CONTAINS, STARTSWITH, EXACT, or REGEX."
+        match_type_validation.prompt = "Choose CONTAINS, STARTSWITH, or EXACT."
         match_type_validation.errorTitle = "Invalid Match Type"
         match_type_validation.error = "Select a value from the Match Type dropdown."
         ws_rules.add_data_validation(match_type_validation)
@@ -1394,8 +1392,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
                 match_expr = (
-                    f"(({matchtype_rng}=\"REGEX\")*IFERROR(_xlfn.MAP({pattern_rng},_xlfn.LAMBDA(p,IFERROR(_xlfn.REGEXTEST({desc_ref},p),FALSE))),FALSE))"
-                    f"+(({matchtype_rng}=\"STARTSWITH\")*(LEFT(LOWER({desc_ref}),LEN(LOWER({pattern_rng})))=LOWER({pattern_rng})))"
+                    f"(({matchtype_rng}=\"STARTSWITH\")*(LEFT(LOWER({desc_ref}),LEN(LOWER({pattern_rng})))=LOWER({pattern_rng})))"
                     f"+(({matchtype_rng}=\"EXACT\")*(LOWER({desc_ref})=LOWER({pattern_rng})))"
                     f"+((({matchtype_rng}=\"CONTAINS\")+({matchtype_rng}=\"\"))*ISNUMBER(SEARCH({pattern_rng},{desc_ref})))"
                 )
