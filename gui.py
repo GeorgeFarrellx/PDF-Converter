@@ -1037,6 +1037,7 @@ class App(TkinterDnD.Tk):
         self.output_folder_var = tk.StringVar(value=DEFAULT_OUTPUT_FOLDER)
         self.status_var = tk.StringVar(value="Ready.")
         self.auto_detect_var = tk.BooleanVar(value=True)
+        self.vat_breakdown_var = tk.BooleanVar(value=False)
 
         self.last_report_data = None
         self.last_excel_data = None
@@ -1080,6 +1081,12 @@ class App(TkinterDnD.Tk):
             text="Auto-Detect Bank",
             variable=self.auto_detect_var,
         ).pack(side="left")
+
+        ttk.Checkbutton(
+            bank_row,
+            text="VAT Breakdown",
+            variable=self.vat_breakdown_var,
+        ).pack(side="left", padx=(10, 0))
 
         ttk.Label(root, text="Drag & drop PDF statements here:").pack(anchor="w", pady=(14, 6))
 
@@ -1305,6 +1312,7 @@ class App(TkinterDnD.Tk):
             client_name=client_name,
             header_period_start=hp_start,
             header_period_end=hp_end,
+            enable_vat_breakdown=bool((self.last_excel_data or {}).get("enable_vat_breakdown", self.vat_breakdown_var.get())),
         )
 
         self.last_saved_output_path = output_path
@@ -1600,6 +1608,7 @@ class App(TkinterDnD.Tk):
                             client_name=client_name,
                             header_period_start=hp_start,
                             header_period_end=hp_end,
+                            enable_vat_breakdown=bool((self.last_excel_data or {}).get("enable_vat_breakdown", self.vat_breakdown_var.get())),
                         )
                     else:
                         _create_empty_support_excel(temp_excel_path, client_name_for_header=client_name)
@@ -3003,6 +3012,7 @@ class App(TkinterDnD.Tk):
                     "client_name": client_name,
                     "filename": "No Transactions Found.xlsx",
                     "initial_dir": initial_dir,
+                    "enable_vat_breakdown": bool(self.vat_breakdown_var.get()),
                 }
 
                 try:
@@ -3442,6 +3452,7 @@ class App(TkinterDnD.Tk):
                 "initial_dir": initial_dir,
                 "statement_period_start": statement_period_start,
                 "statement_period_end": statement_period_end,
+                "enable_vat_breakdown": bool(self.vat_breakdown_var.get()),
             }
 
             # Auto-create a support bundle zip whenever reconciliation or continuity has warnings/errors.
@@ -3512,6 +3523,7 @@ class App(TkinterDnD.Tk):
                 client_name=client_name,
                 header_period_start=statement_period_start,
                 header_period_end=statement_period_end,
+                enable_vat_breakdown=bool(self.vat_breakdown_var.get()),
             )
 
             self.last_saved_output_path = output_path
