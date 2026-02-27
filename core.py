@@ -689,6 +689,7 @@ def _load_rules(path: str, pd) -> list[dict]:
                 "Pattern": pattern,
                 "Direction": direction,
                 "Txn Type Contains": txn_type_contains,
+                "VAT Rate": str(row.get("VAT Rate") if "VAT Rate" in row else "").strip(),
             }
         )
 
@@ -739,7 +740,25 @@ def _rule_matches(txn: dict, rule: dict) -> bool:
     return patt_low in desc_low
 
 
-def _apply_global_categorisation(transactions: list[dict], pd) -> None:
+def _parse_vat_rate(v) -> float | None:
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s or s.lower() == "nan":
+        return None
+    try:
+        if s.endswith("%"):
+            x = float(s[:-1].strip()) / 100.0
+        else:
+            x = float(s)
+            if 1 < x <= 100:
+                x = x / 100.0
+        return round(x, 6)
+    except Exception:
+        return None
+
+
+def _apply_global_categorisation(transactions: list[dict], pd, enable_vat_breakdown: bool = False) -> None:
     global_folder = os.path.dirname(os.path.abspath(__file__))
     global_rules_path = _find_rules_file(global_folder, "Global Categorisation Rules")
     if not global_rules_path:
@@ -757,6 +776,9 @@ def _apply_global_categorisation(transactions: list[dict], pd) -> None:
         for rule in rules:
             if _rule_matches(txn, rule):
                 txn["Global"] = rule.get("Category", "")
+                if enable_vat_breakdown:
+                    vat_global = _parse_vat_rate(rule.get("VAT Rate"))
+                    txn["VAT Global"] = 0.0 if vat_global is None else vat_global
                 break
 
 
@@ -1063,7 +1085,7 @@ def _strip_calc_chain_xlsx(xlsx_path: str) -> None:
     os.replace(temp_path, xlsx_path)
 
 
-def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = "", header_period_start=None, header_period_end=None, enable_categorisation: bool = True):
+def save_transactions_to_excel(transactions: list[dict], output_path: str, client_name: str = "", header_period_start=None, header_period_end=None, enable_categorisation: bool = True, enable_vat_breakdown: bool = False):
     if not transactions:
         raise ValueError("No transactions found!")
 
@@ -1085,7 +1107,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
     if enable_categorisation:
         try:
-            _apply_global_categorisation(transactions, pd)
+            _apply_global_categorisation(transactions, pd, enable_vat_breakdown=enable_vat_breakdown)
         except Exception:
             pass
 
@@ -1119,7 +1141,20 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     if "Final" not in df.columns:
         df["Final"] = None
 
-    df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global", "Custom", "Manual", "Final"]]
+    if enable_vat_breakdown:
+        if "VAT Global" not in df.columns:
+            df["VAT Global"] = None
+        if "VAT Custom" not in df.columns:
+            df["VAT Custom"] = None
+        if "VAT Manual" not in df.columns:
+            df["VAT Manual"] = ""
+        if "VAT Final" not in df.columns:
+            df["VAT Final"] = None
+
+    if enable_vat_breakdown:
+        df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global", "Custom", "Manual", "Final", "VAT Global", "VAT Custom", "VAT Manual", "VAT Final"]]
+    else:
+        df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global", "Custom", "Manual", "Final"]]
 
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
@@ -1133,6 +1168,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
 
     df["Custom"] = None
     df["Final"] = None
+    if enable_vat_breakdown:
+        df["VAT Custom"] = None
+        df["VAT Final"] = None
+        if "VAT Manual" not in df.columns:
+            df["VAT Manual"] = ""
 
     def _coerce_header_period_date(v):
         try:
@@ -1232,7 +1272,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             if not rules_sheet_created:
                 end_row = rules_table.ref.split(":")[1]
                 end_row = int("".join(ch for ch in end_row if ch.isdigit()))
-                rules_table.ref = f"A1:H{end_row}"
+                rules_table.ref = f"A1:I{end_row}"
                 rules_table.tableColumns = [
                     TableColumn(id=idx, name=header)
                     for idx, header in enumerate(
@@ -1245,6 +1285,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                             "Txn Type Contains",
                             "Active",
                             "Notes",
+                            "VAT Rate",
                         ],
                         start=1,
                     )
@@ -1259,15 +1300,20 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                         "Txn Type Contains",
                         "Active",
                         "Notes",
+                        "VAT Rate",
                     ],
                     start=1,
                 ):
                     ws_rules.cell(row=1, column=col_idx).value = header
+                if str(ws_rules["I2"].value or "").strip().upper() in {"ANY", "DEBIT", "CREDIT"}:
+                    ws_rules["I2"] = ""
+                if str(ws_rules["I3"].value or "").strip().upper() in {"ANY", "DEBIT", "CREDIT"}:
+                    ws_rules["I3"] = ""
         if rules_sheet_created:
-            ws_rules.append(["Priority", "Category", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes"])
+            ws_rules.append(["Priority", "Category", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes", "VAT Rate"])
             for _ in range(10):
-                ws_rules.append(["", "", "", "", "ANY", "", True, ""])
-            rules_table = Table(displayName="ClientRules", ref="A1:H11")
+                ws_rules.append(["", "", "", "", "ANY", "", True, "", ""])
+            rules_table = Table(displayName="ClientRules", ref="A1:I11")
             rules_style = TableStyleInfo(
                 name="None",
                 showFirstColumn=False,
@@ -1281,22 +1327,29 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws_rules.freeze_panes = "A2"
             ws_rules["A13"] = "Sort the table by Priority (smallest first). First matching rule wins."
 
-            ws_rules["I1"] = "ANY"
-            ws_rules["I2"] = "DEBIT"
-            ws_rules["I3"] = "CREDIT"
-            ws_rules["J1"] = True
-            ws_rules["J2"] = False
-            ws_rules["K1"] = "CONTAINS"
-            ws_rules["K2"] = "STARTSWITH"
-            ws_rules["K3"] = "EXACT"
-            ws_rules.column_dimensions["I"].hidden = True
+            ws_rules["J1"] = "ANY"
+            ws_rules["J2"] = "DEBIT"
+            ws_rules["J3"] = "CREDIT"
+            ws_rules["K1"] = True
+            ws_rules["K2"] = False
+            ws_rules["L1"] = "CONTAINS"
+            ws_rules["L2"] = "STARTSWITH"
+            ws_rules["L3"] = "EXACT"
             ws_rules.column_dimensions["J"].hidden = True
             ws_rules.column_dimensions["K"].hidden = True
+            ws_rules.column_dimensions["L"].hidden = True
 
-        ws_rules["K1"] = "CONTAINS"
-        ws_rules["K2"] = "STARTSWITH"
-        ws_rules["K3"] = "EXACT"
+        ws_rules["J1"] = "ANY"
+        ws_rules["J2"] = "DEBIT"
+        ws_rules["J3"] = "CREDIT"
+        ws_rules["K1"] = True
+        ws_rules["K2"] = False
+        ws_rules["L1"] = "CONTAINS"
+        ws_rules["L2"] = "STARTSWITH"
+        ws_rules["L3"] = "EXACT"
+        ws_rules.column_dimensions["J"].hidden = True
         ws_rules.column_dimensions["K"].hidden = True
+        ws_rules.column_dimensions["L"].hidden = True
 
         priority_validation = DataValidation(type="whole", allow_blank=True)
         priority_validation.promptTitle = "Priority"
@@ -1306,7 +1359,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(priority_validation)
         priority_validation.add("A2:A5000")
 
-        direction_validation = DataValidation(type="list", formula1="=$I$1:$I$3", allow_blank=True)
+        direction_validation = DataValidation(type="list", formula1="=$J$1:$J$3", allow_blank=True)
         direction_validation.promptTitle = "Direction"
         direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
         direction_validation.errorTitle = "Invalid Direction"
@@ -1314,7 +1367,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(direction_validation)
         direction_validation.add("E2:E5000")
 
-        active_validation = DataValidation(type="list", formula1="=$J$1:$J$2", allow_blank=True)
+        active_validation = DataValidation(type="list", formula1="=$K$1:$K$2", allow_blank=True)
         active_validation.promptTitle = "Active"
         active_validation.prompt = "Choose TRUE or FALSE."
         active_validation.errorTitle = "Invalid Active Value"
@@ -1322,7 +1375,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(active_validation)
         active_validation.add("G2:G5000")
 
-        match_type_validation = DataValidation(type="list", formula1="=$K$1:$K$3", allow_blank=True)
+        match_type_validation = DataValidation(type="list", formula1="=$L$1:$L$3", allow_blank=True)
         match_type_validation.promptTitle = "Match Type"
         match_type_validation.prompt = "Choose CONTAINS, STARTSWITH, or EXACT."
         match_type_validation.errorTitle = "Invalid Match Type"
@@ -1366,6 +1419,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         custom_col = header_to_col.get("Custom")
         manual_col = header_to_col.get("Manual")
         final_col = header_to_col.get("Final")
+        vat_global_col = header_to_col.get("VAT Global")
+        vat_custom_col = header_to_col.get("VAT Custom")
+        vat_manual_col = header_to_col.get("VAT Manual")
+        vat_final_col = header_to_col.get("VAT Final")
 
         disable_client_specific_formula_for_diagnostics = False
         max_r = ws.max_row
@@ -1378,6 +1435,11 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if bal_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
+        if enable_vat_breakdown:
+            for vat_col in (vat_global_col, vat_custom_col, vat_manual_col, vat_final_col):
+                if vat_col:
+                    for r in range(2, max_r + 1):
+                        ws.cell(row=r, column=vat_col).number_format = "0%"
         if (
             custom_col
             and desc_col
@@ -1409,6 +1471,16 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 if sep != ",":
                     custom_formula = custom_formula.replace(",", sep)
                 ws.cell(row=r, column=custom_col).value = custom_formula
+                if enable_vat_breakdown and vat_custom_col:
+                    vat_rate_rng = "'Custom Rules'!$I$2:$I$5000"
+                    vat_custom_formula = (
+                        f"=IFERROR(IF(INDEX({vat_rate_rng},"
+                        f"MATCH(1,INDEX({cond_expr},0),0))=\"\",0,"
+                        f"INDEX({vat_rate_rng},MATCH(1,INDEX({cond_expr},0),0))),\"\")"
+                    )
+                    if sep != ",":
+                        vat_custom_formula = vat_custom_formula.replace(",", sep)
+                    ws.cell(row=r, column=vat_custom_col).value = vat_custom_formula
         if final_col and manual_col and custom_col and global_cat_col:
             manual_letter = get_column_letter(manual_col)
             custom_letter = get_column_letter(custom_col)
@@ -1421,6 +1493,28 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 if sep != ",":
                     final_category_formula = final_category_formula.replace(",", sep)
                 ws.cell(row=r, column=final_col).value = final_category_formula
+        if enable_vat_breakdown and vat_final_col and manual_col and custom_col and global_cat_col and vat_manual_col and vat_custom_col and vat_global_col:
+            manual_letter = get_column_letter(manual_col)
+            custom_letter = get_column_letter(custom_col)
+            global_letter = get_column_letter(global_cat_col)
+            vat_manual_letter = get_column_letter(vat_manual_col)
+            vat_custom_letter = get_column_letter(vat_custom_col)
+            vat_global_letter = get_column_letter(vat_global_col)
+            for r in range(2, max_r + 1):
+                manual_ref = f"{manual_letter}{r}"
+                custom_ref = f"{custom_letter}{r}"
+                global_ref = f"{global_letter}{r}"
+                vat_manual_ref = f"{vat_manual_letter}{r}"
+                vat_custom_ref = f"{vat_custom_letter}{r}"
+                vat_global_ref = f"{vat_global_letter}{r}"
+                vat_final_formula = (
+                    f'=IF({manual_ref}<>"",IF({vat_manual_ref}<>"",{vat_manual_ref},0),'
+                    f'IF({custom_ref}<>"",IF({vat_custom_ref}<>"",{vat_custom_ref},0),'
+                    f'IF({global_ref}<>"",IF({vat_global_ref}<>"",{vat_global_ref},0),0)))'
+                )
+                if sep != ",":
+                    vat_final_formula = vat_final_formula.replace(",", sep)
+                ws.cell(row=r, column=vat_final_col).value = vat_final_formula
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
@@ -1430,6 +1524,10 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws.column_dimensions[get_column_letter(global_cat_col)].hidden = True
         if custom_col:
             ws.column_dimensions[get_column_letter(custom_col)].hidden = True
+        if enable_vat_breakdown and vat_global_col:
+            ws.column_dimensions[get_column_letter(vat_global_col)].hidden = True
+        if enable_vat_breakdown and vat_custom_col:
+            ws.column_dimensions[get_column_letter(vat_custom_col)].hidden = True
 
         for col_idx in range(1, ws.max_column + 1):
             col_letter = get_column_letter(col_idx)

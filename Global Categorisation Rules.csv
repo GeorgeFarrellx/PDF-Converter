@@ -1,4 +1,4 @@
-﻿Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes
+﻿Priority,Category,Match Type,Pattern,Direction,Txn Type Contains,Active,Notes,VAT Rate
 1,Personal,contains,LNK,DEBIT,,TRUE,ATM cash withdrawals
 2,Personal,regex,.*,DEBIT,Cash Withdrawal,TRUE,Auto: Transaction Type contains Cash Withdrawal
 3,Fuel,contains,PETROL,DEBIT,,TRUE,Petrol/diesel
