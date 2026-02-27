@@ -1150,9 +1150,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             df["VAT Manual"] = ""
         if "VAT Final" not in df.columns:
             df["VAT Final"] = None
+        if "Gross Amount" not in df.columns:
+            df["Gross Amount"] = None
+        if "VAT Amount" not in df.columns:
+            df["VAT Amount"] = None
+        if "Net Amount" not in df.columns:
+            df["Net Amount"] = None
 
     if enable_vat_breakdown:
-        df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global", "Custom", "Manual", "Final", "VAT Global", "VAT Custom", "VAT Manual", "VAT Final"]]
+        df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global", "Custom", "Manual", "Final", "VAT Global", "VAT Custom", "VAT Manual", "VAT Final", "Gross Amount", "VAT Amount", "Net Amount"]]
     else:
         df = df[["T/N", "Date", "Transaction Type", "Description", "Amount", "Balance", "Global", "Custom", "Manual", "Final"]]
 
@@ -1171,6 +1177,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     if enable_vat_breakdown:
         df["VAT Custom"] = None
         df["VAT Final"] = None
+        df["Gross Amount"] = None
+        df["VAT Amount"] = None
+        df["Net Amount"] = None
         if "VAT Manual" not in df.columns:
             df["VAT Manual"] = ""
 
@@ -1423,6 +1432,9 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         vat_custom_col = header_to_col.get("VAT Custom")
         vat_manual_col = header_to_col.get("VAT Manual")
         vat_final_col = header_to_col.get("VAT Final")
+        gross_amt_col = header_to_col.get("Gross Amount")
+        vat_amt_col = header_to_col.get("VAT Amount")
+        net_amt_col = header_to_col.get("Net Amount")
 
         disable_client_specific_formula_for_diagnostics = False
         max_r = ws.max_row
@@ -1435,6 +1447,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if bal_col:
             for r in range(2, max_r + 1):
                 ws.cell(row=r, column=bal_col).number_format = gbp_accounting
+        if gross_amt_col:
+            for r in range(2, max_r + 1):
+                ws.cell(row=r, column=gross_amt_col).number_format = gbp_accounting
+        if vat_amt_col:
+            for r in range(2, max_r + 1):
+                ws.cell(row=r, column=vat_amt_col).number_format = gbp_accounting
+        if net_amt_col:
+            for r in range(2, max_r + 1):
+                ws.cell(row=r, column=net_amt_col).number_format = gbp_accounting
         if enable_vat_breakdown:
             for vat_col in (vat_global_col, vat_custom_col, vat_manual_col, vat_final_col):
                 if vat_col:
@@ -1516,6 +1537,23 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                 if sep != ",":
                     vat_final_formula = vat_final_formula.replace(",", sep)
                 ws.cell(row=r, column=vat_final_col).value = vat_final_formula
+
+        if enable_vat_breakdown and amt_col and vat_final_col and gross_amt_col and vat_amt_col and net_amt_col:
+            amount_letter = get_column_letter(amt_col)
+            vat_final_letter = get_column_letter(vat_final_col)
+            gross_amt_letter = get_column_letter(gross_amt_col)
+            vat_amt_letter = get_column_letter(vat_amt_col)
+            for r in range(2, max_r + 1):
+                amount_ref = f"{amount_letter}{r}"
+                vat_final_ref = f"{vat_final_letter}{r}"
+                gross_amt_ref = f"{gross_amt_letter}{r}"
+                vat_amt_ref = f"{vat_amt_letter}{r}"
+                ws.cell(row=r, column=gross_amt_col).value = f"={amount_ref}"
+                vat_amt_formula = f"=IF({vat_final_ref}=\"\",0,IF({vat_final_ref}=0,0,{amount_ref}*{vat_final_ref}/(1+{vat_final_ref})))"
+                if sep != ",":
+                    vat_amt_formula = vat_amt_formula.replace(",", sep)
+                ws.cell(row=r, column=vat_amt_col).value = vat_amt_formula
+                ws.cell(row=r, column=net_amt_col).value = f"={gross_amt_ref}-{vat_amt_ref}"
 
         if tn_col:
             ws.column_dimensions[get_column_letter(tn_col)].hidden = True
