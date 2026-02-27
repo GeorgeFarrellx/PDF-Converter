@@ -1281,7 +1281,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             if not rules_sheet_created:
                 end_row = rules_table.ref.split(":")[1]
                 end_row = int("".join(ch for ch in end_row if ch.isdigit()))
-                rules_table.ref = f"A1:I{end_row}"
+                rules_table.ref = f"A1:J{end_row}"
                 rules_table.tableColumns = [
                     TableColumn(id=idx, name=header)
                     for idx, header in enumerate(
@@ -1295,6 +1295,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                             "Active",
                             "Notes",
                             "VAT Rate",
+                            "Global Category",
                         ],
                         start=1,
                     )
@@ -1310,6 +1311,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                         "Active",
                         "Notes",
                         "VAT Rate",
+                        "Global Category",
                     ],
                     start=1,
                 ):
@@ -1318,11 +1320,15 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
                     ws_rules["I2"] = ""
                 if str(ws_rules["I3"].value or "").strip().upper() in {"ANY", "DEBIT", "CREDIT"}:
                     ws_rules["I3"] = ""
+                if str(ws_rules["J2"].value or "").strip().upper() in {"ANY", "DEBIT", "CREDIT"}:
+                    ws_rules["J2"] = ""
+                if str(ws_rules["J3"].value or "").strip().upper() in {"ANY", "DEBIT", "CREDIT"}:
+                    ws_rules["J3"] = ""
         if rules_sheet_created:
-            ws_rules.append(["Priority", "Category", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes", "VAT Rate"])
+            ws_rules.append(["Priority", "Category", "Match Type", "Pattern", "Direction", "Txn Type Contains", "Active", "Notes", "VAT Rate", "Global Category"])
             for _ in range(10):
-                ws_rules.append(["", "", "", "", "ANY", "", True, "", ""])
-            rules_table = Table(displayName="ClientRules", ref="A1:I11")
+                ws_rules.append(["", "", "", "", "ANY", "", True, "", "", ""])
+            rules_table = Table(displayName="ClientRules", ref="A1:J11")
             rules_style = TableStyleInfo(
                 name="None",
                 showFirstColumn=False,
@@ -1336,29 +1342,29 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws_rules.freeze_panes = "A2"
             ws_rules["A13"] = "Sort the table by Priority (smallest first). First matching rule wins."
 
-            ws_rules["J1"] = "ANY"
-            ws_rules["J2"] = "DEBIT"
-            ws_rules["J3"] = "CREDIT"
-            ws_rules["K1"] = True
-            ws_rules["K2"] = False
-            ws_rules["L1"] = "CONTAINS"
-            ws_rules["L2"] = "STARTSWITH"
-            ws_rules["L3"] = "EXACT"
-            ws_rules.column_dimensions["J"].hidden = True
+            ws_rules["K1"] = "ANY"
+            ws_rules["K2"] = "DEBIT"
+            ws_rules["K3"] = "CREDIT"
+            ws_rules["L1"] = True
+            ws_rules["L2"] = False
+            ws_rules["M1"] = "CONTAINS"
+            ws_rules["M2"] = "STARTSWITH"
+            ws_rules["M3"] = "EXACT"
             ws_rules.column_dimensions["K"].hidden = True
             ws_rules.column_dimensions["L"].hidden = True
+            ws_rules.column_dimensions["M"].hidden = True
 
-        ws_rules["J1"] = "ANY"
-        ws_rules["J2"] = "DEBIT"
-        ws_rules["J3"] = "CREDIT"
-        ws_rules["K1"] = True
-        ws_rules["K2"] = False
-        ws_rules["L1"] = "CONTAINS"
-        ws_rules["L2"] = "STARTSWITH"
-        ws_rules["L3"] = "EXACT"
-        ws_rules.column_dimensions["J"].hidden = True
+        ws_rules["K1"] = "ANY"
+        ws_rules["K2"] = "DEBIT"
+        ws_rules["K3"] = "CREDIT"
+        ws_rules["L1"] = True
+        ws_rules["L2"] = False
+        ws_rules["M1"] = "CONTAINS"
+        ws_rules["M2"] = "STARTSWITH"
+        ws_rules["M3"] = "EXACT"
         ws_rules.column_dimensions["K"].hidden = True
         ws_rules.column_dimensions["L"].hidden = True
+        ws_rules.column_dimensions["M"].hidden = True
 
         priority_validation = DataValidation(type="whole", allow_blank=True)
         priority_validation.promptTitle = "Priority"
@@ -1368,7 +1374,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(priority_validation)
         priority_validation.add("A2:A5000")
 
-        direction_validation = DataValidation(type="list", formula1="=$J$1:$J$3", allow_blank=True)
+        direction_validation = DataValidation(type="list", formula1="=$K$1:$K$3", allow_blank=True)
         direction_validation.promptTitle = "Direction"
         direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
         direction_validation.errorTitle = "Invalid Direction"
@@ -1376,7 +1382,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(direction_validation)
         direction_validation.add("E2:E5000")
 
-        active_validation = DataValidation(type="list", formula1="=$K$1:$K$2", allow_blank=True)
+        active_validation = DataValidation(type="list", formula1="=$L$1:$L$2", allow_blank=True)
         active_validation.promptTitle = "Active"
         active_validation.prompt = "Choose TRUE or FALSE."
         active_validation.errorTitle = "Invalid Active Value"
@@ -1384,7 +1390,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(active_validation)
         active_validation.add("G2:G5000")
 
-        match_type_validation = DataValidation(type="list", formula1="=$L$1:$L$3", allow_blank=True)
+        match_type_validation = DataValidation(type="list", formula1="=$M$1:$M$3", allow_blank=True)
         match_type_validation.promptTitle = "Match Type"
         match_type_validation.prompt = "Choose CONTAINS, STARTSWITH, or EXACT."
         match_type_validation.errorTitle = "Invalid Match Type"
@@ -1464,25 +1470,33 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         if (
             custom_col
             and desc_col
+            and global_cat_col
             and not disable_client_specific_formula_for_diagnostics
         ):
             desc_letter = get_column_letter(desc_col)
+            global_letter = get_column_letter(global_cat_col)
             priority_rng = "'Custom Rules'!$A$2:$A$5000"
             category_rng = "'Custom Rules'!$B$2:$B$5000"
             matchtype_rng = "'Custom Rules'!$C$2:$C$5000"
             pattern_rng = "'Custom Rules'!$D$2:$D$5000"
             active_rng = "'Custom Rules'!$G$2:$G$5000"
+            global_filter_rng = "'Custom Rules'!$J$2:$J$5000"
             for r in range(2, max_r + 1):
                 desc_ref = f"{desc_letter}{r}"
+                global_ref = f"{global_letter}{r}"
                 match_expr = (
                     f"(({matchtype_rng}=\"STARTSWITH\")*(LEFT(LOWER({desc_ref}),LEN(LOWER({pattern_rng})))=LOWER({pattern_rng})))"
                     f"+(({matchtype_rng}=\"EXACT\")*(LOWER({desc_ref})=LOWER({pattern_rng})))"
                     f"+((({matchtype_rng}=\"CONTAINS\")+({matchtype_rng}=\"\"))*ISNUMBER(SEARCH({pattern_rng},{desc_ref})))"
                 )
+                has_any = f"((({pattern_rng}<>\"\")+({global_filter_rng}<>\"\"))>0)"
+                desc_ok = f"((({pattern_rng}=\"\")+(({match_expr})>0))>0)"
+                global_ok = f"((({global_filter_rng}=\"\")+(LOWER(TRIM({global_filter_rng}))=LOWER(TRIM({global_ref}))))>0)"
                 cond_expr = (
                     f"(({active_rng}=TRUE)+({active_rng}=\"\"))"
-                    f"*({pattern_rng}<>\"\")"
-                    f"*(({match_expr})>0)"
+                    f"*{has_any}"
+                    f"*{desc_ok}"
+                    f"*{global_ok}"
                 )
                 custom_formula = (
                     f"=IFERROR(INDEX({category_rng},"
