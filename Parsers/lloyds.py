@@ -1,5 +1,5 @@
-# Version: lloyds-1.3.py
-"""lloyds-1.3.py
+# Version: lloyds-1.4.py
+"""lloyds-1.4.py
 
 Lloyds Bank (UK) Business Account statement parser (text-based PDFs, NO OCR).
 
@@ -677,7 +677,11 @@ def extract_transactions(pdf_path: str) -> List[Dict]:
                         # If Type appears later in the same line, split it out
                         split = re.split(r"\bType\b\s+", desc_tail, maxsplit=1)
                         if split:
-                            cur_desc_parts.append(split[0].strip(" ."))
+                            part = split[0].strip()
+                            if part == ".":
+                                cur_desc_parts.append(".")
+                            else:
+                                cur_desc_parts.append(part.strip(" ."))
                             if len(split) > 1:
                                 # We have inline type + money/balance
                                 rest = "Type " + split[1]
@@ -694,7 +698,11 @@ def extract_transactions(pdf_path: str) -> List[Dict]:
                     continue
 
                 if s.startswith("Description "):
-                    cur_desc_parts.append(s.replace("Description ", "", 1).strip(" ."))
+                    part = s.replace("Description ", "", 1).strip()
+                    if part == ".":
+                        cur_desc_parts.append(".")
+                    else:
+                        cur_desc_parts.append(part.strip(" ."))
                     continue
 
                 if s == "Type":
