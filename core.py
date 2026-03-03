@@ -1,4 +1,4 @@
-# Version: 2.51
+# Version: 2.52
 import os
 import glob
 import gc
@@ -1342,29 +1342,25 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws_rules.freeze_panes = "A2"
             ws_rules["A13"] = "Sort the table by Priority (smallest first). First matching rule wins."
 
-            ws_rules["K1"] = "ANY"
-            ws_rules["K2"] = "DEBIT"
-            ws_rules["K3"] = "CREDIT"
-            ws_rules["L1"] = True
-            ws_rules["L2"] = False
-            ws_rules["M1"] = "CONTAINS"
-            ws_rules["M2"] = "STARTSWITH"
-            ws_rules["M3"] = "EXACT"
-            ws_rules.column_dimensions["K"].hidden = True
-            ws_rules.column_dimensions["L"].hidden = True
-            ws_rules.column_dimensions["M"].hidden = True
+        ws_dv = wb["_DV"] if "_DV" in wb.sheetnames else wb.create_sheet("_DV")
+        ws_dv.sheet_state = "hidden"
+        ws_dv["A1"] = "ANY"
+        ws_dv["A2"] = "DEBIT"
+        ws_dv["A3"] = "CREDIT"
+        ws_dv["B1"] = True
+        ws_dv["B2"] = False
+        ws_dv["C1"] = "CONTAINS"
+        ws_dv["C2"] = "STARTSWITH"
+        ws_dv["C3"] = "EXACT"
 
-        ws_rules["K1"] = "ANY"
-        ws_rules["K2"] = "DEBIT"
-        ws_rules["K3"] = "CREDIT"
-        ws_rules["L1"] = True
-        ws_rules["L2"] = False
-        ws_rules["M1"] = "CONTAINS"
-        ws_rules["M2"] = "STARTSWITH"
-        ws_rules["M3"] = "EXACT"
-        ws_rules.column_dimensions["K"].hidden = True
-        ws_rules.column_dimensions["L"].hidden = True
-        ws_rules.column_dimensions["M"].hidden = True
+        ws_rules["K1"] = None
+        ws_rules["K2"] = None
+        ws_rules["K3"] = None
+        ws_rules["L1"] = None
+        ws_rules["L2"] = None
+        ws_rules["M1"] = None
+        ws_rules["M2"] = None
+        ws_rules["M3"] = None
 
         priority_validation = DataValidation(type="whole", allow_blank=True)
         priority_validation.promptTitle = "Priority"
@@ -1374,7 +1370,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(priority_validation)
         priority_validation.add("A2:A5000")
 
-        direction_validation = DataValidation(type="list", formula1="=$K$1:$K$3", allow_blank=True)
+        direction_validation = DataValidation(type="list", formula1="='_DV'!$A$1:$A$3", allow_blank=True)
         direction_validation.promptTitle = "Direction"
         direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
         direction_validation.errorTitle = "Invalid Direction"
@@ -1382,7 +1378,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(direction_validation)
         direction_validation.add("E2:E5000")
 
-        active_validation = DataValidation(type="list", formula1="=$L$1:$L$2", allow_blank=True)
+        active_validation = DataValidation(type="list", formula1="='_DV'!$B$1:$B$2", allow_blank=True)
         active_validation.promptTitle = "Active"
         active_validation.prompt = "Choose TRUE or FALSE."
         active_validation.errorTitle = "Invalid Active Value"
@@ -1390,7 +1386,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
         ws_rules.add_data_validation(active_validation)
         active_validation.add("G2:G5000")
 
-        match_type_validation = DataValidation(type="list", formula1="=$M$1:$M$3", allow_blank=True)
+        match_type_validation = DataValidation(type="list", formula1="='_DV'!$C$1:$C$3", allow_blank=True)
         match_type_validation.promptTitle = "Match Type"
         match_type_validation.prompt = "Choose CONTAINS, STARTSWITH, or EXACT."
         match_type_validation.errorTitle = "Invalid Match Type"
