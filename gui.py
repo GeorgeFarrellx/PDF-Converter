@@ -1,4 +1,4 @@
-# Version: 2.19
+# Version: 2.20
 import os
 import re
 import shutil
@@ -3339,7 +3339,9 @@ class App(TkinterDnD.Tk):
 
             coverage_period = ""
             try:
-                if date_min and date_max:
+                if statement_period_start and statement_period_end:
+                    coverage_period = f"{statement_period_start.strftime('%d/%m/%Y')} to {statement_period_end.strftime('%d/%m/%Y')}"
+                elif date_min and date_max:
                     coverage_period = f"{date_min.strftime('%d/%m/%Y')} to {date_max.strftime('%d/%m/%Y')}"
             except Exception:
                 coverage_period = ""
