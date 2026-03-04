@@ -549,6 +549,9 @@ def extract_transactions(pdf_path: str) -> List[dict]:
                 money_out = _find_number_in_tokens(out_tokens)
                 balance = _find_number_in_tokens(bal_tokens)
                 desc = _join_description(desc_tokens)
+                if (not desc) and any((tok or "").strip() == "." for tok in desc_tokens):
+                    if (money_in is not None) or (money_out is not None) or (balance is not None) or (type_code is not None):
+                        desc = "."
 
                 has_amt = (money_in is not None) or (money_out is not None)
                 has_any = has_amt or (balance is not None) or (type_code is not None)
