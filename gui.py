@@ -1,4 +1,4 @@
-# Version: 2.18
+# Version: 2.19
 import os
 import re
 import shutil
@@ -2279,14 +2279,25 @@ class App(TkinterDnD.Tk):
     def _cleanup_removed_zip_files(self, removed_paths: list[str]) -> None:
         candidate_dirs = set()
         for path in (removed_paths or []):
-            temp_dir = self._zip_extracted_file_to_dir.pop(path, "")
+            temp_dir = self._zip_extracted_file_to_dir.get(path, "")
             if temp_dir:
                 candidate_dirs.add(temp_dir)
             try:
-                if os.path.exists(path):
+                abs_path = os.path.abspath(path)
+                abs_temp_dir = os.path.abspath(temp_dir) if temp_dir else ""
+                in_temp_dir = False
+                if abs_temp_dir:
+                    try:
+                        in_temp_dir = os.path.commonpath([abs_path, abs_temp_dir]) == abs_temp_dir
+                    except Exception:
+                        in_temp_dir = False
+
+                # Only delete ZIP-extracted temp copies; never delete user-selected source PDFs.
+                if path in self._zip_extracted_file_to_dir and in_temp_dir and os.path.exists(path):
                     os.remove(path)
             except Exception:
                 pass
+            self._zip_extracted_file_to_dir.pop(path, None)
 
         for temp_dir in candidate_dirs:
             if temp_dir not in self._zip_extracted_file_to_dir.values():
