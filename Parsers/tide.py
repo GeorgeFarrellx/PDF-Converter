@@ -138,6 +138,7 @@ def _finalize_txn(txn: dict, out: list[dict]) -> None:
 def extract_transactions(pdf_path: str) -> list[dict]:
     balances = extract_statement_balances(pdf_path)
     start_balance = balances.get("start_balance")
+    end_balance = balances.get("end_balance")
 
     txns: list[dict] = []
     pending_prefix: list[str] = []
@@ -245,26 +246,39 @@ def extract_transactions(pdf_path: str) -> list[dict]:
 
     first_date = txns[0].get("Date")
     last_date = txns[-1].get("Date")
-    reverse_order = bool(first_date and last_date and first_date >= last_date)
+    reverse_order = False
+
+    first_balance = txns[0].get("Balance")
+    last_balance = txns[-1].get("Balance")
+    if end_balance is not None:
+        first_matches_end = first_balance is not None and abs(float(first_balance) - float(end_balance)) <= 0.01
+        last_matches_end = last_balance is not None and abs(float(last_balance) - float(end_balance)) <= 0.01
+        if first_matches_end and not last_matches_end:
+            reverse_order = True
+        elif last_matches_end and not first_matches_end:
+            reverse_order = False
+        elif first_date and last_date and first_date > last_date:
+            reverse_order = True
+        elif first_date and last_date and first_date < last_date:
+            reverse_order = False
+    elif first_date and last_date and first_date > last_date:
+        reverse_order = True
+    elif first_date and last_date and first_date < last_date:
+        reverse_order = False
 
     if reverse_order:
-        for i in range(0, len(txns) - 1):
-            b0 = txns[i].get("Balance")
-            b1 = txns[i + 1].get("Balance")
-            if b0 is not None and b1 is not None:
-                txns[i]["Amount"] = round(b0 - b1, 2)
-        blast = txns[-1].get("Balance")
-        if blast is not None and start_balance is not None:
-            txns[-1]["Amount"] = round(blast - start_balance, 2)
-    else:
-        for i in range(1, len(txns)):
-            b0 = txns[i - 1].get("Balance")
-            b1 = txns[i].get("Balance")
-            if b0 is not None and b1 is not None:
-                txns[i]["Amount"] = round(b1 - b0, 2)
-        bfirst = txns[0].get("Balance")
-        if bfirst is not None and start_balance is not None:
-            txns[0]["Amount"] = round(bfirst - start_balance, 2)
+        txns.reverse()
+
+    previous_balance = float(start_balance) if start_balance is not None else None
+    for row in txns:
+        bal = row.get("Balance")
+        if bal is not None and previous_balance is not None:
+            row["Amount"] = round(float(bal) - float(previous_balance), 2)
+            previous_balance = float(bal)
+        else:
+            row["Amount"] = None
+            if bal is not None:
+                previous_balance = float(bal)
 
     for row in txns:
         if row.get("Amount") is not None:
