@@ -120,6 +120,41 @@ def _is_merchant_prefix(line: str) -> bool:
     return (" - " in line) or mostly_upper
 
 
+def _split_type_and_desc(remainder: str) -> tuple[str, str]:
+    raw = (remainder or "").strip()
+    normalized = re.sub(r"\s+", " ", raw).strip()
+    if not normalized:
+        return ("", "")
+
+    known_types = [
+        "Own Account Transfer",
+        "International Transfer",
+        "Domestic Transfer",
+        "Card Transaction",
+        "Direct Debit",
+        "Standing Order",
+        "Bank Transfer",
+        "Cash Withdrawal",
+        "Transfer",
+        "Fee",
+    ]
+
+    lowered = normalized.lower()
+    for tx_type in known_types:
+        prefix = tx_type.lower()
+        if lowered == prefix or lowered.startswith(prefix + " "):
+            desc = normalized[len(tx_type) :].strip()
+            return (tx_type, desc)
+
+    if "  " in raw:
+        tx_type, desc = raw.split("  ", 1)
+    else:
+        pieces = raw.split(" ", 1)
+        tx_type = pieces[0]
+        desc = pieces[1] if len(pieces) > 1 else ""
+    return (tx_type.strip(), desc.strip())
+
+
 def _finalize_txn(txn: dict, out: list[dict]) -> None:
     if not txn:
         return
@@ -187,15 +222,7 @@ def extract_transactions(pdf_path: str) -> list[dict]:
                             balance = _to_float(tail.group(2))
                             remainder = remainder[: tail.start()].strip()
 
-                        if remainder:
-                            if "  " in remainder:
-                                tx_type, desc = remainder.split("  ", 1)
-                            else:
-                                pieces = remainder.split(" ", 1)
-                                tx_type = pieces[0]
-                                desc = pieces[1] if len(pieces) > 1 else ""
-                        else:
-                            tx_type, desc = "", ""
+                        tx_type, desc = _split_type_and_desc(remainder)
 
                         desc_parts = []
                         if pending_prefix:
