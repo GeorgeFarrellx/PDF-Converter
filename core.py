@@ -1221,7 +1221,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
     left_text = (client_name or "").strip()
     right_text = period
 
-    def _post_write_formatting(wb, ws):
+    def _post_write_formatting(wb, ws, template_in_use: bool):
         center_text = "Transaction Data"
 
         for hdr in (ws.oddHeader, ws.evenHeader, ws.firstHeader):
@@ -1347,57 +1347,59 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             ws_rules.freeze_panes = "A2"
             ws_rules["A13"] = "Sort the table by Priority (smallest first). First matching rule wins."
 
-        ws_dv = wb["_DV"] if "_DV" in wb.sheetnames else wb.create_sheet("_DV")
-        ws_dv.sheet_state = "hidden"
-        ws_dv["A1"] = "ANY"
-        ws_dv["A2"] = "DEBIT"
-        ws_dv["A3"] = "CREDIT"
-        ws_dv["B1"] = True
-        ws_dv["B2"] = False
-        ws_dv["C1"] = "CONTAINS"
-        ws_dv["C2"] = "STARTSWITH"
-        ws_dv["C3"] = "EXACT"
+        # Data validation is owned by ExcelTemplate.xlsx when a template is in use.
+        if not template_in_use:
+            ws_dv = wb["_DV"] if "_DV" in wb.sheetnames else wb.create_sheet("_DV")
+            ws_dv.sheet_state = "hidden"
+            ws_dv["A1"] = "ANY"
+            ws_dv["A2"] = "DEBIT"
+            ws_dv["A3"] = "CREDIT"
+            ws_dv["B1"] = True
+            ws_dv["B2"] = False
+            ws_dv["C1"] = "CONTAINS"
+            ws_dv["C2"] = "STARTSWITH"
+            ws_dv["C3"] = "EXACT"
 
-        ws_rules["K1"] = None
-        ws_rules["K2"] = None
-        ws_rules["K3"] = None
-        ws_rules["L1"] = None
-        ws_rules["L2"] = None
-        ws_rules["M1"] = None
-        ws_rules["M2"] = None
-        ws_rules["M3"] = None
+            ws_rules["K1"] = None
+            ws_rules["K2"] = None
+            ws_rules["K3"] = None
+            ws_rules["L1"] = None
+            ws_rules["L2"] = None
+            ws_rules["M1"] = None
+            ws_rules["M2"] = None
+            ws_rules["M3"] = None
 
-        priority_validation = DataValidation(type="whole", allow_blank=True)
-        priority_validation.promptTitle = "Priority"
-        priority_validation.prompt = "Enter a whole number."
-        priority_validation.errorTitle = "Invalid Priority"
-        priority_validation.error = "Priority must be a whole number."
-        ws_rules.add_data_validation(priority_validation)
-        priority_validation.add("A2:A5000")
+            priority_validation = DataValidation(type="whole", allow_blank=True)
+            priority_validation.promptTitle = "Priority"
+            priority_validation.prompt = "Enter a whole number."
+            priority_validation.errorTitle = "Invalid Priority"
+            priority_validation.error = "Priority must be a whole number."
+            ws_rules.add_data_validation(priority_validation)
+            priority_validation.add("A2:A5000")
 
-        direction_validation = DataValidation(type="list", formula1="='_DV'!$A$1:$A$3", allow_blank=True)
-        direction_validation.promptTitle = "Direction"
-        direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
-        direction_validation.errorTitle = "Invalid Direction"
-        direction_validation.error = "Select a value from the Direction dropdown."
-        ws_rules.add_data_validation(direction_validation)
-        direction_validation.add("E2:E5000")
+            direction_validation = DataValidation(type="list", formula1="='_DV'!$A$1:$A$3", allow_blank=True)
+            direction_validation.promptTitle = "Direction"
+            direction_validation.prompt = "Choose ANY, DEBIT, or CREDIT."
+            direction_validation.errorTitle = "Invalid Direction"
+            direction_validation.error = "Select a value from the Direction dropdown."
+            ws_rules.add_data_validation(direction_validation)
+            direction_validation.add("E2:E5000")
 
-        active_validation = DataValidation(type="list", formula1="='_DV'!$B$1:$B$2", allow_blank=True)
-        active_validation.promptTitle = "Active"
-        active_validation.prompt = "Choose TRUE or FALSE."
-        active_validation.errorTitle = "Invalid Active Value"
-        active_validation.error = "Select TRUE or FALSE from the Active dropdown."
-        ws_rules.add_data_validation(active_validation)
-        active_validation.add("G2:G5000")
+            active_validation = DataValidation(type="list", formula1="='_DV'!$B$1:$B$2", allow_blank=True)
+            active_validation.promptTitle = "Active"
+            active_validation.prompt = "Choose TRUE or FALSE."
+            active_validation.errorTitle = "Invalid Active Value"
+            active_validation.error = "Select TRUE or FALSE from the Active dropdown."
+            ws_rules.add_data_validation(active_validation)
+            active_validation.add("G2:G5000")
 
-        match_type_validation = DataValidation(type="list", formula1="='_DV'!$C$1:$C$3", allow_blank=True)
-        match_type_validation.promptTitle = "Match Type"
-        match_type_validation.prompt = "Choose CONTAINS, STARTSWITH, or EXACT."
-        match_type_validation.errorTitle = "Invalid Match Type"
-        match_type_validation.error = "Select a value from the Match Type dropdown."
-        ws_rules.add_data_validation(match_type_validation)
-        match_type_validation.add("C2:C5000")
+            match_type_validation = DataValidation(type="list", formula1="='_DV'!$C$1:$C$3", allow_blank=True)
+            match_type_validation.promptTitle = "Match Type"
+            match_type_validation.prompt = "Choose CONTAINS, STARTSWITH, or EXACT."
+            match_type_validation.errorTitle = "Invalid Match Type"
+            match_type_validation.error = "Select a value from the Match Type dropdown."
+            ws_rules.add_data_validation(match_type_validation)
+            match_type_validation.add("C2:C5000")
 
         for hdr in (ws_rules.oddHeader, ws_rules.evenHeader, ws_rules.firstHeader):
             hdr.left.text = left_text
@@ -1663,7 +1665,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             for col_idx, value in enumerate(row_vals, start=1):
                 ws.cell(row=row_idx, column=col_idx).value = value
 
-        _post_write_formatting(wb, ws)
+        _post_write_formatting(wb, ws, template_in_use=True)
         wb.save(output_path)
     else:
         with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
@@ -1674,7 +1676,7 @@ def save_transactions_to_excel(transactions: list[dict], output_path: str, clien
             df.to_excel(writer, index=False, sheet_name="Transaction Data")
 
             ws = writer.sheets["Transaction Data"]
-            _post_write_formatting(wb, ws)
+            _post_write_formatting(wb, ws, template_in_use=False)
 
     try:
         _strip_calc_chain_xlsx(output_path)
